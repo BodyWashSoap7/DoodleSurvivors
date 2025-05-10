@@ -45,6 +45,7 @@ let selectedConfirmOption = 0; // 0 = 예, 1 = 아니오
 let confirmDialogType = ""; // 어떤 확인 대화상자인지 구분
 
 // Player object
+// 플레이어 객체 수정 - 색상 대신 캐릭터 타입 사용
 const player = {
     x: 0,
     y: 0,
@@ -57,73 +58,34 @@ const player = {
     nextLevelExp: 100,
     prevLevelExp: 0,
     weapons: [],
-    characterType: 1,
-    image: null,
-    
-    // 애니메이션 관련 속성 추가
-    currentAnimation: 'idle', // 'idle' 또는 'walk'
-    frameIndex: 0,
-    frameTime: 0,
-    frameDelay: 100, // 프레임 전환 시간 (밀리초)
-    
-    // 스프라이트 시트 정보
-    idleFrames: 4, // idle 애니메이션 프레임 수
-    walkFrames: 6, // walk 애니메이션 프레임 수
-    spriteWidth: 32, // 각 프레임의 가로 크기
-    spriteHeight: 32, // 각 프레임의 세로 크기
-    
-    // 방향
-    direction: 'right', // 'left' 또는 'right'
-    isMoving: false
+    characterType: 1, // 기본 캐릭터 (1, 2, 3 중 하나)
+    image: null     // 이미지 객체는 선택에 따라 할당됨
 };
 
 // 플레이어 캐릭터 이미지 배열 생성 (색상 배열 대체)
 const playerImages = [
-    { 
-        name: '캐릭터 1', 
-        idleImage: new Image(),
-        walkImage: new Image()
-    },
-    { 
-        name: '캐릭터 2', 
-        idleImage: new Image(),
-        walkImage: new Image()
-    },
-    { 
-        name: '캐릭터 3', 
-        idleImage: new Image(),
-        walkImage: new Image()
-    }
+    { name: '캐릭터 1', image: new Image() },
+    { name: '캐릭터 2', image: new Image() },
+    { name: '캐릭터 3', image: new Image() }
 ];
 
 // 선택된 캐릭터 인덱스 (0, 1, 2 중 하나)
 let currentCharacterIndex = 0;
 let previousCharacterIndex = 0;
 
-// 이미지 리소스 로딩
+// 이미지 리소스 로딩 - 3개의 캐릭터 이미지 로드
 function loadCharacterImages() {
-    // 캐릭터 1
-    playerImages[0].idleImage.src = 'player1_idle.png';
-    playerImages[0].walkImage.src = 'player1_walk.png';
-    
-    // 캐릭터 2
-    playerImages[1].idleImage.src = 'player2_idle.png';
-    playerImages[1].walkImage.src = 'player2_walk.png';
-    
-    // 캐릭터 3
-    playerImages[2].idleImage.src = 'player3_idle.png';
-    playerImages[2].walkImage.src = 'player3_walk.png';
+    playerImages[0].image.src = './img/player1.png';
+    playerImages[1].image.src = './img/player2.png';
+    playerImages[2].image.src = './img/player3.png';
     
     // 첫 번째 캐릭터로 기본 설정
-    player.image = playerImages[0].idleImage;
+    player.image = playerImages[0].image;
     
     // 이미지 로드 확인용 로그
     playerImages.forEach((character, index) => {
-        character.idleImage.onload = function() {
-            console.log(`캐릭터 ${index + 1} idle 이미지 로드 완료`);
-        };
-        character.walkImage.onload = function() {
-            console.log(`캐릭터 ${index + 1} walk 이미지 로드 완료`);
+        character.image.onload = function() {
+            console.log(`캐릭터 ${index + 1} 이미지 로드 완료`);
         };
     });
 }
@@ -209,14 +171,16 @@ document.addEventListener('keydown', (e) => {
     // 설정 화면 네비게이션
     else if (currentGameState === GAME_STATE.SETTINGS) {
         if (e.key === 'ArrowLeft') {
+            // 이전 캐릭터로
             currentCharacterIndex = (currentCharacterIndex - 1 + playerImages.length) % playerImages.length;
-            player.characterType = currentCharacterIndex + 1;
-            player.image = playerImages[currentCharacterIndex].idleImage; // idle 이미지로 설정
+            player.characterType = currentCharacterIndex + 1; // 1, 2, 3 값 저장
+            player.image = playerImages[currentCharacterIndex].image;
             e.preventDefault();
         } else if (e.key === 'ArrowRight') {
+            // 다음 캐릭터로
             currentCharacterIndex = (currentCharacterIndex + 1) % playerImages.length;
-            player.characterType = currentCharacterIndex + 1;
-            player.image = playerImages[currentCharacterIndex].idleImage; // idle 이미지로 설정
+            player.characterType = currentCharacterIndex + 1; // 1, 2, 3 값 저장
+            player.image = playerImages[currentCharacterIndex].image;
             e.preventDefault();
         } else if (e.key === 'Enter') {
             // 캐릭터 바뀐 채 시작 화면으로 돌아가기
@@ -699,31 +663,6 @@ function drawSettingsScreen() {
     ctx.fillText('ESC를 눌러 취소', canvas.width / 2, canvas.height * 3/4 + 50);
 }
 
-// 애니메이션 업데이트 함수 추가
-function updatePlayerAnimation() {
-    // 프레임 시간 업데이트
-    player.frameTime += 16; // 약 60 FPS 기준
-    
-    // 프레임 전환
-    if (player.frameTime >= player.frameDelay) {
-        player.frameTime = 0;
-        
-        if (player.currentAnimation === 'idle') {
-            player.frameIndex = (player.frameIndex + 1) % player.idleFrames;
-        } else if (player.currentAnimation === 'walk') {
-            player.frameIndex = (player.frameIndex + 1) % player.walkFrames;
-        }
-    }
-    
-    // 현재 애니메이션에 맞는 이미지 설정
-    const currentCharacter = playerImages[currentCharacterIndex];
-    if (player.currentAnimation === 'idle') {
-        player.image = currentCharacter.idleImage;
-    } else if (player.currentAnimation === 'walk') {
-        player.image = currentCharacter.walkImage;
-    }
-}
-
 // Update Game State
 // Cache previous values to avoid unnecessary DOM updates
 let lastHealth = player.health;
@@ -731,52 +670,27 @@ let lastLevel = player.level;
 let lastScore = score;
 let lastExp = player.exp;
 
+// update 함수를 수정합니다 - 플레이어 움직임과 상관없이 항상 자동 조준 업데이트
 function update() {
     // Move Player
     let playerMoved = false;
-    let oldX = player.x;
-    let oldY = player.y;
-    
     if (keys['ArrowUp']) { player.y -= player.speed; playerMoved = true; }
     if (keys['ArrowDown']) { player.y += player.speed; playerMoved = true; }
-    if (keys['ArrowLeft']) { 
-        player.x -= player.speed; 
-        playerMoved = true;
-        player.direction = 'left';
-    }
-    if (keys['ArrowRight']) { 
-        player.x += player.speed; 
-        playerMoved = true;
-        player.direction = 'right';
-    }
+    if (keys['ArrowLeft']) { player.x -= player.speed; playerMoved = true; }
+    if (keys['ArrowRight']) { player.x += player.speed; playerMoved = true; }
     
-    // 애니메이션 상태 업데이트
+    // 플레이어가 움직였을 때만 청크를 생성
     if (playerMoved) {
-        if (player.currentAnimation !== 'walk') {
-            player.currentAnimation = 'walk';
-            player.frameIndex = 0;
-            player.frameTime = 0;
-        }
-        player.isMoving = true;
-    } else {
-        if (player.currentAnimation !== 'idle') {
-            player.currentAnimation = 'idle';
-            player.frameIndex = 0;
-            player.frameTime = 0;
-        }
-        player.isMoving = false;
-    }
-    
-    // 애니메이션 업데이트
-    updatePlayerAnimation();
-    
-    // 나머지 update 로직은 동일...
-    if (playerMoved) {
+        // Generate chunks around the player
         generateChunksAroundPlayer();
     }
-    
+    // 적 스폰 로직 실행
     spawnEnemyAroundPlayer();
+    
+    // 플레이어 움직임과 상관없이 항상 가장 가까운 적을 조준
     updatePlayerAim();
+    
+    // Auto-fire at the nearest enemy (no spacebar needed)
     autoFireAtNearestEnemy();
 
     // Update Weapons
@@ -891,44 +805,35 @@ function draw() {
         bullet.draw(offsetX, offsetY);
     });
 
-    // 플레이어 스프라이트 애니메이션 그리기
+    // 플레이어 그리기 (색상 적용 대신 선택된 캐릭터 이미지 사용)
     if (player.image && player.image.complete) {
-        const playerDrawSize = player.size * 3; // 화면에 그릴 크기
+        // 이미지가 로드된 경우 이미지 그리기
+        const playerSize = player.size * 2; // 이미지 크기 조정
         
-        // 스프라이트 시트에서 현재 프레임의 위치 계산
-        const frameX = player.frameIndex * player.spriteWidth;
-        const frameY = 0; // 단일 행 스프라이트 시트 가정
-        
+        // 상태 저장
         ctx.save();
         
-        // 방향에 따라 스프라이트 뒤집기
-        if (player.direction === 'left') {
-            ctx.translate(canvas.width / 2 + playerDrawSize, canvas.height / 2);
-            ctx.scale(-1, 1);
-            ctx.translate(-playerDrawSize, -playerDrawSize);
-        } else {
-            ctx.translate(canvas.width / 2 - playerDrawSize, canvas.height / 2 - playerDrawSize);
-        }
-        
-        // 스프라이트 프레임 그리기
+        // 투명도를 유지하며 이미지 그리기
+        ctx.globalCompositeOperation = 'source-over';
         ctx.drawImage(
             player.image,
-            frameX, frameY, // 소스 이미지에서의 위치
-            player.spriteWidth, player.spriteHeight, // 소스 이미지에서의 크기
-            0, 0, // 캔버스에서의 위치
-            playerDrawSize * 2, playerDrawSize * 2 // 캔버스에서의 크기
+            canvas.width / 2 - playerSize,
+            canvas.height / 2 - playerSize,
+            playerSize * 2,
+            playerSize * 2
         );
         
+        // 상태 복원
         ctx.restore();
     } else {
         // 이미지가 로드되지 않은 경우 기존 원 그리기 (대체용)
-        ctx.fillStyle = 'white';
+        ctx.fillStyle = 'white'; // 기본 흰색 사용
         ctx.beginPath();
         ctx.arc(canvas.width / 2, canvas.height / 2, player.size, 0, Math.PI * 2);
         ctx.fill();
     }
     
-    // 플레이어 방향 표시기 그리기
+    // 플레이어 방향 표시기 그리기 (이전과 동일)
     if (player.aimAngle !== undefined) {
         const indicatorLength = player.size * 1.2;
         ctx.strokeStyle = 'cyan';
@@ -941,6 +846,14 @@ function draw() {
         );
         ctx.stroke();
     }
+
+    /*
+    // Draw controls help
+    ctx.fillStyle = 'white';
+    ctx.font = '14px Arial';
+    ctx.textAlign = 'left';
+    ctx.fillText('방향키: 이동, 스페이스바: 발사', 10, canvas.height - 10);
+    */
 }
 
 function drawGameOverScreen() {
