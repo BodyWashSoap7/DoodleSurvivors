@@ -714,11 +714,25 @@ let lastExp = player.exp;
 // update 함수를 수정합니다 - 플레이어 움직임과 상관없이 항상 자동 조준 업데이트
 function update() {
     // Move Player
+    let dx = 0;
+    let dy = 0;
     let playerMoved = false;
-    if (keys['ArrowUp']) { player.y -= player.speed; playerMoved = true; }
-    if (keys['ArrowDown']) { player.y += player.speed; playerMoved = true; }
-    if (keys['ArrowLeft']) { player.x -= player.speed; playerMoved = true; }
-    if (keys['ArrowRight']) { player.x += player.speed; playerMoved = true; }
+    
+    // 이동 방향 벡터 계산
+    if (keys['ArrowUp']) { dy -= 1; }
+    if (keys['ArrowDown']) { dy += 1; }
+    if (keys['ArrowLeft']) { dx -= 1; }
+    if (keys['ArrowRight']) { dx += 1; }
+    
+    // 벡터 정규화
+    if (dx !== 0 || dy !== 0) {
+        playerMoved = true;
+        const magnitude = Math.sqrt(dx * dx + dy * dy);
+        dx = (dx / magnitude) * player.speed;
+        dy = (dy / magnitude) * player.speed;
+        player.x += dx;
+        player.y += dy;
+    }
     
     // 애니메이션 상태 업데이트
     if (playerMoved && player.animationState === 'idle') {
