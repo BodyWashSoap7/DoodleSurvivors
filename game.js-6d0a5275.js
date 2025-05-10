@@ -45,7 +45,7 @@ let selectedConfirmOption = 0; // 0 = 예, 1 = 아니오
 let confirmDialogType = ""; // 어떤 확인 대화상자인지 구분
 
 // Player object
-// 플레이어 객체 수정 - 색상 대신 캐릭터 타입 사용
+// 플레이어 객체
 const player = {
     x: 0,
     y: 0,
@@ -58,34 +58,66 @@ const player = {
     nextLevelExp: 100,
     prevLevelExp: 0,
     weapons: [],
-    characterType: 1, // 기본 캐릭터 (1, 2, 3 중 하나)
-    image: null     // 이미지 객체는 선택에 따라 할당됨
+    characterType: 1,
+    image: null,
+    
+    // 애니메이션 관련 속성 추가
+    animationState: 'idle', // 'idle' or 'walking'
+    currentFrame: 0,
+    frameCount: 4, // 스프라이트 시트의 프레임 수 (예: idle 4프레임, walking 4프레임)
+    frameTime: 0,
+    frameDuration: 150, // 각 프레임 지속 시간 (밀리초)
+    spriteWidth: 32, // 스프라이트 한 프레임의 너비
+    spriteHeight: 32, // 스프라이트 한 프레임의 높이
+    lastMovementState: false // 이동 상태 추적용
 };
 
-// 플레이어 캐릭터 이미지 배열 생성 (색상 배열 대체)
+// 플레이어 캐릭터 이미지 배열 수정 - 스프라이트 시트 정보 추가
 const playerImages = [
-    { name: '캐릭터 1', image: new Image() },
-    { name: '캐릭터 2', image: new Image() },
-    { name: '캐릭터 3', image: new Image() }
+    { 
+        name: '캐릭터 1', 
+        image: new Image(),
+        spriteWidth: 32, // 각 캐릭터별 스프라이트 크기 설정 가능
+        spriteHeight: 32,
+        frameCount: 4
+    },
+    { 
+        name: '캐릭터 2', 
+        image: new Image(),
+        spriteWidth: 32,
+        spriteHeight: 32,
+        frameCount: 4
+    },
+    { 
+        name: '캐릭터 3', 
+        image: new Image(),
+        spriteWidth: 32,
+        spriteHeight: 32,
+        frameCount: 4
+    }
 ];
 
 // 선택된 캐릭터 인덱스 (0, 1, 2 중 하나)
 let currentCharacterIndex = 0;
 let previousCharacterIndex = 0;
 
-// 이미지 리소스 로딩 - 3개의 캐릭터 이미지 로드
+// 이미지 리소스 로딩 수정 - 스프라이트 시트 로드
 function loadCharacterImages() {
-    playerImages[0].image.src = './img/player1.png';
-    playerImages[1].image.src = './img/player2.png';
-    playerImages[2].image.src = './img/player3.png';
+    // 스프라이트 시트 이미지 경로 (idle과 walking이 포함된 이미지)
+    playerImages[0].image.src = './img/player1_sprites.png';
+    playerImages[1].image.src = './img/player2_sprites.png';
+    playerImages[2].image.src = './img/player3_sprites.png';
     
     // 첫 번째 캐릭터로 기본 설정
     player.image = playerImages[0].image;
+    player.spriteWidth = playerImages[0].spriteWidth;
+    player.spriteHeight = playerImages[0].spriteHeight;
+    player.frameCount = playerImages[0].frameCount;
     
     // 이미지 로드 확인용 로그
     playerImages.forEach((character, index) => {
         character.image.onload = function() {
-            console.log(`캐릭터 ${index + 1} 이미지 로드 완료`);
+            console.log(`캐릭터 ${index + 1} 스프라이트 시트 로드 완료`);
         };
     });
 }
@@ -168,19 +200,28 @@ document.addEventListener('keydown', (e) => {
             e.preventDefault();
         }
     } 
-    // 설정 화면 네비게이션
+    // 설정 화면에서 캐릭터 변경 시 스프라이트 정보도 업데이트
+    // drawSettingsScreen 함수 내 캐릭터 선택 부분 수정
     else if (currentGameState === GAME_STATE.SETTINGS) {
         if (e.key === 'ArrowLeft') {
             // 이전 캐릭터로
             currentCharacterIndex = (currentCharacterIndex - 1 + playerImages.length) % playerImages.length;
-            player.characterType = currentCharacterIndex + 1; // 1, 2, 3 값 저장
+            player.characterType = currentCharacterIndex + 1;
             player.image = playerImages[currentCharacterIndex].image;
+            // 스프라이트 정보 업데이트
+            player.spriteWidth = playerImages[currentCharacterIndex].spriteWidth;
+            player.spriteHeight = playerImages[currentCharacterIndex].spriteHeight;
+            player.frameCount = playerImages[currentCharacterIndex].frameCount;
             e.preventDefault();
         } else if (e.key === 'ArrowRight') {
             // 다음 캐릭터로
             currentCharacterIndex = (currentCharacterIndex + 1) % playerImages.length;
-            player.characterType = currentCharacterIndex + 1; // 1, 2, 3 값 저장
+            player.characterType = currentCharacterIndex + 1;
             player.image = playerImages[currentCharacterIndex].image;
+            // 스프라이트 정보 업데이트
+            player.spriteWidth = playerImages[currentCharacterIndex].spriteWidth;
+            player.spriteHeight = playerImages[currentCharacterIndex].spriteHeight;
+            player.frameCount = playerImages[currentCharacterIndex].frameCount;
             e.preventDefault();
         } else if (e.key === 'Enter') {
             // 캐릭터 바뀐 채 시작 화면으로 돌아가기
@@ -679,11 +720,30 @@ function update() {
     if (keys['ArrowLeft']) { player.x -= player.speed; playerMoved = true; }
     if (keys['ArrowRight']) { player.x += player.speed; playerMoved = true; }
     
+    // 애니메이션 상태 업데이트
+    if (playerMoved && player.animationState === 'idle') {
+        player.animationState = 'walking';
+        player.currentFrame = 0;
+        player.frameTime = 0;
+    } else if (!playerMoved && player.animationState === 'walking') {
+        player.animationState = 'idle';
+        player.currentFrame = 0;
+        player.frameTime = 0;
+    }
+    
+    // 애니메이션 프레임 업데이트
+    player.frameTime += 16; // 약 60fps 기준
+    if (player.frameTime >= player.frameDuration) {
+        player.frameTime = 0;
+        player.currentFrame = (player.currentFrame + 1) % player.frameCount;
+    }
+    
     // 플레이어가 움직였을 때만 청크를 생성
     if (playerMoved) {
         // Generate chunks around the player
         generateChunksAroundPlayer();
     }
+    
     // 적 스폰 로직 실행
     spawnEnemyAroundPlayer();
     
@@ -805,29 +865,32 @@ function draw() {
         bullet.draw(offsetX, offsetY);
     });
 
-    // 플레이어 그리기 (색상 적용 대신 선택된 캐릭터 이미지 사용)
+    // 플레이어 그리기 - 스프라이트 방식으로 수정
     if (player.image && player.image.complete) {
-        // 이미지가 로드된 경우 이미지 그리기
-        const playerSize = player.size * 2; // 이미지 크기 조정
+        const playerSize = player.size * 2;
         
-        // 상태 저장
+        // 스프라이트 시트에서 현재 프레임 위치 계산
+        const spriteX = player.currentFrame * player.spriteWidth;
+        const spriteY = player.animationState === 'idle' ? 0 : player.spriteHeight; // idle: 0행, walking: 1행
+        
         ctx.save();
-        
-        // 투명도를 유지하며 이미지 그리기
         ctx.globalCompositeOperation = 'source-over';
+        
+        // 스프라이트 시트에서 해당 프레임만 그리기
         ctx.drawImage(
             player.image,
+            spriteX, spriteY, // 스프라이트 시트에서의 위치
+            player.spriteWidth, player.spriteHeight, // 스프라이트 프레임 크기
             canvas.width / 2 - playerSize,
             canvas.height / 2 - playerSize,
             playerSize * 2,
             playerSize * 2
         );
         
-        // 상태 복원
         ctx.restore();
     } else {
         // 이미지가 로드되지 않은 경우 기존 원 그리기 (대체용)
-        ctx.fillStyle = 'white'; // 기본 흰색 사용
+        ctx.fillStyle = 'white';
         ctx.beginPath();
         ctx.arc(canvas.width / 2, canvas.height / 2, player.size, 0, Math.PI * 2);
         ctx.fill();
@@ -846,14 +909,6 @@ function draw() {
         );
         ctx.stroke();
     }
-
-    /*
-    // Draw controls help
-    ctx.fillStyle = 'white';
-    ctx.font = '14px Arial';
-    ctx.textAlign = 'left';
-    ctx.fillText('방향키: 이동, 스페이스바: 발사', 10, canvas.height - 10);
-    */
 }
 
 function drawGameOverScreen() {
@@ -1032,7 +1087,6 @@ function fireWeapon() {
     }
 }
 
-// resetGame 함수 수정 - 색상 대신 캐릭터 타입 유지
 function resetGame() {
     player.x = 0;
     player.y = 0;
@@ -1042,6 +1096,10 @@ function resetGame() {
     player.nextLevelExp = 100;
     player.prevLevelExp = 0;
     player.weapons = [new BasicWeapon()];
+    // 애니메이션 상태 초기화
+    player.animationState = 'idle';
+    player.currentFrame = 0;
+    player.frameTime = 0;
     // characterType과 image는 그대로 유지 (캐릭터 선택 유지)
     bullets = [];
     enemies = [];
@@ -1055,8 +1113,6 @@ function resetGame() {
     levelElement.textContent = `Level: ${player.level}`;
     scoreElement.textContent = `Score: ${score}`;
     expElement.textContent = `EXP: ${player.exp} / ${player.nextLevelExp}`;
-    
-    // 게임 상태 변경은 호출하는 함수에서 처리
 }
 
 function restartGame() {
