@@ -125,7 +125,12 @@ const player = {
     frameDuration: 150, // 각 프레임 지속 시간 (밀리초)
     spriteWidth: 32, // 스프라이트 한 프레임의 너비
     spriteHeight: 32, // 스프라이트 한 프레임의 높이
-    lastMovementState: false // 이동 상태 추적용
+    lastMovementState: false, // 이동 상태 추적용
+
+    // 피격 효과 관련 속성 추가
+    isHit: false,
+    hitStartTime: 0,
+    hitDuration: 500 // 0.5초 동안 빨간색 효과
 };
 
 // 미리보기 애니메이션을 위한 전역 변수
@@ -827,6 +832,14 @@ function update() {
         player.y += dy;
     }
     
+    // 플레이어 피격 상태 업데이트
+    if (player.isHit) {
+        const currentTime = Date.now();
+        if (currentTime - player.hitStartTime >= player.hitDuration) {
+            player.isHit = false;
+        }
+    }
+    
     // 애니메이션 상태 업데이트
     if (playerMoved && player.animationState === 'idle') {
         player.animationState = 'walking';
@@ -950,41 +963,32 @@ function update() {
 
 // Draw Game Objects
 function draw() {
-    // 화면 흔들림 효과 (더 천천히 감소)
-    if (screenShake > 0) {
-        // 흔들림 감소 속도를 더 느리게
-        screenShake *= 0.96; // 기존 0.9에서 0.96으로 변경 (더 천천히 감소)
+    let screenOffsetX = 0;
+    let screenOffsetY = 0;
+    
+    // 단순한 좌우 진동 효과
+    if (screenShakeTime > 0) {
+        // 시간에 따라 좌우로 진동
+        const vibrationSpeed = 0.08; // 진동 속도
+        const time = Date.now() * vibrationSpeed;
         
-        // 시간에 따른 감소도 추가
-        const shakeDecay = Math.max(0, 1 - (Date.now() % screenShakeDuration) / screenShakeDuration);
+        // 좌우로만 진동 (단순한 사인파)
+        screenOffsetX = Math.sin(time) * screenShakeIntensity;
         
-        // 흔들림 강도 계산
-        const currentIntensity = screenShakeIntensity * screenShake * shakeDecay;
+        // 시간이 지나면서 강도 감소
+        const fadeProgress = screenShakeTime / 400;
+        screenOffsetX *= fadeProgress;
         
-        // 랜덤 흔들림 + 사인파 흔들림 조합
-        const time = Date.now() * 0.01;
-        screenShakeX = (Math.random() - 0.5) * currentIntensity + 
-                       Math.sin(time * 1.5) * currentIntensity * 0.3;
-        screenShakeY = (Math.random() - 0.5) * currentIntensity + 
-                       Math.cos(time * 1.7) * currentIntensity * 0.3;
-        
-        // 매우 작은 값이 되면 완전히 0으로
-        if (screenShake < 0.01) {
-            screenShake = 0;
-            screenShakeX = 0;
-            screenShakeY = 0;
-        }
-    } else {
-        screenShakeX = 0;
-        screenShakeY = 0;
+        // 시간 감소
+        screenShakeTime -= 16; // 약 60fps 기준
     }
     
     // Clear Canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     // Calculate camera offset to center the player (흔들림 효과 적용)
-    const offsetX = canvas.width / 2 - player.x + screenShakeX;
-    const offsetY = canvas.height / 2 - player.y + screenShakeY;
+    const offsetX = canvas.width / 2 - player.x + screenOffsetX;
+    const offsetY = canvas.height / 2 - player.y + screenOffsetY;
 
     // Draw Background
     drawBackground(offsetX, offsetY);
@@ -1031,6 +1035,24 @@ function draw() {
             playerSize * 2
         );
         
+        // 피격 상태일 때 빨간색 오버레이 효과
+        if (player.isHit) {
+            ctx.globalCompositeOperation = 'source-atop';
+            
+            // 피격 효과의 진행도 계산 (깜빡임 효과)
+            const currentTime = Date.now();
+            const hitProgress = (currentTime - player.hitStartTime) / player.hitDuration;
+            const blinkSpeed = 10; // 깜빡임 속도
+            const alpha = Math.abs(Math.sin(hitProgress * Math.PI * blinkSpeed)) * 0.8;
+            
+            ctx.fillStyle = `rgba(255, 0, 0, ${alpha})`;
+            ctx.fillRect(
+                canvas.width / 2 - playerSize,
+                canvas.height / 2 - playerSize,
+                playerSize * 2,
+                playerSize * 2
+            );
+        }
         ctx.restore();
     } else {
         // 이미지가 로드되지 않은 경우 기존 원 그리기
@@ -1491,8 +1513,8 @@ let enemySpatialGrid = {};
 let screenShake = 0;
 let screenShakeX = 0;
 let screenShakeY = 0;
+let screenShakeTime = 0; // 흔들림 지속 시간
 let screenShakeIntensity = 0; // 흔들림 강도
-let screenShakeDuration = 0; // 흔들림 지속 시간
 
 // 적들의 공간 분할 그리드 업데이트 함수
 function updateEnemySpatialGrid() {
@@ -2066,6 +2088,10 @@ class Enemy {
             player.health -= this.attackStrength;
             this.lastAttackTime = currentTime;
             
+            // 플레이어 피격 상태 설정
+            player.isHit = true;
+            player.hitStartTime = currentTime;
+            
             // 공격 애니메이션 시작
             this.isAttacking = true;
             this.attackStartTime = currentTime;
@@ -2077,10 +2103,10 @@ class Enemy {
             // 충격파 효과 시작
             this.attackShockwave = 1;
             
-        // 화면 흔들림 효과 (데미지에 비례)
-        screenShake = 2;
-        screenShakeIntensity = Math.min(25, 10 + this.attackStrength * 0.5); // 데미지에 따라 흔들림 강도 조절
-        screenShakeDuration = 1200; // 1.2초 동안 지속
+            // 데미지가 강할수록 흔들림이 더 강하고 길게
+            const damageHealthRatio = this.attackStrength / player.maxHealth;
+            screenShakeTime = 400 + damageHealthRatio * 2000;
+            screenShakeIntensity = 5 + damageHealthRatio * 10;
         }
     }
 
