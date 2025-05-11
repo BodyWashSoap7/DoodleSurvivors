@@ -1048,23 +1048,23 @@ function draw() {
         const spriteX = player.currentFrame * player.spriteWidth;
         const spriteY = player.animationState === 'idle' ? 0 : player.spriteHeight;
         
-        ctx.save();
-        ctx.globalCompositeOperation = 'source-over';
-        
-        // 스프라이트 시트에서 해당 프레임만 그리기
-        ctx.drawImage(
-            player.image,
-            spriteX, spriteY,
-            player.spriteWidth, player.spriteHeight,
-            canvas.width / 2 - playerSize,
-            canvas.height / 2 - playerSize,
-            playerSize * 2,
-            playerSize * 2
-        );
-        
-        // 피격 상태일 때 빨간색 오버레이 효과
+        // 피격 상태일 때
         if (player.isHit) {
-            ctx.globalCompositeOperation = 'source-atop';
+            // 임시 캔버스 생성
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = playerSize * 2;
+            tempCanvas.height = playerSize * 2;
+            const tempCtx = tempCanvas.getContext('2d');
+            
+            // 플레이어 이미지를 임시 캔버스에 그리기
+            tempCtx.drawImage(
+                player.image,
+                spriteX, spriteY,
+                player.spriteWidth, player.spriteHeight,
+                0, 0,
+                playerSize * 2,
+                playerSize * 2
+            );
             
             // 피격 효과의 진행도 계산 (깜빡임 효과)
             const currentTime = Date.now();
@@ -1072,15 +1072,29 @@ function draw() {
             const blinkSpeed = 10; // 깜빡임 속도
             const alpha = Math.abs(Math.sin(hitProgress * Math.PI * blinkSpeed)) * 0.8;
             
-            ctx.fillStyle = `rgba(255, 0, 0, ${alpha})`;
-            ctx.fillRect(
+            // 빨간색 오버레이 효과 (투명한 부분 제외)
+            tempCtx.globalCompositeOperation = 'source-atop';
+            tempCtx.fillStyle = `rgba(255, 0, 0, ${alpha})`;
+            tempCtx.fillRect(0, 0, playerSize * 2, playerSize * 2);
+            
+            // 최종 이미지를 메인 캔버스에 그리기
+            ctx.drawImage(
+                tempCanvas,
+                canvas.width / 2 - playerSize,
+                canvas.height / 2 - playerSize
+            );
+        } else {
+            // 일반 상태일 때는 그냥 그리기
+            ctx.drawImage(
+                player.image,
+                spriteX, spriteY,
+                player.spriteWidth, player.spriteHeight,
                 canvas.width / 2 - playerSize,
                 canvas.height / 2 - playerSize,
                 playerSize * 2,
                 playerSize * 2
             );
         }
-        ctx.restore();
     } else {
         // 이미지가 로드되지 않은 경우 기존 원 그리기
         ctx.fillStyle = 'white';
@@ -1397,6 +1411,10 @@ function resetGame() {
     player.animationState = 'idle';
     player.currentFrame = 0;
     player.frameTime = 0;
+    // 피격 상태 초기화
+    player.isHit = false;
+    player.hitStartTime = 0;
+    
     bullets = [];
     enemies = [];
     jewels = [];
@@ -1408,6 +1426,11 @@ function resetGame() {
     elapsedTime = 0;
     totalPausedTime = 0;
     
+    // 화면 흔들림 초기화
+    screenShakeTime = 0;
+    screenShakeIntensity = 0;
+    screenShakeX = 0;
+    screenShakeY = 0;
 }
 
 function restartGame() {
@@ -1666,7 +1689,7 @@ class Enemy {
         this.attackShockwave = 0;
         this.originalSize = size;
     }
-
+    
     update() {
         const currentTime = Date.now();
         const deltaTime = 16; // 약 60fps 기준
@@ -1687,11 +1710,6 @@ class Enemy {
                 // 죽음 상태에서는 제거 대기
                 break;
         }
-
-        // 체력이 0 이하가 되면 죽음 상태로 전환
-        if (this.health <= 0 && this.state === 'moving') {
-            this.startDying();
-        }
     }
 
     updateSpawning(currentTime) {
@@ -1699,7 +1717,8 @@ class Enemy {
         const progress = Math.min(elapsedTime / this.spawnDuration, 1);
         
         // 크기가 0에서 정상 크기로 커지는 애니메이션
-        this.currentSize = this.size * this.easeOutBack(progress);
+        // Math.max를 사용하여 최소값을 0으로 제한
+        this.currentSize = Math.max(0, this.size * this.easeOutBack(progress));
         
         // 스폰 애니메이션이 끝나면 이동 상태로 전환
         if (progress >= 1) {
@@ -1826,9 +1845,18 @@ class Enemy {
             });
         }
         
-        // 죽을 때 바로 보석 드랍
-        jewels.push(new Jewel(this.x, this.y));
+        // 10% 확률로만 jewel 드롭
+        if (Math.random() < 0.1) {
+            jewels.push(new Jewel(this.x, this.y));
+        }
+        
+        // 플레이어가 적을 죽였을 때 경험치 획득 (jewel 5개 분량)
+        player.exp += 100;  // jewel 1개당 20 경험치이므로, 5개는 100
         score += 10;
+        
+        // 레벨업 체크 (Jewel 클래스의 checkLevelUp 메서드를 재사용)
+        const jewelTemp = new Jewel(0, 0);
+        jewelTemp.checkLevelUp();
     }
 
     updateDeathParticles() {
@@ -2080,11 +2108,16 @@ class Enemy {
             barHeight
         );
     }
-
+    // takeDamage 메서드, 적이 죽을 때의 처리가 자동으로 되도록 함
     takeDamage(damage) {
         // 이동 중일 때만 데미지 받음
         if (this.state === 'moving') {
             this.health -= damage;
+            
+            // 체력이 0 이하가 되면 자동으로 죽음 상태로 전환
+            if (this.health <= 0) {
+                this.startDying();
+            }
         }
     }
 
@@ -2250,14 +2283,25 @@ class Jewel {
     }
 
     checkLevelUp() {
-        if (player.exp >= player.nextLevelExp) {
+        while (player.exp >= player.nextLevelExp) {
+            // 레벨업
             player.level += 1;
+            
+            // 초과 경험치 계산
+            const excessExp = player.exp - player.nextLevelExp;
+            
+            // 이전 레벨 경험치와 다음 레벨 경험치 업데이트
             player.prevLevelExp = player.nextLevelExp;
             player.nextLevelExp = Math.floor(player.nextLevelExp * 1.5);
-            player.health = player.maxHealth; // Restore health on level up
-            player.speed += 0.1; // Increase speed
-            // Optionally, add new weapons or increase stats
-            // For example, add a new weapon at certain levels
+            
+            // 초과 경험치만 남기고 현재 경험치 초기화
+            player.exp = excessExp;
+            
+            // 레벨업 보상
+            player.health = player.maxHealth; // 체력 회복
+            player.speed += 0.1; // 속도 증가
+            
+            // 특정 레벨에서 무기 추가
             if (player.level === 3) {
                 player.weapons.push(new ShotgunWeapon());
             }
