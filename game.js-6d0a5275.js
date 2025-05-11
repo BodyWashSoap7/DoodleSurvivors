@@ -128,6 +128,13 @@ const player = {
     lastMovementState: false // 이동 상태 추적용
 };
 
+// 미리보기 애니메이션을 위한 전역 변수
+const previewAnimation = {
+    currentFrame: 0,
+    frameTime: 0,
+    frameDuration: 150 // 각 프레임 지속 시간 (밀리초)
+};
+
 // 플레이어 캐릭터 이미지 배열 수정 - 스프라이트 시트 정보 추가
 const playerImages = [
     { 
@@ -182,10 +189,10 @@ function loadCharacterImages() {
 loadCharacterImages();
 
 // 적 스폰 관련 변수 추가
-const MAX_ENEMIES = 50; // 최대 적 수
+const MAX_ENEMIES = 100; // 최대 적 수
 const MIN_SPAWN_DISTANCE = 150; // 최소 스폰 거리
 const MAX_SPAWN_DISTANCE = 450; // 최대 스폰 거리
-const ENEMY_SPAWN_INTERVAL = 1000; // 적 스폰 간격 (1초)
+const ENEMY_SPAWN_INTERVAL = 50; // 적 스폰 간격 (1초)
 let lastEnemySpawnTime = 0; // 마지막 적 스폰 시간
 
 
@@ -253,7 +260,7 @@ document.addEventListener('keydown', (e) => {
         }
     } 
     // 설정 화면에서 캐릭터 변경 시 스프라이트 정보도 업데이트
-    // drawSettingsScreen 함수 내 캐릭터 선택 부분 수정
+    // drawSettingsScreen 함수 내 캐릭터 선택
     else if (currentGameState === GAME_STATE.SETTINGS) {
         if (e.key === 'ArrowLeft') {
             // 이전 캐릭터로
@@ -264,6 +271,9 @@ document.addEventListener('keydown', (e) => {
             player.spriteWidth = playerImages[currentCharacterIndex].spriteWidth;
             player.spriteHeight = playerImages[currentCharacterIndex].spriteHeight;
             player.frameCount = playerImages[currentCharacterIndex].frameCount;
+            // 애니메이션 초기화
+            previewAnimation.currentFrame = 0;
+            previewAnimation.frameTime = 0;
             e.preventDefault();
         } else if (e.key === 'ArrowRight') {
             // 다음 캐릭터로
@@ -274,6 +284,9 @@ document.addEventListener('keydown', (e) => {
             player.spriteWidth = playerImages[currentCharacterIndex].spriteWidth;
             player.spriteHeight = playerImages[currentCharacterIndex].spriteHeight;
             player.frameCount = playerImages[currentCharacterIndex].frameCount;
+            // 애니메이션 초기화
+            previewAnimation.currentFrame = 0;
+            previewAnimation.frameTime = 0;
             e.preventDefault();
         } else if (e.key === 'Enter') {
             // 캐릭터 바뀐 채 시작 화면으로 돌아가기
@@ -536,9 +549,10 @@ function updatePlayerAim() {
         const dx = nearestEnemy.x - player.x;
         const dy = nearestEnemy.y - player.y;
         player.aimAngle = Math.atan2(dy, dx);
-    } else {
-        // Default aim direction (right)
-        player.aimAngle = 0;
+    }
+    // 첫 시작 시 aimAngle이 undefined일 수 있으므로 초기값 설정
+    else if (player.aimAngle === undefined) {
+        player.aimAngle = 0; // 기본값으로 오른쪽 방향
     }
 }
 
@@ -547,13 +561,16 @@ function findNearestEnemy() {
     let minDistance = 250;
     
     enemies.forEach((enemy) => {
-        const dx = enemy.x - player.x;
-        const dy = enemy.y - player.y;
-        const distance = Math.hypot(dx, dy);
-        
-        if (distance < minDistance) {
-            minDistance = distance;
-            nearestEnemy = enemy;
+        // moving 상태인 적만 조준 대상으로 고려 (수정된 부분)
+        if (enemy.state === 'moving') {
+            const dx = enemy.x - player.x;
+            const dy = enemy.y - player.y;
+            const distance = Math.hypot(dx, dy);
+            
+            if (distance < minDistance) {
+                minDistance = distance;
+                nearestEnemy = enemy;
+            }
         }
     });
     
@@ -645,15 +662,28 @@ function drawStartScreen() {
     ctx.textAlign = 'center';
     ctx.fillText('뱀파이어 서바이벌', canvas.width / 2, canvas.height / 3 + 50);
     
-    // Draw selected character preview
+    // Draw selected character preview with animation
     const previewSize = player.size * 3;
     const previewX = canvas.width / 2;
     const previewY = canvas.height / 3 + 70;
     
-    // Draw character preview
+    // 애니메이션 프레임 업데이트
+    previewAnimation.frameTime += 16; // 약 60fps 기준
+    if (previewAnimation.frameTime >= previewAnimation.frameDuration) {
+        previewAnimation.frameTime = 0;
+        previewAnimation.currentFrame = (previewAnimation.currentFrame + 1) % player.frameCount;
+    }
+    
+    // Draw character preview with idle animation
     if (player.image && player.image.complete) {
+        // idle 애니메이션 프레임 그리기
+        const spriteX = previewAnimation.currentFrame * player.spriteWidth;
+        const spriteY = 0; // idle 애니메이션은 Y축 0
+        
         ctx.drawImage(
             player.image,
+            spriteX, spriteY,
+            player.spriteWidth, player.spriteHeight,
             previewX - previewSize * 2,
             previewY - previewSize * 2 - 150,
             previewSize * 4,
@@ -663,7 +693,7 @@ function drawStartScreen() {
         // Fallback if image not loaded
         ctx.fillStyle = '#AAAAAA';
         ctx.beginPath();
-        ctx.arc(previewX, previewY, previewSize, 0, Math.PI * 2);
+        ctx.arc(previewX, previewY - 150, previewSize, 0, Math.PI * 2);
         ctx.fill();
     }
     
@@ -693,13 +723,11 @@ function drawStartScreen() {
     // Instructions
     ctx.fillStyle = '#AAAAAA';
     ctx.font = '16px Arial';
-    //ctx.fillText('좌우 방향키로 캐릭터를 선택하세요', canvas.width / 2, canvas.height * 3/4 + 20);
     ctx.fillText('방향키로 조작', canvas.width / 2, canvas.height * 3/4 + 50);
     ctx.fillText('Enter로 선택', canvas.width / 2, canvas.height * 3/4 + 80);
-    //ctx.fillText('ESC: 취소', canvas.width / 2, canvas.height * 3/4 + 80);
 }
 
-// 설정 화면 그리기 함수 수정 - 색상 선택에서 캐릭터 선택으로 변경
+// 설정 화면 그리기 함수
 function drawSettingsScreen() {
     ctx.fillStyle = 'black';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -730,10 +758,23 @@ function drawSettingsScreen() {
     const centerX = canvas.width / 2;
     const centerY = canvas.height / 2 + 50;
     
-    // 현재 선택된 캐릭터 이미지 그리기
+    // 애니메이션 프레임 업데이트
+    previewAnimation.frameTime += 16; // 약 60fps 기준
+    if (previewAnimation.frameTime >= previewAnimation.frameDuration) {
+        previewAnimation.frameTime = 0;
+        previewAnimation.currentFrame = (previewAnimation.currentFrame + 1) % playerImages[currentCharacterIndex].frameCount;
+    }
+    
+    // 현재 선택된 캐릭터 이미지 그리기 (idle 애니메이션)
     if (playerImages[currentCharacterIndex].image.complete) {
+        const character = playerImages[currentCharacterIndex];
+        const spriteX = previewAnimation.currentFrame * character.spriteWidth;
+        const spriteY = 0; // idle 애니메이션은 Y축 0
+        
         ctx.drawImage(
-            playerImages[currentCharacterIndex].image,
+            character.image,
+            spriteX, spriteY,
+            character.spriteWidth, character.spriteHeight,
             centerX - previewSize,
             centerY - previewSize,
             previewSize * 2,
@@ -755,15 +796,6 @@ function drawSettingsScreen() {
     ctx.fillText('Enter를 눌러 캐릭터 선택', canvas.width / 2, canvas.height * 3/4 + 20);
     ctx.fillText('ESC를 눌러 취소', canvas.width / 2, canvas.height * 3/4 + 50);
 }
-
-// Update Game State
-/*
-// Cache previous values to avoid unnecessary DOM updates
-let lastHealth = player.health;
-let lastLevel = player.level;
-let lastScore = score;
-let lastExp = player.exp;
-*/
 
 // update 함수
 function update() {
@@ -821,6 +853,9 @@ function update() {
     
     // 적 스폰 로직 실행
     spawnEnemyAroundPlayer();
+
+    // 공간 분할 그리드 업데이트 (적들 업데이트 전에 실행)
+    updateEnemySpatialGrid();
     
     // 플레이어 움직임과 상관없이 항상 가장 가까운 적을 조준
     updatePlayerAim();
@@ -842,7 +877,7 @@ function update() {
     }
     
     // 화면 밖으로 너무 멀리 벗어난 적은 제거 (최적화)
-    const despawnDistance = MAX_SPAWN_DISTANCE * 2; // 스폰 거리의 2배 이상 떨어지면 제거
+    const despawnDistance = MAX_SPAWN_DISTANCE * 3; // 스폰 거리의 3배 이상 떨어지면 제거
     for (let i = enemies.length - 1; i >= 0; i--) {
         const enemy = enemies[i];
         const dx = enemy.x - player.x;
@@ -862,11 +897,15 @@ function update() {
             enemy.update();
 
             // Check Collision with Player
-            if (detectCollision(player, enemy)) {
-                player.health -= enemy.attackStrength;
-                enemies.splice(i, 1);
+            if (detectCollision(player, enemy) && enemy.state === 'moving') {
+                // 플레이어를 밀어내기
+                enemy.pushPlayer(player);
                 
-                // Player health changed, update will happen at end of function
+                // 일정 시간마다 데미지 주기
+                enemy.attackPlayer(player);
+                
+                // 적을 제거하지 않음!
+                // enemies.splice(i, 1); // 이 줄을 제거
             }
         }
     }
@@ -911,12 +950,41 @@ function update() {
 
 // Draw Game Objects
 function draw() {
+    // 화면 흔들림 효과 (더 천천히 감소)
+    if (screenShake > 0) {
+        // 흔들림 감소 속도를 더 느리게
+        screenShake *= 0.96; // 기존 0.9에서 0.96으로 변경 (더 천천히 감소)
+        
+        // 시간에 따른 감소도 추가
+        const shakeDecay = Math.max(0, 1 - (Date.now() % screenShakeDuration) / screenShakeDuration);
+        
+        // 흔들림 강도 계산
+        const currentIntensity = screenShakeIntensity * screenShake * shakeDecay;
+        
+        // 랜덤 흔들림 + 사인파 흔들림 조합
+        const time = Date.now() * 0.01;
+        screenShakeX = (Math.random() - 0.5) * currentIntensity + 
+                       Math.sin(time * 1.5) * currentIntensity * 0.3;
+        screenShakeY = (Math.random() - 0.5) * currentIntensity + 
+                       Math.cos(time * 1.7) * currentIntensity * 0.3;
+        
+        // 매우 작은 값이 되면 완전히 0으로
+        if (screenShake < 0.01) {
+            screenShake = 0;
+            screenShakeX = 0;
+            screenShakeY = 0;
+        }
+    } else {
+        screenShakeX = 0;
+        screenShakeY = 0;
+    }
+    
     // Clear Canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Calculate camera offset to center the player
-    const offsetX = canvas.width / 2 - player.x;
-    const offsetY = canvas.height / 2 - player.y;
+    // Calculate camera offset to center the player (흔들림 효과 적용)
+    const offsetX = canvas.width / 2 - player.x + screenShakeX;
+    const offsetY = canvas.height / 2 - player.y + screenShakeY;
 
     // Draw Background
     drawBackground(offsetX, offsetY);
@@ -1148,25 +1216,93 @@ function spawnEnemyAroundPlayer() {
         return;
     }
     
-    // 플레이어 주변 랜덤 위치 계산 (550~650 거리)
+    // 360도를 8개 섹터로 나누어 스폰 시도
+    const sectors = 8;
+    const sectorAngle = (Math.PI * 2) / sectors;
+    let possibleAngles = [];
+    
+    // 각 섹터별로 적의 수 확인
+    for (let i = 0; i < sectors; i++) {
+        const angle = i * sectorAngle;
+        const enemyCount = countEnemiesInSector(angle, sectorAngle);
+        
+        // 섹터에 적이 적으면 가능한 각도로 추가
+        if (enemyCount < 5) { // 섹터당 최대 5마리
+            possibleAngles.push(angle + Math.random() * sectorAngle);
+        }
+    }
+    
+    // 가능한 각도가 없으면 스폰하지 않음
+    if (possibleAngles.length === 0) {
+        return;
+    }
+    
+    // 랜덤하게 각도 선택
+    const spawnAngle = possibleAngles[Math.floor(Math.random() * possibleAngles.length)];
     const spawnDistance = MIN_SPAWN_DISTANCE + Math.random() * (MAX_SPAWN_DISTANCE - MIN_SPAWN_DISTANCE);
-    const spawnAngle = Math.random() * Math.PI * 2; // 0~360도 랜덤 각도
     
     const spawnX = player.x + Math.cos(spawnAngle) * spawnDistance;
     const spawnY = player.y + Math.sin(spawnAngle) * spawnDistance;
     
-    // 적 생성 (레벨에 따라 강해지도록 설정)
-    const enemySize = 20;
-    const enemySpeed = 1 + Math.random() * 0.5 + (player.level - 1) * 0.1; // 레벨에 따라 속도 증가
-    const enemyHealth = 5 + Math.floor((player.level - 1) * 1.5); // 레벨에 따라 체력 증가
-    const enemyAttack = 10 + Math.floor((player.level - 1) * 0.5); // 레벨에 따라 공격력 증가
+    // 최종적으로 해당 위치가 유효한지 한 번 더 확인
+    if (isValidSpawnPosition(spawnX, spawnY)) {
+        // 적 생성
+        const enemySize = 20;
+        const enemySpeed = 1 + Math.random() * 0.5 + (player.level - 1) * 0.1;
+        const enemyHealth = 5 + Math.floor((player.level - 1) * 1.5);
+        const enemyAttack = 10 + Math.floor((player.level - 1) * 0.5);
+        
+        const enemy = new Enemy(spawnX, spawnY, enemySize, enemySpeed, enemyHealth, enemyAttack);
+        enemies.push(enemy);
+        
+        lastEnemySpawnTime = currentTime;
+    }
+}
+
+// 특정 섹터 내의 적 수를 세는 함수
+function countEnemiesInSector(centerAngle, sectorAngle) {
+    let count = 0;
     
-    // 새 적 객체 생성
-    const enemy = new Enemy(spawnX, spawnY, enemySize, enemySpeed, enemyHealth, enemyAttack);
-    enemies.push(enemy);
+    for (let enemy of enemies) {
+        if (enemy.state === 'dying' || enemy.state === 'dead') continue;
+        
+        const dx = enemy.x - player.x;
+        const dy = enemy.y - player.y;
+        const enemyAngle = Math.atan2(dy, dx);
+        
+        // 각도를 0-2π 범위로 정규화
+        let normalizedEnemyAngle = enemyAngle;
+        if (normalizedEnemyAngle < 0) normalizedEnemyAngle += Math.PI * 2;
+        
+        // 섹터 범위 확인
+        const sectorStart = centerAngle - sectorAngle / 2;
+        const sectorEnd = centerAngle + sectorAngle / 2;
+        
+        if (normalizedEnemyAngle >= sectorStart && normalizedEnemyAngle <= sectorEnd) {
+            count++;
+        }
+    }
     
-    // 마지막 스폰 시간 업데이트
-    lastEnemySpawnTime = currentTime;
+    return count;
+}
+
+// 스폰 위치가 유효한지 확인하는 함수
+function isValidSpawnPosition(x, y) {
+    const minDistance = 40; // 다른 적과의 최소 거리
+    
+    for (let enemy of enemies) {
+        if (enemy.state === 'dying' || enemy.state === 'dead') continue;
+        
+        const dx = enemy.x - x;
+        const dy = enemy.y - y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        if (distance < minDistance) {
+            return false;
+        }
+    }
+    
+    return true;
 }
 
 function detectCollision(obj1, obj2) {
@@ -1322,7 +1458,8 @@ class Bullet {
 
         // Check collision with enemies
         enemies.forEach((enemy) => {
-            if (detectCollision(this, enemy)) {
+            // 적이 'moving' 상태일 때만 충돌 체크
+            if (enemy.state === 'moving' && detectCollision(this, enemy)) {
                 enemy.takeDamage(this.damage);
                 this.used = true;
             }
@@ -1346,6 +1483,35 @@ class Bullet {
 const enemySprite = new Image();
 enemySprite.src = './img/enemy_sprites.png'; // 적 스프라이트 시트 경로
 
+// 적 공간 분할
+const ENEMY_SPATIAL_GRID_SIZE = 100; // 공간 분할 그리드 크기
+let enemySpatialGrid = {};
+
+// 플레이어가 공격받을 때 화면 흔들림 효과
+let screenShake = 0;
+let screenShakeX = 0;
+let screenShakeY = 0;
+let screenShakeIntensity = 0; // 흔들림 강도
+let screenShakeDuration = 0; // 흔들림 지속 시간
+
+// 적들의 공간 분할 그리드 업데이트 함수
+function updateEnemySpatialGrid() {
+    enemySpatialGrid = {};
+    
+    for (let enemy of enemies) {
+        if (enemy.state === 'moving') {
+            const gridX = Math.floor(enemy.x / ENEMY_SPATIAL_GRID_SIZE);
+            const gridY = Math.floor(enemy.y / ENEMY_SPATIAL_GRID_SIZE);
+            const key = `${gridX},${gridY}`;
+            
+            if (!enemySpatialGrid[key]) {
+                enemySpatialGrid[key] = [];
+            }
+            enemySpatialGrid[key].push(enemy);
+        }
+    }
+}
+
 // Enemy 클래스 전체 수정
 class Enemy {
     constructor(x, y, size, speed, health, attackStrength) {
@@ -1355,7 +1521,6 @@ class Enemy {
         this.speed = speed;
         this.health = health;
         this.maxHealth = health;
-        this.attackStrength = attackStrength;
         
         // 애니메이션 관련 속성
         this.state = 'spawning'; // 'spawning', 'moving', 'dying', 'dead'
@@ -1380,6 +1545,20 @@ class Enemy {
         this.wobbleAmount = 0;
         this.currentSize = 0;
         this.deathParticles = [];
+
+        // 공격 관련 속성
+        this.attackStrength = attackStrength;
+        this.lastAttackTime = 0;
+        this.attackCooldown = 500; // 0.5초마다 공격
+        this.isAttacking = false;
+
+        // 공격 애니메이션 속성 추가
+        this.attackAnimationProgress = 0;
+        this.attackAnimationDuration = 300; // 공격 애니메이션 지속 시간
+        this.attackStartTime = 0;
+        this.attackParticles = [];
+        this.attackShockwave = 0;
+        this.originalSize = size;
     }
 
     update() {
@@ -1422,15 +1601,37 @@ class Enemy {
             this.currentSize = this.size;
         }
     }
-
+    
     updateMoving() {
-        // 플레이어를 향해 이동
-        this.angle = Math.atan2(player.y - this.y, player.x - this.x);
-        this.x += Math.cos(this.angle) * this.speed;
-        this.y += Math.sin(this.angle) * this.speed;
+        // 플레이어를 향한 기본 방향 계산
+        const angleToPlayer = Math.atan2(player.y - this.y, player.x - this.x);
+        let moveX = Math.cos(angleToPlayer) * this.speed;
+        let moveY = Math.sin(angleToPlayer) * this.speed;
+        
+        // 다른 적들과의 분리 벡터 계산
+        const separationForce = this.calculateSeparation();
+        
+        // 분리 벡터를 이동 벡터에 적용 (가중치 적용)
+        const separationWeight = 4.5; // 분리 힘의 강도 조절
+        moveX += separationForce.x * separationWeight;
+        moveY += separationForce.y * separationWeight;
+        
+        // 움직임 정규화 (속도 유지)
+        const magnitude = Math.sqrt(moveX * moveX + moveY * moveY);
+        if (magnitude > 0) {
+            moveX = (moveX / magnitude) * this.speed;
+            moveY = (moveY / magnitude) * this.speed;
+        }
+        
+        // 실제 이동
+        this.x += moveX;
+        this.y += moveY;
+        
+        // 실제 이동 방향 계산 (UI 표시용)
+        this.angle = Math.atan2(moveY, moveX);
         
         // 방향 설정 (왼쪽/오른쪽만)
-        if (player.x < this.x) {
+        if (moveX < 0) {
             this.direction = 'left';
         } else {
             this.direction = 'right';
@@ -1438,8 +1639,53 @@ class Enemy {
         
         // 움직일 때 약간의 흔들림 효과
         this.wobbleAmount = Math.sin(this.animationTime * 0.01) * 2;
-    }
+        
+        // 스프라이트 애니메이션 프레임 업데이트
+        this.frameTime += 16; // 약 60fps 기준
+        if (this.frameTime >= this.frameDuration) {
+            this.frameTime = 0;
+            this.currentFrame = (this.currentFrame + 1) % this.frameCount;
+        }
 
+        // 공격 애니메이션 업데이트
+        if (this.isAttacking) {
+            const currentTime = Date.now();
+            const elapsed = currentTime - this.attackStartTime;
+            this.attackAnimationProgress = Math.min(elapsed / this.attackAnimationDuration, 1);
+            
+            // 공격 중 크기 변화 (찌그러지고 커지는 효과)
+            const sizeMultiplier = 1 + Math.sin(this.attackAnimationProgress * Math.PI) * 0.5;
+            this.currentSize = this.originalSize * sizeMultiplier;
+            
+            // 공격 애니메이션 종료
+            if (this.attackAnimationProgress >= 1) {
+                this.isAttacking = false;
+                this.currentSize = this.originalSize;
+            }
+            
+            // 파티클 업데이트
+            this.updateAttackParticles();
+            
+            // 충격파 업데이트
+            this.attackShockwave *= 0.9;
+        }
+    }
+    
+    // 공격 파티클 업데이트 메서드
+    updateAttackParticles() {
+        for (let particle of this.attackParticles) {
+            particle.x += particle.vx;
+            particle.y += particle.vy;
+            particle.life -= 0.05;
+            particle.size *= 0.95;
+            particle.vx *= 0.93;
+            particle.vy *= 0.93;
+        }
+        
+        // 죽은 파티클 제거
+        this.attackParticles = this.attackParticles.filter(p => p.life > 0);
+    }
+    
     updateDying(currentTime) {
         const elapsedTime = currentTime - this.stateStartTime;
         const progress = Math.min(elapsedTime / this.deathDuration, 1);
@@ -1473,6 +1719,10 @@ class Enemy {
                 life: 1
             });
         }
+        
+        // 죽을 때 바로 보석 드랍
+        jewels.push(new Jewel(this.x, this.y));
+        score += 10;
     }
 
     updateDeathParticles() {
@@ -1501,6 +1751,28 @@ class Enemy {
             case 'dying':
                 this.drawDying(drawX, drawY, offsetX, offsetY);
                 break;
+        }
+
+        // 공격 파티클 그리기
+        if (this.attackParticles.length > 0) {
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+            
+            for (let particle of this.attackParticles) {
+                ctx.fillStyle = particle.color;
+                ctx.globalAlpha = particle.life;
+                ctx.beginPath();
+                ctx.arc(
+                    particle.x + offsetX,
+                    particle.y + offsetY,
+                    particle.size,
+                    0,
+                    Math.PI * 2
+                );
+                ctx.fill();
+            }
+            
+            ctx.restore();
         }
     }
 
@@ -1592,6 +1864,57 @@ class Enemy {
         if (this.state === 'moving') {
             this.drawHealthBar(drawX, drawY);
         }
+
+        // 공격 중일 때 붉은 광선 효과
+        if (this.isAttacking) {
+            ctx.save();
+            ctx.strokeStyle = 'rgba(255, 0, 0, 0.7)';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.arc(drawX, drawY, this.size * 1.5, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        // 공격 효과 그리기
+        if (this.isAttacking) {
+            // 충격파 효과
+            if (this.attackShockwave > 0.1) {
+                ctx.save();
+                ctx.strokeStyle = `rgba(255, 0, 0, ${this.attackShockwave * 0.5})`;
+                ctx.lineWidth = 5;
+                ctx.beginPath();
+                const shockwaveRadius = this.size * 2 * (1 + (1 - this.attackShockwave));
+                ctx.arc(drawX, drawY, shockwaveRadius, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.restore();
+            }
+            
+            // 공격 시 몸체 색상 변화
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+            ctx.fillStyle = `rgba(255, 0, 0, ${0.5 * Math.sin(this.attackAnimationProgress * Math.PI)})`;
+            ctx.beginPath();
+            ctx.arc(drawX, drawY, this.currentSize, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+            
+            // 에너지 링 효과
+            const ringCount = 3;
+            for (let i = 0; i < ringCount; i++) {
+                const ringProgress = (this.attackAnimationProgress + i * 0.2) % 1;
+                const ringRadius = this.size * (1 + ringProgress * 2);
+                const ringAlpha = (1 - ringProgress) * 0.7;
+                
+                ctx.save();
+                ctx.strokeStyle = `rgba(255, 100, 0, ${ringAlpha})`;
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.arc(drawX, drawY, ringRadius, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.restore();
+            }
+        }
     }
 
     drawDying(drawX, drawY, offsetX, offsetY) {
@@ -1660,22 +1983,126 @@ class Enemy {
     }
 
     die() {
-        // 보석 드롭
-        jewels.push(new Jewel(this.x, this.y));
-        score += 10;
+        // 적 제거만 수행
         const index = enemies.indexOf(this);
         if (index !== -1) enemies.splice(index, 1);
     }
 
-    // 이징 함수들
+    // 이징 함수들(자연스러운 모션 전환)
     easeOutBack(t) {
-        const c1 = 1.70158;
+        const c1 = 2;
         const c3 = c1 + 1;
         return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
     }
     
     easeInQuad(t) {
         return t * t;
+    }
+
+    // 적 분리 메서드
+    calculateSeparation() {
+        let separationX = 0;
+        let separationY = 0;
+        let neighborCount = 0;
+        
+        const separationRadius = this.size * 5;
+        
+        // 현재 적의 그리드 위치와 주변 그리드만 검사
+        const gridX = Math.floor(this.x / ENEMY_SPATIAL_GRID_SIZE);
+        const gridY = Math.floor(this.y / ENEMY_SPATIAL_GRID_SIZE);
+        
+        // 주변 9개 그리드만 검사 (현재 그리드 포함)
+        for (let dx = -1; dx <= 1; dx++) {
+            for (let dy = -1; dy <= 1; dy++) {
+                const key = `${gridX + dx},${gridY + dy}`;
+                const nearbyEnemies = enemySpatialGrid[key] || [];
+                
+                for (let enemy of nearbyEnemies) {
+                    if (enemy === this || enemy.state !== 'moving') continue;
+                    
+                    const distX = this.x - enemy.x;
+                    const distY = this.y - enemy.y;
+                    const distance = Math.sqrt(distX * distX + distY * distY);
+                    
+                    if (distance < separationRadius && distance > 0) {
+                        const force = (separationRadius - distance) / separationRadius;
+                        separationX += (distX / distance) * force;
+                        separationY += (distY / distance) * force;
+                        neighborCount++;
+                    }
+                }
+            }
+        }
+        
+        if (neighborCount > 0) {
+            separationX /= neighborCount;
+            separationY /= neighborCount;
+        }
+        
+        return { x: separationX, y: separationY };
+    }
+
+    //플레이어 밀어내기
+    pushPlayer(player) {
+        const dx = player.x - this.x;
+        const dy = player.y - this.y;
+        const distance = Math.hypot(dx, dy);
+        
+        if (distance > 0) {
+            // 적이 플레이어를 미는 방향 (정규화)
+            const pushX = (dx / distance) * 2; // 밀어내는 힘
+            const pushY = (dy / distance) * 2;
+            
+            player.x += pushX;
+            player.y += pushY;
+        }
+    }
+    
+    //플레이어 공격
+    attackPlayer(player) {
+        const currentTime = Date.now();
+        
+        if (currentTime - this.lastAttackTime >= this.attackCooldown) {
+            player.health -= this.attackStrength;
+            this.lastAttackTime = currentTime;
+            
+            // 공격 애니메이션 시작
+            this.isAttacking = true;
+            this.attackStartTime = currentTime;
+            this.attackAnimationProgress = 0;
+            
+            // 공격 파티클 생성
+            this.createAttackParticles();
+            
+            // 충격파 효과 시작
+            this.attackShockwave = 1;
+            
+        // 화면 흔들림 효과 (데미지에 비례)
+        screenShake = 2;
+        screenShakeIntensity = Math.min(25, 10 + this.attackStrength * 0.5); // 데미지에 따라 흔들림 강도 조절
+        screenShakeDuration = 1200; // 1.2초 동안 지속
+        }
+    }
+
+    // 공격 파티클 생성 메서드
+    createAttackParticles() {
+        this.attackParticles = [];
+        const particleCount = 12;
+        
+        for (let i = 0; i < particleCount; i++) {
+            const angle = (Math.PI * 2 * i) / particleCount;
+            const speed = 2 + Math.random() * 3;
+            
+            this.attackParticles.push({
+                x: this.x,
+                y: this.y,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                size: 3 + Math.random() * 4,
+                life: 1,
+                color: Math.random() > 0.5 ? '#ff0000' : '#ff6600'
+            });
+        }
     }
 }
 
