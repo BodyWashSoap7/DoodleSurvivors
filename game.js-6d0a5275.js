@@ -32,7 +32,8 @@ const GAME_STATE = {
     GAME_OVER: 3,
     PAUSED: 4,
     LOADING: 5,
-    CONFIRM_DIALOG: 6
+    CONFIRM_DIALOG: 6,
+    LEVEL_UP: 7
 };
 
 let currentGameState = GAME_STATE.START_SCREEN;
@@ -106,15 +107,21 @@ let selectedPauseOption = 0; // 0 = Resume Game, 1 = To the Start Menu
 let selectedConfirmOption = 0; // 0 = 예, 1 = 아니오
 let confirmDialogType = ""; // 어떤 확인 대화상자인지 구분
 
+// 레벨업 선택 관련 변수
+let levelUpOptions = [];
+let selectedLevelUpOption = 0;
+
+// 레벨업 아이콘 이미지 관련 변수
+const levelUpIcons = {};
+let levelUpIconsLoaded = false;
+
 // Player object
 // 플레이어 객체
 const player = {
     x: 0,
     y: 0,
-    size: 15,
-    speed: 3,
+    
     health: 100,
-    maxHealth: 100,
     level: 1,
     exp: 0,
     nextLevelExp: 100,
@@ -122,6 +129,15 @@ const player = {
     weapons: [],
     characterType: 1,
     image: null,
+    
+    size: 15,              // 크기
+    speed: 3,              // 스피드
+    maxHealth: 100,        // 최대체력
+    attackPower: 1,        // 공격력 배율
+    fireRate: 1,           // 공격속도 배율  
+    projectileSpeed: 1,    // 투사체 속도 배율
+    pickupRadius: 100,     // 아이템 획득 범위
+    expMultiplier: 1,      // 경험치획득률
     
     // 애니메이션 관련 속성 추가
     animationState: 'idle', // 'idle' or 'walking'
@@ -132,6 +148,9 @@ const player = {
     spriteWidth: 32, // 스프라이트 한 프레임의 너비
     spriteHeight: 32, // 스프라이트 한 프레임의 높이
     lastMovementState: false, // 이동 상태 추적용
+    
+    // 방향 속성 추가
+    direction: 'left', // 'left' or 'right'
 
     // 피격 효과 관련 속성 추가
     isHit: false,
@@ -377,6 +396,20 @@ document.addEventListener('keydown', (e) => {
         }
     }
 
+    // 레벨업 화면에서의 키 입력 처리
+    else if (currentGameState === GAME_STATE.LEVEL_UP) {
+        if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || 
+            e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+            // 방향키로 선택
+            selectLevelUpOption(e.key);
+            e.preventDefault();
+        } else if (e.key === 'Enter') {
+            // 선택한 옵션 적용
+            applyLevelUpChoice();
+            e.preventDefault();
+        }
+    }
+
     // ESC 키 이벤트 처리
     if (e.key === 'Escape') {
         if (currentGameState === GAME_STATE.PLAYING) {
@@ -415,6 +448,251 @@ window.addEventListener('blur', () => {
         pauseGame();
     }
 });
+
+// 레벨업 옵션 선택 함수
+function selectLevelUpOption(key) {
+    switch(key) {
+        case 'ArrowUp':
+            selectedLevelUpOption = 0;
+            break;
+        case 'ArrowLeft':
+            selectedLevelUpOption = 1;
+            break;
+        case 'ArrowRight':
+            selectedLevelUpOption = 2;
+            break;
+        case 'ArrowDown':
+            selectedLevelUpOption = 3;
+            break;
+    }
+}
+
+// 레벨업 선택 적용 함수
+function applyLevelUpChoice() {
+    const option = levelUpOptions[selectedLevelUpOption];
+    
+    switch(option.type) {
+        case 'attackPower':
+            player.attackPower += option.value;
+            break;
+        case 'maxHealth':
+            player.maxHealth += option.value;
+            player.health = player.maxHealth; // 체력 회복
+            break;
+        case 'fireRate':
+            player.fireRate += option.value;
+            // 모든 무기의 공격속도 업데이트
+            player.weapons.forEach(weapon => {
+                weapon.updateFireRate(player.fireRate);
+            });
+            break;
+        case 'projectileSpeed':
+            player.projectileSpeed += option.value;
+            break;
+        case 'moveSpeed':
+            player.speed += option.value;
+            break;
+        case 'pickupRadius':
+            player.pickupRadius += option.value;
+            break;
+        case 'expMultiplier':
+            player.expMultiplier += option.value;
+            break;
+    }
+    
+    // 게임 재개
+    currentGameState = GAME_STATE.PLAYING;
+    
+    // 일시정지된 시간 업데이트
+    totalPausedTime += Date.now() - pauseStartTime;
+}
+
+// 레벨업 옵션 생성 함수
+function generateLevelUpOptions() {
+    const allUpgrades = [
+        { type: 'attackPower', name: '공격력 증가', value: 0.2, description: '공격력 +20%' },
+        { type: 'maxHealth', name: '최대 체력 증가', value: 20, description: '최대 체력 +20' },
+        { type: 'fireRate', name: '공격속도 증가', value: 0.15, description: '공격속도 +15%' },
+        { type: 'projectileSpeed', name: '투사체 속도', value: 0.2, description: '투사체 속도 +20%' },
+        { type: 'moveSpeed', name: '이동속도 증가', value: 0.3, description: '이동속도 +0.3' },
+        { type: 'pickupRadius', name: '획득 범위 증가', value: 20, description: '아이템 획득 범위 +20' },
+        { type: 'expMultiplier', name: '경험치 증가', value: 0.1, description: '경험치 획득량 +10%' }
+    ];
+    
+    // 랜덤하게 4개 중 하나 선택
+    levelUpOptions = [];
+    const shuffled = [...allUpgrades].sort(() => Math.random() - 0.5);
+    levelUpOptions = shuffled.slice(0, 4);
+    selectedLevelUpOption = 0;
+}
+
+// 레벨업 아이콘 이미지 로드 함수
+function loadLevelUpIcons() {
+    const iconTypes = [
+        'attackPower',
+        'maxHealth',
+        'fireRate',
+        'projectileSpeed',
+        'moveSpeed',
+        'pickupRadius',
+        'expMultiplier'
+    ];
+    
+    let loadedCount = 0;
+    
+    iconTypes.forEach(type => {
+        levelUpIcons[type] = new Image();
+        levelUpIcons[type].src = `./img/levelup/${type}_icon.png`;
+        
+        levelUpIcons[type].onload = function() {
+            loadedCount++;
+            if (loadedCount === iconTypes.length) {
+                levelUpIconsLoaded = true;
+                console.log('모든 레벨업 아이콘 로드 완료');
+            }
+        };
+        
+        levelUpIcons[type].onerror = function() {
+            console.error(`레벨업 아이콘 로드 실패: ${type}`);
+            // 로드 실패시 기본 이미지 사용하거나 null로 설정
+            levelUpIcons[type] = null;
+            loadedCount++;
+            if (loadedCount === iconTypes.length) {
+                levelUpIconsLoaded = true;
+            }
+        };
+    });
+}
+
+// 게임 초기화 시 레벨업 아이콘 로드
+loadCharacterImages();
+loadMapTiles();
+loadLevelUpIcons();
+
+// 레벨업 화면 그리기 함수 수정 (박스 크기 조정)
+function drawLevelUpScreen() {
+    // 배경
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // 제목
+    ctx.fillStyle = '#66fcf1';
+    ctx.font = '36px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('LEVEL UP!', canvas.width / 2, 100);
+    
+    // 레벨 표시
+    ctx.fillStyle = '#ffff00';
+    ctx.font = '24px Arial';
+    ctx.fillText(`LEVEL ${player.level}`, canvas.width / 2, 140);
+    
+    // 중앙 위치
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+    
+    // 옵션 박스 크기 (이미지를 담을 수 있도록 크기 조정)
+    const boxWidth = 160;
+    const boxHeight = 120;
+    const spacing = 150;
+    
+    // 위쪽 옵션 (상)
+    drawOptionBox(centerX - boxWidth/2, centerY - spacing - boxHeight/2, 
+                 boxWidth, boxHeight, levelUpOptions[0], selectedLevelUpOption === 0);
+    
+    // 왼쪽 옵션 (좌)  
+    drawOptionBox(centerX - spacing - boxWidth/2, centerY - boxHeight/2,
+                 boxWidth, boxHeight, levelUpOptions[1], selectedLevelUpOption === 1);
+    
+    // 오른쪽 옵션 (우)
+    drawOptionBox(centerX + spacing - boxWidth/2, centerY - boxHeight/2,
+                 boxWidth, boxHeight, levelUpOptions[2], selectedLevelUpOption === 2);
+    
+    // 아래쪽 옵션 (하)
+    drawOptionBox(centerX - boxWidth/2, centerY + spacing - boxHeight/2,
+                 boxWidth, boxHeight, levelUpOptions[3], selectedLevelUpOption === 3);
+    
+    // 방향키 그리기
+    drawArrowKeys(centerX, centerY);
+}
+
+// 옵션 박스 그리기 함수
+function drawOptionBox(x, y, width, height, option, isSelected) {
+    // 박스 배경
+    ctx.fillStyle = isSelected ? 'rgba(69, 162, 158, 0.8)' : 'rgba(31, 40, 51, 0.8)';
+    ctx.fillRect(x, y, width, height);
+    
+    // 박스 테두리
+    ctx.strokeStyle = isSelected ? '#66fcf1' : '#45a29e';
+    ctx.lineWidth = isSelected ? 3 : 1;
+    ctx.strokeRect(x, y, width, height);
+    
+    // 아이콘 이미지 그리기
+    const iconSize = 64;
+    const iconX = x + (width - iconSize) / 2;
+    const iconY = y + 10; // 박스 상단에서 10px 아래
+    
+    // 이미지가 로드되었고 해당 타입의 아이콘이 있으면 그리기
+    if (levelUpIconsLoaded && levelUpIcons[option.type]) {
+        ctx.drawImage(levelUpIcons[option.type], iconX, iconY, iconSize, iconSize);
+    } else {
+        // 이미지가 없을 경우 대체 표시 (임시 아이콘)
+        ctx.fillStyle = isSelected ? '#ffff00' : '#66fcf1';
+        ctx.fillRect(iconX, iconY, iconSize, iconSize);
+        ctx.strokeStyle = '#ffffff';
+        ctx.strokeRect(iconX, iconY, iconSize, iconSize);
+        
+        // 타입의 첫 글자를 크게 표시
+        ctx.fillStyle = '#000000';
+        ctx.font = '32px Arial';
+        ctx.textAlign = 'center';
+        const letter = option.type.charAt(0).toUpperCase();
+        ctx.fillText(letter, iconX + iconSize/2, iconY + iconSize/2 + 10);
+    }
+    
+    // 옵션 이름 (아이콘 아래로 위치 조정)
+    ctx.fillStyle = isSelected ? '#ffff00' : '#ffffff';
+    ctx.font = '16px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText(option.name, x + width/2, y + iconSize + 35);
+    
+    // 옵션 설명 (더 아래로)
+    ctx.fillStyle = isSelected ? '#ffffff' : '#c5c6c7';
+    ctx.font = '14px Arial';
+    ctx.fillText(option.description, x + width/2, y + iconSize + 55);
+}
+
+// 방향키 안내 그리기 함수
+function drawArrowKeys(centerX, centerY) {
+    const keySize = 30;
+    const keySpacing = 40;
+    
+    // 상
+    drawKey(centerX - keySize/2, centerY - keySpacing - keySize/2, keySize, '↑', selectedLevelUpOption === 0);
+    
+    // 좌
+    drawKey(centerX - keySpacing - keySize/2, centerY - keySize/2, keySize, '←', selectedLevelUpOption === 1);
+    
+    // 우
+    drawKey(centerX + keySpacing - keySize/2, centerY - keySize/2, keySize, '→', selectedLevelUpOption === 2);
+    
+    // 하
+    drawKey(centerX - keySize/2, centerY + keySpacing - keySize/2, keySize, '↓', selectedLevelUpOption === 3);
+}
+
+// 방향키 그리기 함수
+function drawKey(x, y, size, arrow, isSelected) {
+    ctx.fillStyle = isSelected ? '#ffff00' : '#666666';
+    ctx.fillRect(x, y, size, size);
+    
+    ctx.strokeStyle = isSelected ? '#66fcf1' : '#999999';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x, y, size, size);
+    
+    ctx.fillStyle = isSelected ? '#000000' : '#ffffff';
+    ctx.font = '20px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText(arrow, x + size/2, y + size/2 + 6);
+}
 
 // pauseGame 함수
 function pauseGame() {
@@ -469,12 +747,6 @@ function drawPauseScreen() {
     }
     ctx.fillText('MAIN MENU', canvas.width / 2, canvas.height / 2 + 50);
     
-    // 안내 메시지
-    /*
-    ctx.fillStyle = '#AAAAAA';
-    ctx.font = '16px Arial';
-    ctx.fillText('방향키로 선택하고 Enter를 눌러 확인하세요', canvas.width / 2, canvas.height / 2 + 100);
-    */
 }
 
 // 확인 대화상자 그리기 함수
@@ -659,6 +931,11 @@ function gameLoop(timestamp) {
             if (player.health <= 0) {
                 currentGameState = GAME_STATE.GAME_OVER;
             }
+        } else if (currentGameState === GAME_STATE.LEVEL_UP) {
+            // 게임 화면을 배경으로 그리기
+            draw();
+            // 레벨업 선택 화면 그리기
+            drawLevelUpScreen();
         } else if (currentGameState === GAME_STATE.START_SCREEN) {
             drawStartScreen();
         } else if (currentGameState === GAME_STATE.SETTINGS) {
@@ -857,6 +1134,13 @@ function update() {
         dy = (dy / magnitude) * player.speed;
         player.x += dx;
         player.y += dy;
+        
+        // 방향 업데이트
+        if (dx < 0) {
+            player.direction = 'left';
+        } else if (dx > 0) {
+            player.direction = 'right';
+        }
     }
     
     // 플레이어 피격 상태 업데이트
@@ -964,28 +1248,6 @@ function update() {
             }
         }
     }
-/*
-    // Update HUD elements only when values change
-    if (lastHealth !== player.health) {
-        healthElement.textContent = `Health: ${player.health}`;
-        lastHealth = player.health;
-    }
-    
-    if (lastLevel !== player.level) {
-        levelElement.textContent = `Level: ${player.level}`;
-        lastLevel = player.level;
-    }
-    
-    if (lastScore !== score) {
-        scoreElement.textContent = `Score: ${score}`;
-        lastScore = score;
-    }
-    
-    if (lastExp !== player.exp) {
-        expElement.textContent = `EXP: ${player.exp} / ${player.nextLevelExp}`;
-        lastExp = player.exp;
-    }
-*/
 }
 
 // Draw Game Objects
@@ -1056,6 +1318,12 @@ function draw() {
             tempCanvas.height = playerSize * 2;
             const tempCtx = tempCanvas.getContext('2d');
             
+            // 오른쪽 방향일 때 좌우반전 처리
+            if (player.direction === 'right') {
+                tempCtx.translate(tempCanvas.width, 0);
+                tempCtx.scale(-1, 1);
+            }
+            
             // 플레이어 이미지를 임시 캔버스에 그리기
             tempCtx.drawImage(
                 player.image,
@@ -1065,6 +1333,11 @@ function draw() {
                 playerSize * 2,
                 playerSize * 2
             );
+            
+            // 좌우반전 원복
+            if (player.direction === 'right') {
+                tempCtx.setTransform(1, 0, 0, 1, 0, 0);
+            }
             
             // 피격 효과의 진행도 계산 (깜빡임 효과)
             const currentTime = Date.now();
@@ -1084,16 +1357,29 @@ function draw() {
                 canvas.height / 2 - playerSize
             );
         } else {
-            // 일반 상태일 때는 그냥 그리기
+            // 일반 상태일 때
+            ctx.save();
+            
+            // 캔버스 중앙으로 이동
+            ctx.translate(canvas.width / 2, canvas.height / 2);
+            
+            // 오른쪽 방향일 때 좌우반전
+            if (player.direction === 'right') {
+                ctx.scale(-1, 1);
+            }
+            
+            // 이미지를 중앙에 그리기
             ctx.drawImage(
                 player.image,
                 spriteX, spriteY,
                 player.spriteWidth, player.spriteHeight,
-                canvas.width / 2 - playerSize,
-                canvas.height / 2 - playerSize,
+                -playerSize, // x를 -playerSize로 설정하여 중앙 정렬
+                -playerSize, // y를 -playerSize로 설정하여 중앙 정렬
                 playerSize * 2,
                 playerSize * 2
             );
+            
+            ctx.restore();
         }
     } else {
         // 이미지가 로드되지 않은 경우 기존 원 그리기
@@ -1407,13 +1693,6 @@ function resetGame() {
     player.nextLevelExp = 100;
     player.prevLevelExp = 0;
     player.weapons = [new BasicWeapon()];
-    // 애니메이션 상태 초기화
-    player.animationState = 'idle';
-    player.currentFrame = 0;
-    player.frameTime = 0;
-    // 피격 상태 초기화
-    player.isHit = false;
-    player.hitStartTime = 0;
     
     bullets = [];
     enemies = [];
@@ -1421,6 +1700,25 @@ function resetGame() {
     terrain = [];
     chunks = {};
     score = 0;
+    
+    // 능력치 초기화
+    player.attackPower = 1;
+    player.fireRate = 1;
+    player.projectileSpeed = 1;
+    player.pickupRadius = 100;
+    player.expMultiplier = 1;
+    
+    // 애니메이션 상태 초기화
+    player.animationState = 'idle';
+    player.currentFrame = 0;
+    player.frameTime = 0;
+    
+    // 피격 상태 초기화
+    player.isHit = false;
+    player.hitStartTime = 0;
+
+    // 방향 초기화
+    player.direction = 'left';
     
     // 시간 초기화
     elapsedTime = 0;
@@ -1533,8 +1831,14 @@ function drawArrow(x, y) {
 
 class Weapon {
     constructor() {
-        this.attackSpeed = 1000; // ms
+        this.baseAttackSpeed = 1000; // 기본 공격속도
+        this.attackSpeed = this.baseAttackSpeed;
         this.lastAttackTime = Date.now();
+    }
+
+    //fireRateMultiplier에 따른 공격속도 증가
+    updateFireRate(fireRateMultiplier) {
+        this.attackSpeed = this.baseAttackSpeed / fireRateMultiplier;
     }
 
     update() {
@@ -1575,9 +1879,11 @@ class Bullet {
         this.x = x;
         this.y = y;
         this.size = size;
-        this.speed = speed;
+        this.baseSpeed = speed;
+        this.speed = speed * player.projectileSpeed; // 투사체 속도 배율 적용
         this.angle = angle;
-        this.damage = damage;
+        this.baseDamage = damage;
+        this.damage = damage * player.attackPower; // 공격력 배율 적용
         this.used = false;
     }
 
@@ -1845,14 +2151,14 @@ class Enemy {
             });
         }
         
+        // 플레이어가 적을 죽였을 때 경험치 획득 (경험치 배율 적용)
+        player.exp += Math.floor(100 * player.expMultiplier);
+        score += 10;
+        
         // 10% 확률로만 jewel 드롭
         if (Math.random() < 0.1) {
             jewels.push(new Jewel(this.x, this.y));
         }
-        
-        // 플레이어가 적을 죽였을 때 경험치 획득 (jewel 5개 분량)
-        player.exp += 100;  // jewel 1개당 20 경험치이므로, 5개는 100
-        score += 10;
         
         // 레벨업 체크 (Jewel 클래스의 checkLevelUp 메서드를 재사용)
         const jewelTemp = new Jewel(0, 0);
@@ -2258,9 +2564,8 @@ class Jewel {
     }
 
     update() {
-        // Move towards the player if within attraction radius
-        const attractionRadius = 100;
-        if (detectCollision(this, { x: player.x, y: player.y, size: attractionRadius })) {
+        // 플레이어의 pickupRadius에 따른 범위 내의 아이템 끌어당기기
+        if (detectCollision(this, { x: player.x, y: player.y, size: player.pickupRadius })) {
             const angle = Math.atan2(player.y - this.y, player.x - this.x);
             this.x += Math.cos(angle) * 2;
             this.y += Math.sin(angle) * 2;
@@ -2274,14 +2579,16 @@ class Jewel {
         ctx.fill();
     }
 
+    // jewel 획득시 메서드
     collect() {
-        // Increase player's EXP
-        const expGained = 20;
+        // 경험치 획득량에 배율 적용
+        const expGained = Math.floor(20 * player.expMultiplier);
         player.exp += expGained;
         score += 5;
         this.checkLevelUp();
     }
 
+    //레벨업 시의 메서드
     checkLevelUp() {
         while (player.exp >= player.nextLevelExp) {
             // 레벨업
@@ -2297,14 +2604,12 @@ class Jewel {
             // 초과 경험치만 남기고 현재 경험치 초기화
             player.exp = excessExp;
             
-            // 레벨업 보상
-            player.health = player.maxHealth; // 체력 회복
-            player.speed += 0.1; // 속도 증가
+            // 레벨업 선택 화면으로 전환
+            currentGameState = GAME_STATE.LEVEL_UP;
+            pauseStartTime = Date.now(); // 일시정지 시간 기록
             
-            // 특정 레벨에서 무기 추가
-            if (player.level === 3) {
-                player.weapons.push(new ShotgunWeapon());
-            }
+            // 레벨업 옵션 생성
+            generateLevelUpOptions();
         }
     }
 }
