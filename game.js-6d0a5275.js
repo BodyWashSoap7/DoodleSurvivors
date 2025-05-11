@@ -109,7 +109,7 @@ let confirmDialogType = ""; // 어떤 확인 대화상자인지 구분
 
 // 레벨업 선택 관련 변수
 let levelUpOptions = [];
-let selectedLevelUpOption = 0;
+let selectedLevelUpOption = -1; // -1은 선택되지 않은 상태
 
 // 레벨업 아이콘 이미지 관련 변수
 const levelUpIcons = {};
@@ -404,8 +404,10 @@ document.addEventListener('keydown', (e) => {
             selectLevelUpOption(e.key);
             e.preventDefault();
         } else if (e.key === 'Enter') {
-            // 선택한 옵션 적용
-            applyLevelUpChoice();
+            // 선택한 옵션이 있을 때만 적용
+            if (selectedLevelUpOption !== -1) {
+                applyLevelUpChoice();
+            }
             e.preventDefault();
         }
     }
@@ -469,6 +471,11 @@ function selectLevelUpOption(key) {
 
 // 레벨업 선택 적용 함수
 function applyLevelUpChoice() {
+    // 선택된 옵션이 없으면 리턴
+    if (selectedLevelUpOption === -1) {
+        return;
+    }
+    
     const option = levelUpOptions[selectedLevelUpOption];
     
     switch(option.type) {
@@ -519,11 +526,11 @@ function generateLevelUpOptions() {
         { type: 'expMultiplier', name: '경험치 증가', value: 0.1, description: '경험치 획득량 +10%' }
     ];
     
-    // 랜덤하게 4개 중 하나 선택
+    // 랜덤하게 4개 선택
     levelUpOptions = [];
     const shuffled = [...allUpgrades].sort(() => Math.random() - 0.5);
     levelUpOptions = shuffled.slice(0, 4);
-    selectedLevelUpOption = 0;
+    selectedLevelUpOption = -1; // 초기에는 아무것도 선택되지 않은 상태
 }
 
 // 레벨업 아이콘 이미지 로드 함수
@@ -569,7 +576,7 @@ loadCharacterImages();
 loadMapTiles();
 loadLevelUpIcons();
 
-// 레벨업 화면 그리기 함수 수정 (박스 크기 조정)
+// 레벨업 화면 그리기 함수
 function drawLevelUpScreen() {
     // 배경
     ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
@@ -579,40 +586,77 @@ function drawLevelUpScreen() {
     ctx.fillStyle = '#66fcf1';
     ctx.font = '36px Arial';
     ctx.textAlign = 'center';
-    ctx.fillText('LEVEL UP!', canvas.width / 2, 100);
+    ctx.fillText('LEVEL UP!', canvas.width / 2, 50);
     
     // 레벨 표시
     ctx.fillStyle = '#ffff00';
     ctx.font = '24px Arial';
-    ctx.fillText(`LEVEL ${player.level}`, canvas.width / 2, 140);
+    ctx.fillText(`LEVEL ${player.level}`, canvas.width / 2, canvas.height - 40);
     
     // 중앙 위치
     const centerX = canvas.width / 2;
     const centerY = canvas.height / 2;
     
     // 옵션 박스 크기 (이미지를 담을 수 있도록 크기 조정)
-    const boxWidth = 160;
-    const boxHeight = 120;
-    const spacing = 150;
+    const boxWidth = 320;
+    const boxHeight = 150;
     
     // 위쪽 옵션 (상)
-    drawOptionBox(centerX - boxWidth/2, centerY - spacing - boxHeight/2, 
+    drawOptionBox(centerX - boxWidth/2, centerY - 160 - boxHeight/2, 
                  boxWidth, boxHeight, levelUpOptions[0], selectedLevelUpOption === 0);
     
     // 왼쪽 옵션 (좌)  
-    drawOptionBox(centerX - spacing - boxWidth/2, centerY - boxHeight/2,
+    drawOptionBox(centerX - 230 - boxWidth/2, centerY - boxHeight/2,
                  boxWidth, boxHeight, levelUpOptions[1], selectedLevelUpOption === 1);
     
     // 오른쪽 옵션 (우)
-    drawOptionBox(centerX + spacing - boxWidth/2, centerY - boxHeight/2,
+    drawOptionBox(centerX + 230 - boxWidth/2, centerY - boxHeight/2,
                  boxWidth, boxHeight, levelUpOptions[2], selectedLevelUpOption === 2);
     
     // 아래쪽 옵션 (하)
-    drawOptionBox(centerX - boxWidth/2, centerY + spacing - boxHeight/2,
+    drawOptionBox(centerX - boxWidth/2, centerY + 160 - boxHeight/2,
                  boxWidth, boxHeight, levelUpOptions[3], selectedLevelUpOption === 3);
-    
+       
     // 방향키 그리기
     drawArrowKeys(centerX, centerY);
+
+    // 플레이어 캐릭터 그리기 (중앙에)
+    if (player.image && player.image.complete) {
+        const playerDisplaySize = player.size * 4; // 레벨업 화면에서는 크게 표시
+        
+        // 플레이어의 현재 프레임과 애니메이션 상태에 맞는 스프라이트 위치
+        const spriteX = player.currentFrame * player.spriteWidth;
+        const spriteY = player.animationState === 'idle' ? 0 : player.spriteHeight;
+        
+        ctx.save();
+        
+        // 플레이어 중앙에 그리기
+        ctx.translate(centerX, centerY);
+        
+        // 플레이어 방향에 따른 좌우반전
+        if (player.direction === 'right') {
+            ctx.scale(-1, 1);
+        }
+        
+        // 캐릭터 이미지 그리기
+        ctx.drawImage(
+            player.image,
+            spriteX, spriteY,
+            player.spriteWidth, player.spriteHeight,
+            -playerDisplaySize / 2,
+            -playerDisplaySize / 2,
+            playerDisplaySize,
+            playerDisplaySize
+        );
+        
+        ctx.restore();
+    } else {
+        // 이미지가 로드되지 않은 경우 기본 원 그리기
+        ctx.fillStyle = 'white';
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, player.size * 2, 0, Math.PI * 2);
+        ctx.fill();
+    }
 }
 
 // 옵션 박스 그리기 함수
@@ -626,10 +670,10 @@ function drawOptionBox(x, y, width, height, option, isSelected) {
     ctx.lineWidth = isSelected ? 3 : 1;
     ctx.strokeRect(x, y, width, height);
     
-    // 아이콘 이미지 그리기
-    const iconSize = 64;
-    const iconX = x + (width - iconSize) / 2;
-    const iconY = y + 10; // 박스 상단에서 10px 아래
+    // 아이콘 이미지 그리기 (왼쪽 중앙)
+    const iconSize = 128;
+    const iconX = x + 15; // 박스 왼쪽에서 15px 떨어진 위치
+    const iconY = y + (height - iconSize) / 2; // 세로 중앙 정렬
     
     // 이미지가 로드되었고 해당 타입의 아이콘이 있으면 그리기
     if (levelUpIconsLoaded && levelUpIcons[option.type]) {
@@ -649,16 +693,20 @@ function drawOptionBox(x, y, width, height, option, isSelected) {
         ctx.fillText(letter, iconX + iconSize/2, iconY + iconSize/2 + 10);
     }
     
-    // 옵션 이름 (아이콘 아래로 위치 조정)
-    ctx.fillStyle = isSelected ? '#ffff00' : '#ffffff';
-    ctx.font = '16px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText(option.name, x + width/2, y + iconSize + 35);
+    // 텍스트 영역 (아이콘 오른쪽)
+    const textX = iconX + iconSize + 15; // 아이콘 오른쪽에서 15px 떨어진 위치
+    const textWidth = width - (textX - x) - 10; // 남은 공간에서 오른쪽 여백 10px 제외
     
-    // 옵션 설명 (더 아래로)
+    // 옵션 이름 (위쪽)
+    ctx.fillStyle = isSelected ? '#ffff00' : '#ffffff';
+    ctx.font = '24px Arial';
+    ctx.textAlign = 'left';
+    ctx.fillText(option.name, textX, y + height/2 - 10);
+    
+    // 옵션 설명 (아래쪽)
     ctx.fillStyle = isSelected ? '#ffffff' : '#c5c6c7';
-    ctx.font = '14px Arial';
-    ctx.fillText(option.description, x + width/2, y + iconSize + 55);
+    ctx.font = '18px Arial';
+    ctx.fillText(option.description, textX, y + height/2 + 15);
 }
 
 // 방향키 안내 그리기 함수
@@ -681,6 +729,7 @@ function drawArrowKeys(centerX, centerY) {
 
 // 방향키 그리기 함수
 function drawKey(x, y, size, arrow, isSelected) {
+    // 선택되지 않은 상태도 고려
     ctx.fillStyle = isSelected ? '#ffff00' : '#666666';
     ctx.fillRect(x, y, size, size);
     
