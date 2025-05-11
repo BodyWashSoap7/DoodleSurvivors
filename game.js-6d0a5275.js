@@ -183,8 +183,8 @@ loadCharacterImages();
 
 // 적 스폰 관련 변수 추가
 const MAX_ENEMIES = 50; // 최대 적 수
-const MIN_SPAWN_DISTANCE = 550; // 최소 스폰 거리
-const MAX_SPAWN_DISTANCE = 650; // 최대 스폰 거리
+const MIN_SPAWN_DISTANCE = 150; // 최소 스폰 거리
+const MAX_SPAWN_DISTANCE = 450; // 최대 스폰 거리
 const ENEMY_SPAWN_INTERVAL = 1000; // 적 스폰 간격 (1초)
 let lastEnemySpawnTime = 0; // 마지막 적 스폰 시간
 
@@ -1342,6 +1342,11 @@ class Bullet {
     }
 }
 
+// 전역 변수로 적 스프라이트 이미지 추가
+const enemySprite = new Image();
+enemySprite.src = './img/enemy_sprites.png'; // 적 스프라이트 시트 경로
+
+// Enemy 클래스 전체 수정
 class Enemy {
     constructor(x, y, size, speed, health, attackStrength) {
         this.x = x;
@@ -1351,53 +1356,326 @@ class Enemy {
         this.health = health;
         this.maxHealth = health;
         this.attackStrength = attackStrength;
+        
+        // 애니메이션 관련 속성
+        this.state = 'spawning'; // 'spawning', 'moving', 'dying', 'dead'
+        this.stateStartTime = Date.now();
+        this.spawnDuration = 500;
+        this.deathDuration = 500;
+        
+        // 스프라이트 애니메이션 속성
+        this.currentFrame = 0;
+        this.frameCount = 4; // 프레임 수
+        this.frameTime = 0;
+        this.frameDuration = 150; // 각 프레임 지속 시간
+        this.spriteWidth = 32; // 스프라이트 한 프레임의 너비
+        this.spriteHeight = 32; // 스프라이트 한 프레임의 높이
+        
+        // 방향 관련 (왼쪽/오른쪽만)
+        this.direction = 'right'; // 'left' or 'right'
+        this.angle = 0;
+        
+        // 애니메이션 효과
+        this.animationTime = 0;
+        this.wobbleAmount = 0;
+        this.currentSize = 0;
+        this.deathParticles = [];
     }
 
     update() {
-        // Move Enemy Towards Player
-        const angle = Math.atan2(player.y - this.y, player.x - this.x);
-        this.x += Math.cos(angle) * this.speed;
-        this.y += Math.sin(angle) * this.speed;
+        const currentTime = Date.now();
+        const deltaTime = 16; // 약 60fps 기준
+        this.animationTime += deltaTime;
+        
+        // 상태에 따른 업데이트
+        switch(this.state) {
+            case 'spawning':
+                this.updateSpawning(currentTime);
+                break;
+            case 'moving':
+                this.updateMoving();
+                break;
+            case 'dying':
+                this.updateDying(currentTime);
+                break;
+            case 'dead':
+                // 죽음 상태에서는 제거 대기
+                break;
+        }
 
-        // Remove enemy if health is zero or below
-        if (this.health <= 0) {
+        // 체력이 0 이하가 되면 죽음 상태로 전환
+        if (this.health <= 0 && this.state === 'moving') {
+            this.startDying();
+        }
+    }
+
+    updateSpawning(currentTime) {
+        const elapsedTime = currentTime - this.stateStartTime;
+        const progress = Math.min(elapsedTime / this.spawnDuration, 1);
+        
+        // 크기가 0에서 정상 크기로 커지는 애니메이션
+        this.currentSize = this.size * this.easeOutBack(progress);
+        
+        // 스폰 애니메이션이 끝나면 이동 상태로 전환
+        if (progress >= 1) {
+            this.state = 'moving';
+            this.currentSize = this.size;
+        }
+    }
+
+    updateMoving() {
+        // 플레이어를 향해 이동
+        this.angle = Math.atan2(player.y - this.y, player.x - this.x);
+        this.x += Math.cos(this.angle) * this.speed;
+        this.y += Math.sin(this.angle) * this.speed;
+        
+        // 방향 설정 (왼쪽/오른쪽만)
+        if (player.x < this.x) {
+            this.direction = 'left';
+        } else {
+            this.direction = 'right';
+        }
+        
+        // 움직일 때 약간의 흔들림 효과
+        this.wobbleAmount = Math.sin(this.animationTime * 0.01) * 2;
+    }
+
+    updateDying(currentTime) {
+        const elapsedTime = currentTime - this.stateStartTime;
+        const progress = Math.min(elapsedTime / this.deathDuration, 1);
+        
+        // 크기가 작아지면서 사라지는 애니메이션
+        this.currentSize = this.size * (1 - this.easeInQuad(progress));
+        
+        // 파티클 업데이트
+        this.updateDeathParticles();
+        
+        // 죽음 애니메이션이 끝나면 완전히 제거
+        if (progress >= 1) {
+            this.state = 'dead';
             this.die();
         }
     }
 
+    startDying() {
+        this.state = 'dying';
+        this.stateStartTime = Date.now();
+        
+        // 죽음 파티클 생성
+        for (let i = 0; i < 8; i++) {
+            const angle = (Math.PI * 2 * i) / 8;
+            this.deathParticles.push({
+                x: this.x,
+                y: this.y,
+                vx: Math.cos(angle) * 3,
+                vy: Math.sin(angle) * 3,
+                size: 5,
+                life: 1
+            });
+        }
+    }
+
+    updateDeathParticles() {
+        for (let particle of this.deathParticles) {
+            particle.x += particle.vx;
+            particle.y += particle.vy;
+            particle.life -= 0.05;
+            particle.size *= 0.95;
+            particle.vx *= 0.95;
+            particle.vy *= 0.95;
+        }
+    }
+
     draw(offsetX, offsetY) {
+        const drawX = this.x + offsetX;
+        const drawY = this.y + offsetY;
+        
+        // 상태에 따른 그리기
+        switch(this.state) {
+            case 'spawning':
+                this.drawSpawning(drawX, drawY);
+                break;
+            case 'moving':
+                this.drawMoving(drawX, drawY);
+                break;
+            case 'dying':
+                this.drawDying(drawX, drawY, offsetX, offsetY);
+                break;
+        }
+    }
+
+    drawSpawning(drawX, drawY) {
+        // 스폰 중일 때 - 반투명하게 나타나면서 커지는 효과
+        const progress = (Date.now() - this.stateStartTime) / this.spawnDuration;
+        ctx.globalAlpha = Math.min(progress, 1);
+        
+        // 스폰 서클 효과
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(drawX, drawY, this.currentSize * 1.5, 0, Math.PI * 2 * progress);
+        ctx.stroke();
+        
+        // 스프라이트 또는 기본 형태
+        if (enemySprite.complete) {
+            const displaySize = this.currentSize * 2.5;
+            
+            // 스폰 시 기본 방향 설정
+            const defaultDirection = player.x < this.x ? 'left' : 'right';
+            const spriteY = defaultDirection === 'left' ? 0 : this.spriteHeight;
+            
+            ctx.drawImage(
+                enemySprite,
+                0, spriteY, // 기본 프레임, 적절한 방향
+                this.spriteWidth, this.spriteHeight,
+                drawX - displaySize / 2,
+                drawY - displaySize / 2,
+                displaySize,
+                displaySize
+            );
+        } else {
+            ctx.fillStyle = 'red';
+            ctx.beginPath();
+            ctx.arc(drawX, drawY, this.currentSize, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        
+        ctx.globalAlpha = 1;
+    }
+
+    drawMoving(drawX, drawY) {
+        // 이동 중일 때 스프라이트 그리기
+        const pulse = 1 + Math.sin(this.animationTime * 0.005) * 0.05;
+        const currentSize = this.currentSize * pulse;
+        
+        // 그림자 효과
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+        ctx.beginPath();
+        ctx.ellipse(drawX + 3, drawY + 5, currentSize * 0.8, currentSize * 0.4, 0, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // 스프라이트 그리기
+        if (enemySprite.complete) {
+            // 방향에 따른 스프라이트 시트 Y 위치 (2줄만 사용)
+            const spriteY = this.direction === 'left' ? 0 : this.spriteHeight;
+            
+            // 현재 프레임의 X 위치
+            const spriteX = this.currentFrame * this.spriteWidth;
+            
+            // 스프라이트 크기 (적 크기에 맞춤)
+            const displaySize = this.size * 2.5;
+            
+            ctx.save();
+            ctx.drawImage(
+                enemySprite,
+                spriteX, spriteY,
+                this.spriteWidth, this.spriteHeight,
+                drawX - displaySize / 2 + this.wobbleAmount,
+                drawY - displaySize / 2,
+                displaySize,
+                displaySize
+            );
+            ctx.restore();
+        } else {
+            // 스프라이트가 로드되지 않은 경우 기존 원 그리기
+            ctx.fillStyle = 'red';
+            ctx.beginPath();
+            ctx.arc(drawX + this.wobbleAmount, drawY, currentSize, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.strokeStyle = '#8B0000';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
+        
+        // 체력바는 스폰 완료 후에만 표시
+        if (this.state === 'moving') {
+            this.drawHealthBar(drawX, drawY);
+        }
+    }
+
+    drawDying(drawX, drawY, offsetX, offsetY) {
+        // 죽을 때 - 폭발 효과
+        const progress = (Date.now() - this.stateStartTime) / this.deathDuration;
+        ctx.globalAlpha = 1 - progress;
+        
+        // 파티클 그리기
+        ctx.fillStyle = 'orange';
+        for (let particle of this.deathParticles) {
+            if (particle.life > 0) {
+                ctx.globalAlpha = particle.life;
+                ctx.beginPath();
+                ctx.arc(
+                    particle.x + offsetX, 
+                    particle.y + offsetY, 
+                    particle.size, 
+                    0, 
+                    Math.PI * 2
+                );
+                ctx.fill();
+            }
+        }
+        
+        // 축소되는 적 본체
+        ctx.globalAlpha = 1 - progress;
         ctx.fillStyle = 'red';
         ctx.beginPath();
-        ctx.arc(this.x + offsetX, this.y + offsetY, this.size, 0, Math.PI * 2);
+        ctx.arc(drawX, drawY, this.currentSize, 0, Math.PI * 2);
         ctx.fill();
+        
+        ctx.globalAlpha = 1;
+    }
 
-        // Draw Health Bar
+    drawHealthBar(drawX, drawY) {
+        // 체력바 그리기
+        const barWidth = this.size * 2;
+        const barHeight = 5;
+        const barY = drawY - this.currentSize - 10;
+        
+        // 체력바 배경
         ctx.fillStyle = 'black';
         ctx.fillRect(
-            this.x - this.size + offsetX,
-            this.y - this.size - 10 + offsetY,
-            this.size * 2,
-            5
+            drawX - barWidth/2,
+            barY,
+            barWidth,
+            barHeight
         );
-        ctx.fillStyle = 'green';
+        
+        // 체력바
+        const healthPercent = this.health / this.maxHealth;
+        ctx.fillStyle = healthPercent > 0.5 ? 'green' : healthPercent > 0.25 ? 'yellow' : 'red';
         ctx.fillRect(
-            this.x - this.size + offsetX,
-            this.y - this.size - 10 + offsetY,
-            (this.size * 2) * (this.health / this.maxHealth),
-            5
+            drawX - barWidth/2,
+            barY,
+            barWidth * healthPercent,
+            barHeight
         );
     }
 
     takeDamage(damage) {
-        this.health -= damage;
+        // 이동 중일 때만 데미지 받음
+        if (this.state === 'moving') {
+            this.health -= damage;
+        }
     }
 
     die() {
-        // Drop a jewel
+        // 보석 드롭
         jewels.push(new Jewel(this.x, this.y));
         score += 10;
         const index = enemies.indexOf(this);
         if (index !== -1) enemies.splice(index, 1);
+    }
+
+    // 이징 함수들
+    easeOutBack(t) {
+        const c1 = 1.70158;
+        const c3 = c1 + 1;
+        return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+    }
+    
+    easeInQuad(t) {
+        return t * t;
     }
 }
 
