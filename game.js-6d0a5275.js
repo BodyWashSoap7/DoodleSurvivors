@@ -18,6 +18,12 @@ let jewels = [];
 let keys = {};
 let score = 0;
 
+// 맵 타일 이미지 관련 변수 추가 (파일 상단에)
+const mapTileImages = [];
+const TILE_SIZE = 100; // 타일 크기
+const MAP_TILES_COUNT = 4; // 맵 타일 이미지 개수
+let tilesLoaded = false;
+
 // Game state
 const GAME_STATE = {
     START_SCREEN: 0,
@@ -190,8 +196,29 @@ function loadCharacterImages() {
     });
 }
 
+// 맵 타일 이미지 로드 함수
+function loadMapTiles() {
+    for (let i = 1; i <= MAP_TILES_COUNT; i++) {
+        const img = new Image();
+        img.src = `./img/map_tile_${i}.png`; // map_tile_1.png ~ map_tile_4.png
+        mapTileImages.push(img);
+        
+        // 모든 이미지가 로드되었는지 확인
+        img.onload = function() {
+            const loadedCount = mapTileImages.filter(img => img.complete).length;
+            if (loadedCount === MAP_TILES_COUNT) {
+                tilesLoaded = true;
+                console.log('모든 맵 타일 이미지 로드 완료');
+            }
+        };
+    }
+}
+
 // 게임 초기화 시 이미지 로딩 호출
 loadCharacterImages();
+
+// 게임 초기화 시 맵 타일 로드
+loadMapTiles();
 
 // 적 스폰 관련 변수 추가
 const MAX_ENEMIES = 100; // 최대 적 수
@@ -1388,8 +1415,65 @@ function restartGame() {
     currentGameState = GAME_STATE.START_SCREEN;
 }
 
+// 위치 기반 랜덤 시드 함수 (같은 위치는 항상 같은 타일이 나오도록)
+function getTileIndex(tileX, tileY) {
+    // 간단한 해시 함수를 사용하여 랜덤하지만 일관된 타일 인덱스 생성
+    const hash = Math.abs((tileX * 73856093) ^ (tileY * 19349663)) % MAP_TILES_COUNT;
+    return hash;
+}
+
+// drawBackground 함수
 function drawBackground(offsetX, offsetY) {
-    const gridSize = 50; // Size of each grid cell
+    if (!tilesLoaded) {
+        drawGridBackground(offsetX, offsetY);
+        return;
+    }
+    
+    // 플레이어 위치를 기준으로 타일 시작 위치 계산
+    const playerTileX = Math.floor(player.x / TILE_SIZE);
+    const playerTileY = Math.floor(player.y / TILE_SIZE);
+    
+    // 화면에 보이는 타일 개수 계산 (여유 있게 더 많이 그림)
+    const tilesX = Math.ceil(canvas.width / TILE_SIZE) + 3;
+    const tilesY = Math.ceil(canvas.height / TILE_SIZE) + 3;
+    
+    // 시작 타일 위치
+    const startTileX = playerTileX - Math.floor(tilesX / 2);
+    const startTileY = playerTileY - Math.floor(tilesY / 2);
+    
+    // 타일 그리기
+    for (let tileY = startTileY; tileY < startTileY + tilesY; tileY++) {
+        for (let tileX = startTileX; tileX < startTileX + tilesX; tileX++) {
+            const tileIndex = getTileIndex(tileX, tileY);
+            const tileImage = mapTileImages[tileIndex];
+            
+            if (tileImage && tileImage.complete) {
+                // 월드 좌표를 화면 좌표로 변환
+                const worldX = tileX * TILE_SIZE;
+                const worldY = tileY * TILE_SIZE;
+                const screenX = worldX + offsetX;
+                const screenY = worldY + offsetY;
+                
+                // 화면 밖의 타일은 그리지 않음 (성능 최적화)
+                if (screenX + TILE_SIZE > 0 && screenX < canvas.width &&
+                    screenY + TILE_SIZE > 0 && screenY < canvas.height) {
+                    
+                    ctx.drawImage(
+                        tileImage,
+                        0, 0,
+                        tileImage.width, tileImage.height,
+                        screenX, screenY,
+                        TILE_SIZE, TILE_SIZE
+                    );
+                }
+            }
+        }
+    }
+}
+
+// 기존 격자무늬 배경 함수 (폴백용)
+function drawGridBackground(offsetX, offsetY) {
+    const gridSize = 50;
     ctx.strokeStyle = '#333';
     ctx.lineWidth = 1;
 
