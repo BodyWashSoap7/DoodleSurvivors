@@ -35,6 +35,62 @@ let loadingStartTime = 0; // 로딩 시작 시간
 let loadingMinDuration = 500; // 최소 로딩 시간 (0.5초)
 let chunksLoaded = false; // 청크 로딩 완료 여부
 
+// HUD 관련 변수들
+let gameStartTime = 0;      // 게임 시작 시간
+let totalPausedTime = 0;    // 총 일시정지 시간
+let pauseStartTime = 0;     // 일시정지 시작 시간
+let elapsedTime = 0;        // 경과 시간 (초)
+
+// Get HUD elements
+const healthElement = document.getElementById('health');
+const levelElement = document.getElementById('level');
+const scoreElement = document.getElementById('score');
+const expElement = document.getElementById('exp');
+
+// HUD를 캔버스에 그리는 함수
+function drawHUD() {
+    // 경과 시간 (화면 최상단 가운데)
+    ctx.font = '20px Arial';
+    ctx.fillStyle = '#66fcf1';
+    ctx.textAlign = 'center';
+    ctx.fillText(formatTime(elapsedTime), canvas.width / 2, 30);
+    
+    // 점수 (화면 왼쪽 위)
+    ctx.font = '18px Arial';
+    ctx.fillStyle = '#66fcf1';
+    ctx.textAlign = 'left';
+    ctx.fillText(`Score: ${score}`, 20, 30);
+    
+    // 레벨 (화면 하단, 경험치 바 바로 위)
+    ctx.font = '24px Arial';
+    ctx.fillStyle = '#ffff00';
+    ctx.textAlign = 'center';
+    ctx.fillText(`LEVEL ${player.level}`, canvas.width / 2, canvas.height - 40);
+    
+    // 경험치 바 (화면 최하단에 전체 너비)
+    const expBarHeight = 20;
+    const expBarY = canvas.height - expBarHeight;
+    
+    // 경험치 바 배경 (검은색)
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+    ctx.fillRect(0, expBarY, canvas.width, expBarHeight);
+    
+    // 경험치 바 (진행도)
+    const expProgress = (player.exp - player.prevLevelExp) / (player.nextLevelExp - player.prevLevelExp);
+    ctx.fillStyle = '#00ff00';
+    ctx.fillRect(0, expBarY, canvas.width * expProgress, expBarHeight);
+    
+    // 경험치 바 테두리
+    ctx.strokeStyle = '#66fcf1';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(0, expBarY, canvas.width, expBarHeight);
+    
+    // 경험치 텍스트 (바 중앙에)
+    ctx.font = '14px Arial';
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.fillText(`${player.exp} / ${player.nextLevelExp}`, canvas.width / 2, expBarY + 15);
+}
 
 // Start menu options
 let selectedMenuOption = 0; // 0 = Start Game, 1 = Settings
@@ -132,11 +188,7 @@ const MAX_SPAWN_DISTANCE = 650; // 최대 스폰 거리
 const ENEMY_SPAWN_INTERVAL = 1000; // 적 스폰 간격 (1초)
 let lastEnemySpawnTime = 0; // 마지막 적 스폰 시간
 
-// Get HUD elements
-const healthElement = document.getElementById('health');
-const levelElement = document.getElementById('level');
-const scoreElement = document.getElementById('score');
-const expElement = document.getElementById('exp');
+
 
 // Handle window resizing
 function resizeCanvas() {
@@ -319,19 +371,23 @@ window.addEventListener('blur', () => {
     }
 });
 
-// 일시정지 기능 추가
-// 게임이 일시 정지될 때 selectedPauseOption 초기화 추가
+// pauseGame 함수
 function pauseGame() {
     if (currentGameState === GAME_STATE.PLAYING) {
         previousGameState = currentGameState;
         currentGameState = GAME_STATE.PAUSED;
-        selectedPauseOption = 0; // 일시정지 시 첫 번째 옵션 선택
+        selectedPauseOption = 0;
+        pauseStartTime = Date.now(); // 일시정지 시작 시간 기록
     }
 }
 
-// 게임 재개 기능 추가
+// 게임 재개 기능
 function resumeGame() {
     if (currentGameState === GAME_STATE.PAUSED && previousGameState !== null) {
+        // 일시정지된 시간 계산
+        const pausedDuration = Date.now() - pauseStartTime;
+        totalPausedTime += pausedDuration;
+        
         currentGameState = previousGameState;
     }
 }
@@ -448,7 +504,7 @@ function drawLoadingScreen() {
     ctx.fillRect(canvas.width / 2 - 100, canvas.height / 2 + 20, 200 * progress, 20);
 }
 
-// startGame 함수 수정 - 로딩 상태로 전환
+// startGame 함수
 function startGame() {
     // 로딩 상태로 변경
     currentGameState = GAME_STATE.LOADING;
@@ -458,12 +514,17 @@ function startGame() {
     // 게임 초기화
     resetGame();
     
+    // 게임 시작 시간 초기화
+    gameStartTime = Date.now();
+    totalPausedTime = 0;
+    elapsedTime = 0;
+    
     // 비동기적으로 청크 생성
     setTimeout(() => {
         // 플레이어 주변 청크 생성
         generateChunksAroundPlayer();
         chunksLoaded = true;
-    }, 10); // 약간의 딜레이를 주어 UI 스레드가 로딩 화면을 그릴 수 있게 함
+    }, 10);
 }
 
 // Removed mouse event listeners to only use keyboard controls
@@ -513,13 +574,13 @@ function autoFireAtNearestEnemy() {
     }
 }
 
-// Game Loop
+// Game Loop 변수
 let lastGameState = null;
 let lastFrameTime = 0;
 const TARGET_FPS = 120;
 const FRAME_INTERVAL = 1000 / TARGET_FPS;
 
-// Game Loop 수정 - 로딩 상태 처리 추가
+// Game Loop 함수
 function gameLoop(timestamp) {
     // Calculate delta time and limit frame rate
     if (!lastFrameTime) lastFrameTime = timestamp;
@@ -529,16 +590,7 @@ function gameLoop(timestamp) {
     if (deltaTime >= FRAME_INTERVAL) {
         lastFrameTime = timestamp;
         
-        // Only update HUD display when game state changes to avoid unnecessary DOM operations
-        if (currentGameState !== lastGameState) {
-            if (currentGameState === GAME_STATE.PLAYING) {
-                document.getElementById('hud').style.display = 'flex';
-            } else if (currentGameState !== GAME_STATE.PAUSED && currentGameState !== GAME_STATE.LOADING) {
-                // 일시정지 상태와 로딩 상태에서는 HUD를 계속 표시
-                document.getElementById('hud').style.display = 'none';
-            }
-            lastGameState = currentGameState;
-        }
+        // DOM HUD 표시/숨김 코드 제거
         
         // 로딩 상태 처리
         if (currentGameState === GAME_STATE.LOADING) {
@@ -705,14 +757,23 @@ function drawSettingsScreen() {
 }
 
 // Update Game State
+/*
 // Cache previous values to avoid unnecessary DOM updates
 let lastHealth = player.health;
 let lastLevel = player.level;
 let lastScore = score;
 let lastExp = player.exp;
+*/
 
-// update 함수를 수정합니다 - 플레이어 움직임과 상관없이 항상 자동 조준 업데이트
+// update 함수
 function update() {
+    // 경과 시간 계산 (게임이 실행 중일 때만)
+    if (currentGameState === GAME_STATE.PLAYING) {
+        const currentTime = Date.now();
+        const totalElapsed = currentTime - gameStartTime - totalPausedTime;
+        elapsedTime = Math.floor(totalElapsed / 1000); // 초 단위로 변환
+    }
+    
     // Move Player
     let dx = 0;
     let dy = 0;
@@ -824,7 +885,7 @@ function update() {
             }
         }
     }
-
+/*
     // Update HUD elements only when values change
     if (lastHealth !== player.health) {
         healthElement.textContent = `Health: ${player.health}`;
@@ -845,6 +906,7 @@ function update() {
         expElement.textContent = `EXP: ${player.exp} / ${player.nextLevelExp}`;
         lastExp = player.exp;
     }
+*/
 }
 
 // Draw Game Objects
@@ -879,13 +941,13 @@ function draw() {
         bullet.draw(offsetX, offsetY);
     });
 
-    // 플레이어 그리기 - 스프라이트 방식으로 수정
+    // 플레이어 그리기
     if (player.image && player.image.complete) {
         const playerSize = player.size * 2;
         
         // 스프라이트 시트에서 현재 프레임 위치 계산
         const spriteX = player.currentFrame * player.spriteWidth;
-        const spriteY = player.animationState === 'idle' ? 0 : player.spriteHeight; // idle: 0행, walking: 1행
+        const spriteY = player.animationState === 'idle' ? 0 : player.spriteHeight;
         
         ctx.save();
         ctx.globalCompositeOperation = 'source-over';
@@ -893,8 +955,8 @@ function draw() {
         // 스프라이트 시트에서 해당 프레임만 그리기
         ctx.drawImage(
             player.image,
-            spriteX, spriteY, // 스프라이트 시트에서의 위치
-            player.spriteWidth, player.spriteHeight, // 스프라이트 프레임 크기
+            spriteX, spriteY,
+            player.spriteWidth, player.spriteHeight,
             canvas.width / 2 - playerSize,
             canvas.height / 2 - playerSize,
             playerSize * 2,
@@ -903,14 +965,40 @@ function draw() {
         
         ctx.restore();
     } else {
-        // 이미지가 로드되지 않은 경우 기존 원 그리기 (대체용)
+        // 이미지가 로드되지 않은 경우 기존 원 그리기
         ctx.fillStyle = 'white';
         ctx.beginPath();
         ctx.arc(canvas.width / 2, canvas.height / 2, player.size, 0, Math.PI * 2);
         ctx.fill();
     }
     
-    // 플레이어 방향 표시기 그리기 (이전과 동일)
+    // 플레이어 체력바 그리기 (플레이어 머리 위)
+    const healthBarWidth = 50;
+    const healthBarHeight = 6;
+    const healthBarX = canvas.width / 2 - healthBarWidth / 2;
+    const healthBarY = canvas.height / 2 - player.size * 2 - 20;
+    
+    // 체력바 배경 (검은색)
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(healthBarX, healthBarY, healthBarWidth, healthBarHeight);
+    
+    // 체력바 (현재 체력)
+    const healthPercentage = player.health / player.maxHealth;
+    if (healthPercentage > 0.6) {
+        ctx.fillStyle = '#00ff00'; // 초록색
+    } else if (healthPercentage > 0.3) {
+        ctx.fillStyle = '#ffff00'; // 노란색
+    } else {
+        ctx.fillStyle = '#ff0000'; // 빨간색
+    }
+    ctx.fillRect(healthBarX, healthBarY, healthBarWidth * healthPercentage, healthBarHeight);
+    
+    // 체력바 테두리
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(healthBarX, healthBarY, healthBarWidth, healthBarHeight);
+    
+    // 플레이어 방향 표시기
     if (player.aimAngle !== undefined) {
         const indicatorLength = player.size * 1.2;
         ctx.strokeStyle = 'cyan';
@@ -923,6 +1011,9 @@ function draw() {
         );
         ctx.stroke();
     }
+    
+    // HUD 그리기 (마지막에 그려서 다른 요소들 위에 표시)
+    drawHUD();
 }
 
 function drawGameOverScreen() {
@@ -941,6 +1032,14 @@ function drawGameOverScreen() {
 }
 
 // Helper Functions
+
+// 시간을 MM:SS 형식으로 포맷팅하는 함수
+function formatTime(seconds) {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = Math.floor(seconds % 60);
+    return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+}
+
 function getChunkCoord(x, y) {
     return {
         x: Math.floor(x / CHUNK_SIZE),
@@ -1070,7 +1169,6 @@ function spawnEnemyAroundPlayer() {
     lastEnemySpawnTime = currentTime;
 }
 
-
 function detectCollision(obj1, obj2) {
     const dx = obj1.x - obj2.x;
     const dy = obj1.y - obj2.y;
@@ -1114,19 +1212,17 @@ function resetGame() {
     player.animationState = 'idle';
     player.currentFrame = 0;
     player.frameTime = 0;
-    // characterType과 image는 그대로 유지 (캐릭터 선택 유지)
     bullets = [];
     enemies = [];
     jewels = [];
     terrain = [];
     chunks = {};
     score = 0;
-
-    // HUD 업데이트
-    healthElement.textContent = `Health: ${player.health}`;
-    levelElement.textContent = `Level: ${player.level}`;
-    scoreElement.textContent = `Score: ${score}`;
-    expElement.textContent = `EXP: ${player.exp} / ${player.nextLevelExp}`;
+    
+    // 시간 초기화
+    elapsedTime = 0;
+    totalPausedTime = 0;
+    
 }
 
 function restartGame() {
