@@ -124,7 +124,7 @@ const player = {
     health: 100,
     level: 1,
     exp: 0,
-    nextLevelExp: 100,
+    nextLevelExp: 50,
     prevLevelExp: 0,
     weapons: [],
     characterType: 1,
@@ -217,20 +217,55 @@ function loadCharacterImages() {
 
 // 맵 타일 이미지 로드 함수
 function loadMapTiles() {
+    let loadedCount = 0;
+    let errorCount = 0;
+    
+    // 모든 이미지가 로드되었거나 오류 발생 시 호출할 함수
+    function checkAllLoaded() {
+        if (loadedCount + errorCount === MAP_TILES_COUNT) {
+            // 최소 하나 이상의 이미지가 로드되었으면 진행
+            if (loadedCount > 0) {
+                tilesLoaded = true;
+                console.log(`맵 타일 이미지 로드 완료: ${loadedCount}개 성공, ${errorCount}개 실패`);
+            } else {
+                console.error('모든 맵 타일 이미지 로드 실패');
+            }
+        }
+    }
+    
     for (let i = 1; i <= MAP_TILES_COUNT; i++) {
         const img = new Image();
-        img.src = `./img/map_tile_${i}.png`; // map_tile_1.png ~ map_tile_4.png
-        mapTileImages.push(img);
         
-        // 모든 이미지가 로드되었는지 확인
+        // onload 핸들러 먼저 설정
         img.onload = function() {
-            const loadedCount = mapTileImages.filter(img => img.complete).length;
-            if (loadedCount === MAP_TILES_COUNT) {
-                tilesLoaded = true;
-                console.log('모든 맵 타일 이미지 로드 완료');
-            }
+            loadedCount++;
+            checkAllLoaded();
         };
+        
+        // onerror 핸들러 추가
+        img.onerror = function() {
+            console.error(`맵 타일 이미지 로드 실패: map_tile_${i}.png`);
+            errorCount++;
+            
+            // 실패 시 재시도 (최대 1회)
+            setTimeout(() => {
+                console.log(`맵 타일 이미지 재시도: map_tile_${i}.png`);
+                img.src = `./img/map_tile_${i}.png?retry=${Date.now()}`;
+            }, 1000);
+        };
+        
+        // src 속성 설정은 이벤트 핸들러 설정 후에
+        img.src = `./img/map_tile_${i}.png`;
+        mapTileImages.push(img);
     }
+    
+    // 5초 후에도 로드가 안 되면 강제로 진행
+    setTimeout(() => {
+        if (!tilesLoaded && loadedCount > 0) {
+            tilesLoaded = true;
+            console.log(`시간 초과로 인한 맵 타일 이미지 로드 중단: ${loadedCount}개 성공`);
+        }
+    }, 5000);
 }
 
 // 게임 초기화 시 이미지 로딩 호출
@@ -422,9 +457,15 @@ document.addEventListener('keydown', (e) => {
             currentGameState = GAME_STATE.START_SCREEN;
         } else if (currentGameState === GAME_STATE.CONFIRM_DIALOG) {
             currentGameState = GAME_STATE.PAUSED;
+        } else if (currentGameState === GAME_STATE.LEVEL_UP) {
+            // 레벨업 화면에서 ESC를 누르면 일시정지 화면으로 전환
+            previousGameState = currentGameState;
+            currentGameState = GAME_STATE.PAUSED;
+            pauseStartTime = Date.now(); // 일시정지 시작 시간 기록
         }
         e.preventDefault();
     }
+    
     // 게임 오버 화면에서 키 처리 (이전과 동일)
     else if (currentGameState === GAME_STATE.GAME_OVER) {
         if (e.key === 'Enter') {
@@ -745,7 +786,8 @@ function drawKey(x, y, size, arrow, isSelected) {
 
 // pauseGame 함수
 function pauseGame() {
-    if (currentGameState === GAME_STATE.PLAYING) {
+    if (currentGameState === GAME_STATE.PLAYING || 
+        currentGameState === GAME_STATE.LEVEL_UP) {
         previousGameState = currentGameState;
         currentGameState = GAME_STATE.PAUSED;
         selectedPauseOption = 0;
@@ -760,10 +802,12 @@ function resumeGame() {
         const pausedDuration = Date.now() - pauseStartTime;
         totalPausedTime += pausedDuration;
         
+        // 이전 상태로 복귀 (레벨업 화면 또는 플레이 화면)
         currentGameState = previousGameState;
     }
 }
 
+// 일시정지 화면 그리기 함수 수정
 function drawPauseScreen() {
     ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -795,7 +839,6 @@ function drawPauseScreen() {
         ctx.fillStyle = '#FFFFFF';
     }
     ctx.fillText('MAIN MENU', canvas.width / 2, canvas.height / 2 + 50);
-    
 }
 
 // 확인 대화상자 그리기 함수
@@ -992,13 +1035,27 @@ function gameLoop(timestamp) {
         } else if (currentGameState === GAME_STATE.GAME_OVER) {
             drawGameOverScreen();
         } else if (currentGameState === GAME_STATE.PAUSED) {
-            // 배경 그리기 (플레이어가 어디에 있는지 볼 수 있게)
-            draw();
+            // 일시정지 전 화면에 따라 배경 다르게 그리기
+            if (previousGameState === GAME_STATE.LEVEL_UP) {
+                // 레벨업 화면을 배경으로 그리기
+                draw(); // 게임 화면 먼저 그리기
+                drawLevelUpScreen(); // 그 위에 레벨업 화면 그리기
+            } else {
+                // 기존처럼 게임 화면만 그리기
+                draw();
+            }
+            
             // 그 위에 일시정지 화면 그리기
             drawPauseScreen();
         } else if (currentGameState === GAME_STATE.CONFIRM_DIALOG) {
-            // 게임 화면 그리기
-            draw();
+            // 확인 대화상자 배경도 동일하게 처리
+            if (previousGameState === GAME_STATE.LEVEL_UP) {
+                draw();
+                drawLevelUpScreen();
+            } else {
+                draw();
+            }
+            
             // 일시정지 화면 그리기
             drawPauseScreen();
             // 확인 대화상자 그리기
@@ -1646,7 +1703,8 @@ function spawnEnemyAroundPlayer() {
     if (isValidSpawnPosition(spawnX, spawnY)) {
         // 적 생성
         const enemySize = 20;
-        const enemySpeed = 1 + Math.random() * 0.5 + (player.level - 1) * 0.1;
+        //const enemySpeed = 1 + Math.random() * 0.5 + (player.level - 1) * 0.1;
+        const enemySpeed = 0.5 + Math.random() * 0.1
         const enemyHealth = 5 + Math.floor((player.level - 1) * 1.5);
         const enemyAttack = 10 + Math.floor((player.level - 1) * 0.5);
         
@@ -1717,6 +1775,38 @@ function isWithinDistance(obj1, obj2, distance) {
     return dx * dx + dy * dy <= distance * distance;
 }
 
+// Add this function to calculate XP requirements based on levels
+function getXPForNextLevel(currentLevel) {
+    let xp;
+    
+    // Level 1 to 2: 50 XP
+    if (currentLevel === 1) {
+        xp = 50;
+    }
+    // Level 2 to 20: Increases by 100 XP each level
+    else if (currentLevel <= 19) {
+        xp = 50 + ((currentLevel - 1) * 100);
+    }
+    // Level 20 to 40: Increases by 130 XP each level
+    else if (currentLevel <= 39) {
+        xp = 50 + (19 * 100) + ((currentLevel - 20) * 130);
+    }
+    // Level 40 onwards: Increases by 160 XP each level
+    else {
+        xp = 50 + (19 * 100) + (20 * 130) + ((currentLevel - 40) * 160);
+    }
+    
+    // Special cases: Additional XP at levels 10 and 30
+    if (currentLevel === 9) {
+        xp += 5000; // Additional 5000 XP to reach level 10
+    }
+    else if (currentLevel === 29) {
+        xp += 20000; // Additional 20000 XP to reach level 30
+    }
+    
+    return xp;
+}
+
 function fireWeapon() {
     // Create a bullet in the direction player is aiming
     if (player.aimAngle !== undefined) {
@@ -1739,7 +1829,7 @@ function resetGame() {
     player.health = player.maxHealth;
     player.level = 1;
     player.exp = 0;
-    player.nextLevelExp = 100;
+    player.nextLevelExp = 50;
     player.prevLevelExp = 0;
     player.weapons = [new BasicWeapon()];
     
@@ -2017,8 +2107,8 @@ class Enemy {
         this.frameCount = 4; // 프레임 수
         this.frameTime = 0;
         this.frameDuration = 150; // 각 프레임 지속 시간
-        this.spriteWidth = 32; // 스프라이트 한 프레임의 너비
-        this.spriteHeight = 32; // 스프라이트 한 프레임의 높이
+        this.spriteWidth = 64; // 스프라이트 한 프레임의 너비
+        this.spriteHeight = 64; // 스프라이트 한 프레임의 높이
         
         // 방향 관련 (왼쪽/오른쪽만)
         this.direction = 'right'; // 'left' or 'right'
@@ -2201,7 +2291,7 @@ class Enemy {
         }
         
         // 플레이어가 적을 죽였을 때 경험치 획득 (경험치 배율 적용)
-        player.exp += Math.floor(100 * player.expMultiplier);
+        player.exp += Math.floor(3 * player.expMultiplier);
         score += 10;
         
         // 10% 확률로만 jewel 드롭
@@ -2283,17 +2373,36 @@ class Enemy {
             
             // 스폰 시 기본 방향 설정
             const defaultDirection = player.x < this.x ? 'left' : 'right';
-            const spriteY = defaultDirection === 'left' ? 0 : this.spriteHeight;
             
-            ctx.drawImage(
-                enemySprite,
-                0, spriteY, // 기본 프레임, 적절한 방향
-                this.spriteWidth, this.spriteHeight,
-                drawX - displaySize / 2,
-                drawY - displaySize / 2,
-                displaySize,
-                displaySize
-            );
+            ctx.save();
+            
+            // 오른쪽 방향일 경우 좌우반전
+            if (defaultDirection === 'right') {
+                ctx.translate(drawX + displaySize / 2, 0);
+                ctx.scale(-1, 1);
+                ctx.drawImage(
+                    enemySprite,
+                    0, 0, // 기본 프레임, 항상 첫 줄 사용
+                    this.spriteWidth, this.spriteHeight,
+                    0,
+                    drawY - displaySize / 2,
+                    displaySize,
+                    displaySize
+                );
+            } else {
+                // 왼쪽 방향일 경우 기존대로 그리기
+                ctx.drawImage(
+                    enemySprite,
+                    0, 0, // 기본 프레임, 항상 첫 줄 사용
+                    this.spriteWidth, this.spriteHeight,
+                    drawX - displaySize / 2,
+                    drawY - displaySize / 2,
+                    displaySize,
+                    displaySize
+                );
+            }
+            
+            ctx.restore();
         } else {
             ctx.fillStyle = 'red';
             ctx.beginPath();
@@ -2317,25 +2426,41 @@ class Enemy {
         
         // 스프라이트 그리기
         if (enemySprite.complete) {
-            // 방향에 따른 스프라이트 시트 Y 위치 (2줄만 사용)
-            const spriteY = this.direction === 'left' ? 0 : this.spriteHeight;
-            
-            // 현재 프레임의 X 위치
+            // 현재 프레임의 X 위치 (모든 방향이 왼쪽 방향 스프라이트 사용)
             const spriteX = this.currentFrame * this.spriteWidth;
+            const spriteY = 0; // 항상 첫 번째 줄 사용
             
             // 스프라이트 크기 (적 크기에 맞춤)
             const displaySize = this.size * 2.5;
             
             ctx.save();
-            ctx.drawImage(
-                enemySprite,
-                spriteX, spriteY,
-                this.spriteWidth, this.spriteHeight,
-                drawX - displaySize / 2 + this.wobbleAmount,
-                drawY - displaySize / 2,
-                displaySize,
-                displaySize
-            );
+            
+            // 오른쪽 방향일 경우 좌우반전
+            if (this.direction === 'right') {
+                ctx.translate(drawX + displaySize / 2 + this.wobbleAmount, 0);
+                ctx.scale(-1, 1);
+                ctx.drawImage(
+                    enemySprite,
+                    spriteX, spriteY,
+                    this.spriteWidth, this.spriteHeight,
+                    0,
+                    drawY - displaySize / 2,
+                    displaySize,
+                    displaySize
+                );
+            } else {
+                // 왼쪽 방향일 경우 기존대로 그리기
+                ctx.drawImage(
+                    enemySprite,
+                    spriteX, spriteY,
+                    this.spriteWidth, this.spriteHeight,
+                    drawX - displaySize / 2 + this.wobbleAmount,
+                    drawY - displaySize / 2,
+                    displaySize,
+                    displaySize
+                );
+            }
+            
             ctx.restore();
         } else {
             // 스프라이트가 로드되지 않은 경우 기존 원 그리기
@@ -2499,7 +2624,7 @@ class Enemy {
         let separationY = 0;
         let neighborCount = 0;
         
-        const separationRadius = this.size * 5;
+        const separationRadius = this.size * 2;
         
         // 현재 적의 그리드 위치와 주변 그리드만 검사
         const gridX = Math.floor(this.x / ENEMY_SPATIAL_GRID_SIZE);
@@ -2640,24 +2765,26 @@ class Jewel {
     //레벨업 시의 메서드
     checkLevelUp() {
         while (player.exp >= player.nextLevelExp) {
-            // 레벨업
-            player.level += 1;
-            
-            // 초과 경험치 계산
+            // Calculate excess XP
             const excessExp = player.exp - player.nextLevelExp;
             
-            // 이전 레벨 경험치와 다음 레벨 경험치 업데이트
-            player.prevLevelExp = player.nextLevelExp;
-            player.nextLevelExp = Math.floor(player.nextLevelExp * 1.5);
+            // Level up
+            player.level += 1;
             
-            // 초과 경험치만 남기고 현재 경험치 초기화
+            // Store the previous level's XP threshold
+            player.prevLevelExp = player.nextLevelExp;
+            
+            // Calculate the XP requirement for the next level
+            player.nextLevelExp = getXPForNextLevel(player.level);
+            
+            // Reset XP for the next level, keeping excess
             player.exp = excessExp;
             
-            // 레벨업 선택 화면으로 전환
+            // Trigger level up screen
             currentGameState = GAME_STATE.LEVEL_UP;
-            pauseStartTime = Date.now(); // 일시정지 시간 기록
+            pauseStartTime = Date.now();
             
-            // 레벨업 옵션 생성
+            // Generate level up options
             generateLevelUpOptions();
         }
     }
