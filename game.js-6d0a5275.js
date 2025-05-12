@@ -83,7 +83,7 @@ function drawHUD() {
     ctx.fillRect(0, expBarY, canvas.width, expBarHeight);
     
     // 경험치 바 (진행도)
-    const expProgress = (player.exp - player.prevLevelExp) / (player.nextLevelExp - player.prevLevelExp);
+    const expProgress = player.exp / player.nextLevelExp;
     ctx.fillStyle = '#00ff00';
     ctx.fillRect(0, expBarY, canvas.width * expProgress, expBarHeight);
     
