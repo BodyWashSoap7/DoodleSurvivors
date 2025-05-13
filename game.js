@@ -833,28 +833,51 @@ function generateArtifactOptions() {
     const availableArtifacts = allArtifacts.filter(artifact => 
         !player.acquiredArtifacts.includes(artifact.id));
     
-    // 가능한 아티팩트가 없으면 경험치 제공
+    // 최대 4개의 선택지를 만들 배열 초기화
+    levelUpOptions = [];
+    
     if (availableArtifacts.length === 0) {
-        const xpGain = Math.floor((player.nextLevelExp) * 0.3);
-        levelUpOptions = [{
-            type: 'expGain',  // 이 타입에 맞는 아이콘 이미지 필요
-            name: '경험치 획득',
-            description: `${xpGain} 경험치 획득 (30%)`,
-            value: xpGain,
-            artifactId: 0
-        }];
+        // 가능한 아티팩트가 없으면 경험치 제공 옵션만 4개 생성
+        for (let i = 0; i < 4; i++) {
+            const xpGain = Math.floor((player.nextLevelExp) * 0.3);
+            levelUpOptions.push({
+                type: 'expGain',
+                name: '경험치 획득',
+                description: `${xpGain} 경험치 획득 (30%)`,
+                value: xpGain,
+                artifactId: 0
+            });
+        }
     } else {
-        // 랜덤하게 4개 선택 (또는 가능한 모든 아티팩트)
+        // 랜덤하게 아티팩트 선택 (가능한 만큼)
         const shuffled = [...availableArtifacts].sort(() => Math.random() - 0.5);
-        const selected = shuffled.slice(0, Math.min(4, availableArtifacts.length));
+        const artifactCount = Math.min(4, availableArtifacts.length);
         
-        // 레벨업 옵션 형식으로 변환
-        levelUpOptions = selected.map(artifact => ({
-            type: artifact.effect,
-            name: artifact.name,
-            description: artifact.description,
-            artifactId: artifact.id
-        }));
+        // 선택 가능한 아티팩트 추가
+        for (let i = 0; i < artifactCount; i++) {
+            const artifact = shuffled[i];
+            levelUpOptions.push({
+                type: artifact.effect,
+                name: artifact.name,
+                description: artifact.description,
+                artifactId: artifact.id
+            });
+        }
+        
+        // 부족한 선택지를 경험치 획득 옵션으로 채우기
+        const remainingSlots = 4 - artifactCount;
+        if (remainingSlots > 0) {
+            for (let i = 0; i < remainingSlots; i++) {
+                const xpGain = Math.floor((player.nextLevelExp) * 0.3);
+                levelUpOptions.push({
+                    type: 'expGain',
+                    name: '경험치 획득',
+                    description: `${xpGain} 경험치 획득 (30%)`,
+                    value: xpGain,
+                    artifactId: 0
+                });
+            }
+        }
     }
     
     selectedLevelUpOption = -1;
