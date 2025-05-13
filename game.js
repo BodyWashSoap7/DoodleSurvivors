@@ -145,8 +145,8 @@ const player = {
     frameCount: 4, // 스프라이트 시트의 프레임 수 (예: idle 4프레임, walking 4프레임)
     frameTime: 0,
     frameDuration: 150, // 각 프레임 지속 시간 (밀리초)
-    spriteWidth: 32, // 스프라이트 한 프레임의 너비
-    spriteHeight: 32, // 스프라이트 한 프레임의 높이
+    spriteWidth: 64, // 스프라이트 한 프레임의 너비
+    spriteHeight: 64, // 스프라이트 한 프레임의 높이
     lastMovementState: false, // 이동 상태 추적용
     
     // 방향 속성 추가
@@ -173,22 +173,22 @@ const playerImages = [
     { 
         name: '캐릭터 1', 
         image: new Image(),
-        spriteWidth: 32, // 각 캐릭터별 스프라이트 크기 설정 가능
-        spriteHeight: 32,
+        spriteWidth: 64, // 각 캐릭터별 스프라이트 크기 설정 가능
+        spriteHeight: 64,
         frameCount: 4
     },
     { 
         name: '캐릭터 2', 
         image: new Image(),
-        spriteWidth: 32,
-        spriteHeight: 32,
+        spriteWidth: 64,
+        spriteHeight: 64,
         frameCount: 4
     },
     { 
         name: '캐릭터 3', 
         image: new Image(),
-        spriteWidth: 32,
-        spriteHeight: 32,
+        spriteWidth: 64,
+        spriteHeight: 64,
         frameCount: 4
     }
 ];
@@ -1709,18 +1709,56 @@ function draw() {
         const spriteY = player.animationState === 'idle' ? 0 : player.spriteHeight;
         
         // 피격 상태일 때
-        if (player.isHit && hitEffectLoaded) {
-            const playerSize = player.size * 2;
+        if (player.isHit) {
+            // 임시 캔버스 생성
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = playerSize * 2;
+            tempCanvas.height = playerSize * 2;
+            const tempCtx = tempCanvas.getContext('2d');
             
-            // 스프라이트 시트에서 현재 프레임 위치 계산
-            const spriteX = player.currentFrame * player.spriteWidth;
-            const spriteY = player.animationState === 'idle' ? 0 : player.spriteHeight;
+            // 오른쪽 방향일 때 좌우반전 처리
+            if (player.direction === 'right') {
+                tempCtx.translate(tempCanvas.width, 0);
+                tempCtx.scale(-1, 1);
+            }
             
-            // 피격 효과의 현재 프레임 위치
-            const hitEffectX = player.hitFrame * HIT_FRAME_WIDTH;
+            // 플레이어 이미지를 임시 캔버스에 그리기
+            tempCtx.drawImage(
+                player.image,
+                spriteX, spriteY,
+                player.spriteWidth, player.spriteHeight,
+                0, 0,
+                playerSize * 2,
+                playerSize * 2
+            );
             
-            // 캐릭터 그리기
+            // 좌우반전 원복
+            if (player.direction === 'right') {
+                tempCtx.setTransform(1, 0, 0, 1, 0, 0);
+            }
+            
+            // 피격 효과의 진행도 계산 (깜빡임 효과)
+            const currentTime = Date.now();
+            const hitProgress = (currentTime - player.hitStartTime) / player.hitDuration;
+            const blinkSpeed = 10; // 깜빡임 속도
+            const alpha = Math.abs(Math.sin(hitProgress * Math.PI * blinkSpeed)) * 0.8;
+            
+            // 빨간색 오버레이 효과 (투명한 부분 제외)
+            tempCtx.globalCompositeOperation = 'source-atop';
+            tempCtx.fillStyle = `rgba(255, 0, 0, ${alpha})`;
+            tempCtx.fillRect(0, 0, playerSize * 2, playerSize * 2);
+            
+            // 최종 이미지를 메인 캔버스에 그리기
+            ctx.drawImage(
+                tempCanvas,
+                canvas.width / 2 - playerSize,
+                canvas.height / 2 - playerSize
+            );
+        } else {
+            // 일반 상태일 때 기존 코드
             ctx.save();
+            
+            // 캔버스 중앙으로 이동
             ctx.translate(canvas.width / 2, canvas.height / 2);
             
             // 오른쪽 방향일 때 좌우반전
@@ -1728,49 +1766,13 @@ function draw() {
                 ctx.scale(-1, 1);
             }
             
-            // 캐릭터 이미지 그리기
+            // 이미지를 중앙에 그리기
             ctx.drawImage(
                 player.image,
                 spriteX, spriteY,
                 player.spriteWidth, player.spriteHeight,
                 -playerSize, // x를 -playerSize로 설정하여 중앙 정렬
                 -playerSize, // y를 -playerSize로 설정하여 중앙 정렬
-                playerSize * 2,
-                playerSize * 2
-            );
-            
-            // 피격 효과 스프라이트 그리기 (캐릭터 위에 덮어씌움)
-            ctx.drawImage(
-                hitEffectImage,
-                hitEffectX, 0,
-                HIT_FRAME_WIDTH, 64,
-                -playerSize, // 캐릭터와 같은 위치에 그리기
-                -playerSize,
-                playerSize * 2,
-                playerSize * 2
-            );
-            
-            ctx.restore();
-        } else if (player.image && player.image.complete) {
-            // 기존의 일반 상태 플레이어 그리기 코드 그대로 유지
-            const playerSize = player.size * 2;
-            
-            const spriteX = player.currentFrame * player.spriteWidth;
-            const spriteY = player.animationState === 'idle' ? 0 : player.spriteHeight;
-            
-            ctx.save();
-            ctx.translate(canvas.width / 2, canvas.height / 2);
-            
-            if (player.direction === 'right') {
-                ctx.scale(-1, 1);
-            }
-            
-            ctx.drawImage(
-                player.image,
-                spriteX, spriteY,
-                player.spriteWidth, player.spriteHeight,
-                -playerSize,
-                -playerSize,
                 playerSize * 2,
                 playerSize * 2
             );
