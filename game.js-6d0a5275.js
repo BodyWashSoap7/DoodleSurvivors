@@ -155,7 +155,10 @@ const player = {
     // 피격 효과 관련 속성 추가
     isHit: false,
     hitStartTime: 0,
-    hitDuration: 500 // 0.5초 동안 빨간색 효과
+    hitDuration: 500, // 0.5초 동안 빨간색 효과
+    hitFrame: 0,
+    hitFrameTime: 0,
+    hitFrameDuration: 50 // 각 프레임 지속 시간 (밀리초)
 };
 
 // 미리보기 애니메이션을 위한 전역 변수
