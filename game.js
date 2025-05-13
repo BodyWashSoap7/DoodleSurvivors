@@ -734,6 +734,7 @@ function applyLevelUpChoice() {
 
 // 레벨업 옵션 생성 함수
 function generateLevelUpOptions() {
+    // 기존 레벨업 옵션에 무기 옵션 추가
     const allUpgrades = [
         { type: 'attackPower', name: '공격력 증가', value: 0.2, description: '공격력 +20%' },
         { type: 'maxHealth', name: '최대 체력 증가', value: 20, description: '최대 체력 +20' },
@@ -741,12 +742,34 @@ function generateLevelUpOptions() {
         { type: 'projectileSpeed', name: '투사체 속도', value: 0.2, description: '투사체 속도 +20%' },
         { type: 'moveSpeed', name: '이동속도 증가', value: 0.3, description: '이동속도 +0.3' },
         { type: 'pickupRadius', name: '획득 범위 증가', value: 20, description: '아이템 획득 범위 +20' },
-        { type: 'expMultiplier', name: '경험치 증가', value: 0.1, description: '경험치 획득량 +10%' }
+        { type: 'expMultiplier', name: '경험치 증가', value: 0.1, description: '경험치 획득량 +10%' },
+        
+        // 무기 옵션들
+        { type: 'weapon', weaponType: 'orbit', name: '회전 구체', description: '플레이어 주변을 회전하며 공격' },
+        { type: 'weapon', weaponType: 'flamethrower', name: '화염방사기', description: '넓은 범위의 지속 데미지' },
+        { type: 'weapon', weaponType: 'lightning', name: '번개 사슬', description: '적들 사이를 튀는 번개' },
+        { type: 'weapon', weaponType: 'boomerang', name: '부메랑', description: '던졌다가 돌아오는 무기' },
+        { type: 'weapon', weaponType: 'soul', name: '영혼 폭발', description: '주변의 모든 적에게 데미지' },
+        { type: 'weapon', weaponType: 'axe', name: '도끼 던지기', description: '회전하며 날아가는 도끼' },
+        { type: 'weapon', weaponType: 'wave', name: '파동', description: '주변으로 퍼지는 충격파' },
+        { type: 'weapon', weaponType: 'bible', name: '바이블', description: '주변을 회전하는 책' }
     ];
+    
+    // 플레이어가 이미 가지고 있는 무기 필터링
+    const playerWeaponTypes = player.weapons.map(w => w.constructor.name);
+    const availableUpgrades = allUpgrades.filter(upgrade => {
+        if (upgrade.type === 'weapon') {
+            // 이미 가지고 있는 무기 타입은 제외
+            const weaponClassName = upgrade.weaponType.charAt(0).toUpperCase() + 
+                                   upgrade.weaponType.slice(1) + 'Weapon';
+            return !playerWeaponTypes.includes(weaponClassName);
+        }
+        return true;
+    });
     
     // 랜덤하게 4개 선택
     levelUpOptions = [];
-    const shuffled = [...allUpgrades].sort(() => Math.random() - 0.5);
+    const shuffled = [...availableUpgrades].sort(() => Math.random() - 0.5);
     levelUpOptions = shuffled.slice(0, 4);
     selectedLevelUpOption = -1; // 초기에는 아무것도 선택되지 않은 상태
 }
@@ -1591,9 +1614,10 @@ function update() {
     // Update Bullets
     for (let i = bullets.length - 1; i >= 0; i--) {
         bullets[i].update();
-
+    
         // Remove bullets that are off-screen or used
-        if (bullets[i].used || bullets[i].outOfBounds()) {
+        // outOfBounds 메서드가 있는지 확인하고 호출
+        if (bullets[i].used || (typeof bullets[i].outOfBounds === 'function' && bullets[i].outOfBounds())) {
             bullets.splice(i, 1);
         }
     }
@@ -1772,6 +1796,23 @@ function draw() {
                 canvas.width / 2 - playerSize,
                 canvas.height / 2 - playerSize
             );
+            
+            // 피격 효과 이미지 그리기
+            if (hitEffectLoaded) {
+                // 히트 효과 이미지에서 현재 프레임 계산
+                const hitFrameX = player.hitFrame * HIT_FRAME_WIDTH;
+                const hitEffectSize = playerSize * 2; // 피격 효과 크기
+                
+                ctx.drawImage(
+                    hitEffectImage,
+                    hitFrameX, 0,
+                    HIT_FRAME_WIDTH, HIT_FRAME_WIDTH,
+                    canvas.width / 2 - hitEffectSize / 2,
+                    canvas.height / 2 - hitEffectSize / 2,
+                    hitEffectSize,
+                    hitEffectSize
+                );
+            }
         } else {
             // 일반 상태일 때 기존 코드
             ctx.save();
@@ -2864,7 +2905,7 @@ class Enemy {
                 ctx.arc(
                     particle.x + offsetX, 
                     particle.y + offsetY, 
-                    particle.size, 
+                    Math.max(particle.size, 0.1), // 여기에 Math.max 추가
                     0, 
                     Math.PI * 2
                 );
@@ -2876,7 +2917,7 @@ class Enemy {
         ctx.globalAlpha = 1 - progress;
         ctx.fillStyle = 'red';
         ctx.beginPath();
-        ctx.arc(drawX, drawY, this.currentSize, 0, Math.PI * 2);
+        ctx.arc(drawX, drawY, Math.max(this.currentSize, 0.1), 0, Math.PI * 2);
         ctx.fill();
         
         ctx.globalAlpha = 1;
