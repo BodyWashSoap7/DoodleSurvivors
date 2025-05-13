@@ -285,12 +285,55 @@ let hitEffectLoaded = false;
 const HIT_FRAME_COUNT = 4; // 프레임 수
 const HIT_FRAME_WIDTH = 64; // 각 프레임 너비
 
+// 무기 이미지 관련 변수
+const weaponImages = {
+    bullet: new Image(),
+    orbit: new Image(),
+    flame: new Image(),
+    lightning: new Image(),
+    boomerang: new Image(),
+    soul: new Image(),
+    axe: new Image(),
+    wave: new Image(),
+    bible: new Image()
+};
+let weaponImagesLoaded = false;
+
+// 무기 이미지 로드 함수
+function loadWeaponImages() {
+    let loadedCount = 0;
+    const totalImages = Object.keys(weaponImages).length;
+    
+    for (const key in weaponImages) {
+        weaponImages[key].onload = function() {
+            loadedCount++;
+            if (loadedCount === totalImages) {
+                weaponImagesLoaded = true;
+                console.log('모든 무기 이미지 로드 완료');
+            }
+        };
+        
+        weaponImages[key].onerror = function() {
+            console.error(`무기 이미지 로드 실패: ${key}`);
+            loadedCount++;
+            if (loadedCount === totalImages) {
+                // 일부 이미지라도 로드되면 진행
+                weaponImagesLoaded = true;
+            }
+        };
+        
+        // 이미지 경로 설정 - 이미지 파일은 이런 형식으로 준비해야 합니다
+        weaponImages[key].src = `./img/weapons/${key}.png`;
+    }
+}
+
 // 이미지 로딩 함수 추가
 function loadGameImages() {
     // 기존 이미지 로딩
     loadCharacterImages();
     loadMapTiles();
     loadLevelUpIcons();
+    loadWeaponImages();
     
     // Treasure 이미지 로드
     treasureImage.src = './img/treasure.png';
@@ -650,7 +693,6 @@ function applyLevelUpChoice() {
             // ... 다른 옵션 처리
         }
     }
-
     
     if (isArtifactSelection) {
         // 아티팩트 효과 적용
@@ -682,9 +724,49 @@ function applyLevelUpChoice() {
             case 'expGain':
                 // 경험치 획득
                 player.exp += option.value;
-                // 레벨업 체크
-                const jewelTemp = new Jewel(0, 0);
-                jewelTemp.checkLevelUp();
+                console.log(`경험치 획득: ${option.value}, 현재 경험치: ${player.exp}, 다음 레벨업 필요 경험치: ${player.nextLevelExp}`);
+                
+                // 먼저 게임 상태를 PLAYING으로 변경 (레벨업 화면이 다시 나타나는 것을 방지)
+                currentGameState = GAME_STATE.PLAYING;
+                
+                // 일시정지된 시간 업데이트
+                totalPausedTime += Date.now() - pauseStartTime;
+                
+                // 레벨업 체크 로직을 직접 여기서 실행
+                let leveledUp = false;
+                
+                while (player.exp >= player.nextLevelExp) {
+                    // 초과 경험치 계산
+                    const excessExp = player.exp - player.nextLevelExp;
+                    
+                    // 레벨업
+                    player.level += 1;
+                    leveledUp = true;
+                    
+                    // 이전 레벨 경험치 임계값 저장
+                    player.prevLevelExp = player.nextLevelExp;
+                    
+                    // 다음 레벨 경험치 계산
+                    player.nextLevelExp = getXPForNextLevel(player.level);
+                    
+                    // 초과 경험치 유지
+                    player.exp = excessExp;
+                }
+                
+                // 레벨업했으면 레벨업 화면 표시
+                if (leveledUp) {
+                    // 중요: 경험치로 인한 레벨업은 아티팩트 선택이 아닌 일반 레벨업으로 처리
+                    isArtifactSelection = false;
+                    
+                    currentGameState = GAME_STATE.LEVEL_UP;
+                    pauseStartTime = Date.now();
+                    
+                    // 레벨업 옵션 생성
+                    generateLevelUpOptions();
+                }
+                
+                // 함수 여기서 종료 (게임 상태가 이미 변경됨)
+                return;
                 break;
         }
         
@@ -734,6 +816,8 @@ function applyLevelUpChoice() {
 
 // 레벨업 옵션 생성 함수
 function generateLevelUpOptions() {
+    isArtifactSelection = false;
+    
     // 기존 레벨업 옵션에 무기 옵션 추가
     const allUpgrades = [
         { type: 'attackPower', name: '공격력 증가', value: 0.2, description: '공격력 +20%' },
@@ -2419,10 +2503,28 @@ class Bullet {
     }
 
     draw(offsetX, offsetY) {
-        ctx.fillStyle = 'yellow';
-        ctx.beginPath();
-        ctx.arc(this.x + offsetX, this.y + offsetY, this.size, 0, Math.PI * 2);
-        ctx.fill();
+        if (weaponImagesLoaded && weaponImages.bullet) {
+            // 이미지 그리기
+            const drawSize = this.size * 2;
+            ctx.save();
+            // 총알 방향으로 회전
+            ctx.translate(this.x + offsetX, this.y + offsetY);
+            ctx.rotate(this.angle);
+            ctx.drawImage(
+                weaponImages.bullet,
+                -drawSize / 2,
+                -drawSize / 2,
+                drawSize,
+                drawSize
+            );
+            ctx.restore();
+        } else {
+            // 이미지 로드 전 폴백으로 원 그리기
+            ctx.fillStyle = 'yellow';
+            ctx.beginPath();
+            ctx.arc(this.x + offsetX, this.y + offsetY, this.size, 0, Math.PI * 2);
+            ctx.fill();
+        }
     }
 
     outOfBounds() {
@@ -3168,6 +3270,9 @@ class Jewel {
             currentGameState = GAME_STATE.LEVEL_UP;
             pauseStartTime = Date.now();
             
+            // 중요: 레벨업 시 명시적으로 플래그 설정
+            isArtifactSelection = false;
+            
             // Generate level up options
             generateLevelUpOptions();
         }
@@ -3407,31 +3512,66 @@ class OrbitWeapon extends Weapon {
 class OrbitBullet extends Bullet {
     constructor(x, y, size, speed, angle, damage) {
         super(x, y, size, speed, angle, damage);
-        this.lifeTime = 1; // 수명이 매우 짧음
+        this.lifeTime = 1;
+        this.rotationAngle = Math.random() * Math.PI * 2; // 각 구체마다 다른 회전 시작 각도
+        this.rotationSpeed = 0.05; // 자체 회전 속도
     }
     
     update() {
-        // 움직이지 않음, 단지 존재함
+        // 기존 코드 유지
         this.lifeTime -= 0.1;
         if (this.lifeTime <= 0) {
             this.used = true;
         }
+        
+        // 구체 자체가 회전하는 효과
+        this.rotationAngle += this.rotationSpeed;
     }
     
     draw(offsetX, offsetY) {
-        ctx.fillStyle = '#66fcf1'; // 청록색
-        ctx.beginPath();
-        ctx.arc(this.x + offsetX, this.y + offsetY, this.size, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // 회전 효과 추가
-        ctx.strokeStyle = 'rgba(102, 252, 241, 0.4)';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(this.x + offsetX, this.y + offsetY, this.size + 5, 0, Math.PI * 2);
-        ctx.stroke();
+        if (weaponImagesLoaded && weaponImages.orbit) {
+            const drawSize = this.size * 3; // 이미지 크기 조정
+            
+            ctx.save();
+            ctx.translate(this.x + offsetX, this.y + offsetY);
+            ctx.rotate(this.rotationAngle); // 구체가 자체적으로 회전
+            
+            // 광채 효과 (이미지 뒤에 그려질 원)
+            ctx.globalAlpha = 0.4;
+            ctx.fillStyle = '#66fcf1';
+            ctx.beginPath();
+            ctx.arc(0, 0, drawSize * 0.7, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // 이미지 그리기
+            ctx.globalAlpha = 1;
+            ctx.drawImage(
+                weaponImages.orbit,
+                -drawSize / 2,
+                -drawSize / 2,
+                drawSize,
+                drawSize
+            );
+            
+            ctx.restore();
+        } else {
+            // 기존 폴백 코드
+            ctx.fillStyle = '#66fcf1'; // 청록색
+            ctx.beginPath();
+            ctx.arc(this.x + offsetX, this.y + offsetY, this.size, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.strokeStyle = 'rgba(102, 252, 241, 0.4)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(this.x + offsetX, this.y + offsetY, this.size + 5, 0, Math.PI * 2);
+            ctx.stroke();
+        }
     }
 }
+
+const flameFrames = 4; // 불꽃 애니메이션 프레임 수
+const flameFrameWidth = 64; // 각 프레임 너비
 
 class FlamethrowerWeapon extends Weapon {
     constructor() {
@@ -3477,6 +3617,9 @@ class FlameBullet extends Bullet {
         this.traveled = 0;
         this.fadeRate = 0.02 + Math.random() * 0.02;
         this.alpha = 1.0;
+        this.currentFrame = 0;
+        this.frameTime = 0;
+        this.frameDuration = 100; // 프레임당 지속 시간
         
         // 불꽃 애니메이션용 속성
         this.wobble = Math.random() * Math.PI * 2;
@@ -3521,24 +3664,42 @@ class FlameBullet extends Bullet {
                 // 불꽃은 관통함 (사라지지 않음)
             }
         }
+
+        // 프레임 애니메이션 업데이트
+        this.frameTime += 16; // 약 60fps 기준
+        if (this.frameTime >= this.frameDuration) {
+            this.frameTime = 0;
+            this.currentFrame = (this.currentFrame + 1) % flameFrames;
+        }
     }
     
     draw(offsetX, offsetY) {
-        // 불꽃 그라데이션 효과
-        const gradient = ctx.createRadialGradient(
-            this.x + offsetX, this.y + offsetY, 0,
-            this.x + offsetX, this.y + offsetY, this.size
-        );
-        gradient.addColorStop(0, `rgba(255, 255, 100, ${this.alpha})`);
-        gradient.addColorStop(0.5, `rgba(255, 150, 50, ${this.alpha * 0.8})`);
-        gradient.addColorStop(1, `rgba(255, 50, 50, ${this.alpha * 0.1})`);
-        
-        ctx.fillStyle = gradient;
-        ctx.beginPath();
-        ctx.arc(this.x + offsetX, this.y + offsetY, this.size, 0, Math.PI * 2);
-        ctx.fill();
+        if (weaponImagesLoaded && weaponImages.flame) {
+            const drawSize = this.size * 4;
+            
+            ctx.save();
+            ctx.translate(this.x + offsetX, this.y + offsetY);
+            ctx.rotate(this.angle);
+            ctx.globalAlpha = this.alpha; // 투명도 적용
+            
+            // 스프라이트 시트에서 현재 프레임 그리기
+            ctx.drawImage(
+                weaponImages.flame,
+                this.currentFrame * flameFrameWidth, 0,
+                flameFrameWidth, flameFrameWidth,
+                -drawSize / 2,
+                -drawSize / 2,
+                drawSize,
+                drawSize
+            );
+            
+            ctx.restore();
+        }
     }
 }
+
+const LIGHTNING_FRAMES = 4; // 번개 애니메이션 프레임 수
+const LIGHTNING_FRAME_WIDTH = 128; // 스프라이트 시트의 각 프레임 너비
 
 class LightningWeapon extends Weapon {
     constructor() {
@@ -3578,35 +3739,12 @@ class LightningBullet extends Bullet {
         this.targetEnemy = null;
         this.hasHit = false;
         this.lightningPoints = [];
+        //this.generateLightningPattern();
         
-        // 번개 지그재그 패턴 생성
-        this.generateLightningPattern();
-    }
-    
-    generateLightningPattern() {
-        this.lightningPoints = [];
-        this.lightningPoints.push({x: this.x, y: this.y});
-        
-        // 직선 경로에 지그재그 추가
-        const steps = 10;
-        const targetX = this.x + Math.cos(this.angle) * 1000; // 충분히 먼 거리
-        const targetY = this.y + Math.sin(this.angle) * 1000;
-        
-        for (let i = 1; i <= steps; i++) {
-            const ratio = i / steps;
-            const pointX = this.x + (targetX - this.x) * ratio;
-            const pointY = this.y + (targetY - this.y) * ratio;
-            
-            // 지그재그 효과
-            const offset = 10 * (Math.random() - 0.5);
-            const perpX = -Math.sin(this.angle) * offset;
-            const perpY = Math.cos(this.angle) * offset;
-            
-            this.lightningPoints.push({
-                x: pointX + perpX,
-                y: pointY + perpY
-            });
-        }
+        // 애니메이션 관련 속성 추가
+        this.currentFrame = 0;
+        this.frameTime = 0;
+        this.frameDuration = 80; // 빠른 번개 애니메이션
     }
     
     update() {
@@ -3614,8 +3752,12 @@ class LightningBullet extends Bullet {
         this.x += Math.cos(this.angle) * this.speed;
         this.y += Math.sin(this.angle) * this.speed;
         
-        // 번개 패턴 업데이트
-        this.generateLightningPattern();
+        // 애니메이션 프레임 업데이트
+        this.frameTime += 16;
+        if (this.frameTime >= this.frameDuration) {
+            this.frameTime = 0;
+            this.currentFrame = (this.currentFrame + 1) % LIGHTNING_FRAMES;
+        }
         
         // 첫 번째 타겟을 맞히면 체인 효과 발동
         if (!this.hasHit) {
@@ -3672,28 +3814,66 @@ class LightningBullet extends Bullet {
     }
     
     draw(offsetX, offsetY) {
-        // 번개 효과 그리기
-        ctx.strokeStyle = '#88FFFF';
-        ctx.lineWidth = 3;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        
-        ctx.beginPath();
-        ctx.moveTo(this.lightningPoints[0].x + offsetX, this.lightningPoints[0].y + offsetY);
-        
-        for (let i = 1; i < this.lightningPoints.length; i++) {
-            ctx.lineTo(
-                this.lightningPoints[i].x + offsetX,
-                this.lightningPoints[i].y + offsetY
-            );
+        if (weaponImagesLoaded && weaponImages.lightning) {
+            ctx.save();
+            
+            // 번개 경로를 따라 이미지 그리기
+            for (let i = 0; i < this.lightningPoints.length - 1; i++) {
+                const p1 = this.lightningPoints[i];
+                const p2 = this.lightningPoints[i + 1];
+                
+                // 두 점 사이의 각도 계산
+                const dx = p2.x - p1.x;
+                const dy = p2.y - p1.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                const angle = Math.atan2(dy, dx);
+                
+                // 두 점 사이의 중간점에 번개 이미지 그리기
+                const midX = (p1.x + p2.x) / 2;
+                const midY = (p1.y + p2.y) / 2;
+                
+                ctx.translate(midX + offsetX, midY + offsetY);
+                ctx.rotate(angle);
+                
+                // 스프라이트 시트에서 현재 프레임 선택
+                ctx.drawImage(
+                    weaponImages.lightning,
+                    this.currentFrame * LIGHTNING_FRAME_WIDTH, 0,
+                    LIGHTNING_FRAME_WIDTH, LIGHTNING_FRAME_WIDTH / 2, // 높이는 너비의 절반
+                    -distance / 2, // 중앙에서 시작
+                    -20, // 이미지 높이의 절반
+                    distance, // 두 점 사이 거리만큼 늘리기
+                    40 // 고정 높이
+                );
+                
+                ctx.rotate(-angle);
+                ctx.translate(-(midX + offsetX), -(midY + offsetY));
+            }
+            
+            ctx.restore();
+        } else {
+            // 기존 폴백 코드
+            ctx.strokeStyle = '#88FFFF';
+            ctx.lineWidth = 3;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            
+            ctx.beginPath();
+            ctx.moveTo(this.lightningPoints[0].x + offsetX, this.lightningPoints[0].y + offsetY);
+            
+            for (let i = 1; i < this.lightningPoints.length; i++) {
+                ctx.lineTo(
+                    this.lightningPoints[i].x + offsetX,
+                    this.lightningPoints[i].y + offsetY
+                );
+            }
+            
+            ctx.stroke();
+            
+            ctx.strokeStyle = 'rgba(136, 255, 255, 0.5)';
+            ctx.lineWidth = 6;
+            ctx.stroke();
         }
-        
-        ctx.stroke();
-        
-        // 빛나는 효과
-        ctx.strokeStyle = 'rgba(136, 255, 255, 0.5)';
-        ctx.lineWidth = 6;
-        ctx.stroke();
     }
 }
 
@@ -3801,34 +3981,37 @@ class ChainLightningEffect {
     }
     
     draw(offsetX, offsetY) {
-        // 투명도는 수명에 따라 감소
-        const alpha = 1 - this.age / this.maxAge;
-        
-        // 번개 효과 그리기
-        ctx.strokeStyle = `rgba(136, 255, 255, ${alpha})`;
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.moveTo(this.lightningPoints[0].x + offsetX, this.lightningPoints[0].y + offsetY);
-        
-        for (let i = 1; i < this.lightningPoints.length; i++) {
-            ctx.lineTo(
-                this.lightningPoints[i].x + offsetX,
-                this.lightningPoints[i].y + offsetY
+        if (weaponImagesLoaded && weaponImages.lightning) {
+            const alpha = 1 - this.age / this.maxAge;
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            
+            // 같은 방식으로 구현, 시작점과 끝점 사이에 번개 이미지 배치
+            const dx = this.endX - this.startX;
+            const dy = this.endY - this.startY;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            const angle = Math.atan2(dy, dx);
+            
+            // 중간점에 번개 이미지 그리기
+            const midX = (this.startX + this.endX) / 2;
+            const midY = (this.startY + this.endY) / 2;
+            
+            ctx.translate(midX + offsetX, midY + offsetY);
+            ctx.rotate(angle);
+            
+            // 스프라이트 시트에서 현재 프레임 선택 (번개 애니메이션)
+            ctx.drawImage(
+                weaponImages.lightning,
+                (this.age % LIGHTNING_FRAMES) * LIGHTNING_FRAME_WIDTH, 0,
+                LIGHTNING_FRAME_WIDTH, LIGHTNING_FRAME_WIDTH / 2,
+                -distance / 2,
+                -20,
+                distance,
+                40
             );
+            
+            ctx.restore();
         }
-        
-        ctx.stroke();
-        
-        // 빛나는 효과
-        ctx.strokeStyle = `rgba(136, 255, 255, ${alpha * 0.5})`;
-        ctx.lineWidth = 6;
-        ctx.stroke();
-        
-        // 끝점에 전기 효과 추가
-        ctx.fillStyle = `rgba(200, 255, 255, ${alpha})`;
-        ctx.beginPath();
-        ctx.arc(this.endX + offsetX, this.endY + offsetY, 8, 0, Math.PI * 2);
-        ctx.fill();
     }
 }
 
@@ -3940,44 +4123,35 @@ class BoomerangBullet extends Bullet {
     }
     
     draw(offsetX, offsetY) {
-        ctx.save();
-        
-        // 회전 애니메이션
-        ctx.translate(this.x + offsetX, this.y + offsetY);
-        ctx.rotate(this.rotationAngle);
-        
-        // X 모양 부메랑 그리기
-        ctx.fillStyle = '#FFAA00';
-        
-        // 첫 번째 날개
-        ctx.beginPath();
-        ctx.moveTo(-this.size, -this.size);
-        ctx.lineTo(-this.size/3, -this.size/3);
-        ctx.lineTo(this.size/3, -this.size/3);
-        ctx.lineTo(this.size, -this.size);
-        ctx.lineTo(this.size/3, -this.size/3);
-        ctx.lineTo(this.size/3, this.size/3);
-        ctx.lineTo(this.size, this.size);
-        ctx.lineTo(this.size/3, this.size/3);
-        ctx.lineTo(-this.size/3, this.size/3);
-        ctx.lineTo(-this.size, this.size);
-        ctx.lineTo(-this.size/3, this.size/3);
-        ctx.lineTo(-this.size/3, -this.size/3);
-        ctx.closePath();
-        ctx.fill();
-        
-        // 테두리
-        ctx.strokeStyle = '#AA7700';
-        ctx.lineWidth = 1;
-        ctx.stroke();
-        
-        // 중앙 원
-        ctx.fillStyle = '#FFDD00';
-        ctx.beginPath();
-        ctx.arc(0, 0, this.size/4, 0, Math.PI * 2);
-        ctx.fill();
-        
-        ctx.restore();
+        if (weaponImagesLoaded && weaponImages.boomerang) {
+            ctx.save();
+            // 회전 애니메이션
+            ctx.translate(this.x + offsetX, this.y + offsetY);
+            ctx.rotate(this.rotationAngle);
+            
+            const drawSize = this.size * 2.5;
+            ctx.drawImage(
+                weaponImages.boomerang,
+                -drawSize / 2,
+                -drawSize / 2,
+                drawSize,
+                drawSize
+            );
+            
+            ctx.restore();
+        } else {
+            // 원래 그리기 코드 (폴백)
+            ctx.save();
+            
+            // 회전 애니메이션
+            ctx.translate(this.x + offsetX, this.y + offsetY);
+            ctx.rotate(this.rotationAngle);
+            
+            // X 모양 부메랑 그리기
+            ctx.fillStyle = '#FFAA00';
+            
+            ctx.restore();
+        }
     }
 }
 
@@ -4014,6 +4188,11 @@ class SoulExplosion {
         this.age = 0;
         this.used = false;
         this.hitEnemies = new Set();
+        
+        // 애니메이션 관련 속성
+        this.currentFrame = 0;
+        this.frameTime = 0;
+        this.frameDuration = 120;
         
         // 영혼 파티클 생성
         this.soulParticles = [];
@@ -4068,42 +4247,65 @@ class SoulExplosion {
                 }
             }
         }
+
+        // 애니메이션 프레임 업데이트
+        this.frameTime += 16;
+        if (this.frameTime >= this.frameDuration) {
+            this.frameTime = 0;
+            this.currentFrame = (this.currentFrame + 1) % 4; // 4프레임 애니메이션 가정
+        }
     }
     
     draw(offsetX, offsetY) {
-        // 영혼 파티클 그리기
-        for (let particle of this.soulParticles) {
-            const pulseSize = Math.sin(this.age * particle.pulseSpeed) * 0.3 + 0.7;
-            const fadeOut = Math.min(1, (this.duration - this.age) / (this.duration * 0.3));
+        if (weaponImagesLoaded && weaponImages.soul) {
+            const fadeOut = Math.min(1, (this.duration - this.age) / this.duration);
             
-            ctx.fillStyle = `rgba(200, 200, 255, ${particle.opacity * fadeOut})`;
+            // 중앙 효과 (빛나는 원)
+            ctx.fillStyle = `rgba(200, 200, 255, ${fadeOut * 0.3})`;
             ctx.beginPath();
-            ctx.arc(
-                particle.x + offsetX, 
-                particle.y + offsetY, 
-                particle.size * pulseSize, 
-                0, Math.PI * 2
-            );
+            ctx.arc(this.x + offsetX, this.y + offsetY, this.radius * 0.3, 0, Math.PI * 2);
             ctx.fill();
             
-            // 영혼 꼬리 효과
-            ctx.strokeStyle = `rgba(150, 150, 255, ${particle.opacity * fadeOut * 0.5})`;
-            ctx.lineWidth = 2;
+            // 파티클 그리기
+            for (let particle of this.soulParticles) {
+                const particleAlpha = particle.opacity * fadeOut;
+                const particleSize = particle.size * 2;
+                
+                ctx.save();
+                ctx.globalAlpha = particleAlpha;
+                ctx.translate(particle.x + offsetX, particle.y + offsetY);
+                
+                // 파티클 회전 (랜덤한 느낌을 위해)
+                const rotationSpeed = 0.01;
+                ctx.rotate(this.age * rotationSpeed * particle.speed);
+                
+                ctx.drawImage(
+                    weaponImages.soul,
+                    -particleSize / 2,
+                    -particleSize / 2,
+                    particleSize,
+                    particleSize
+                );
+                
+                ctx.restore();
+                
+                // 영혼 꼬리 효과 (반투명 선)
+                ctx.strokeStyle = `rgba(150, 150, 255, ${particleAlpha * 0.5})`;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(this.x + offsetX, this.y + offsetY);
+                ctx.lineTo(particle.x + offsetX, particle.y + offsetY);
+                ctx.stroke();
+            }
+            
+            // 외곽 원형 효과
+            const ringSize = Math.min(this.radius, (this.age / 5) * this.radius);
+            ctx.strokeStyle = `rgba(150, 150, 255, ${fadeOut * 0.5})`;
+            ctx.lineWidth = 3;
             ctx.beginPath();
-            ctx.moveTo(this.x + offsetX, this.y + offsetY);
-            ctx.lineTo(particle.x + offsetX, particle.y + offsetY);
+            ctx.arc(this.x + offsetX, this.y + offsetY, ringSize, 0, Math.PI * 2);
             ctx.stroke();
         }
-        
-        // 중앙 효과
-        const ringSize = Math.min(this.radius, (this.age / 5) * this.radius);
-        const ringOpacity = Math.min(1, (this.duration - this.age) / this.duration);
-        
-        ctx.strokeStyle = `rgba(150, 150, 255, ${ringOpacity * 0.5})`;
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.arc(this.x + offsetX, this.y + offsetY, ringSize, 0, Math.PI * 2);
-        ctx.stroke();
     }
 }
 
@@ -4279,6 +4481,10 @@ class WaveBullet {
         this.hitEnemies = new Set();
         this.waveWidth = 15;
         this.waveColor = 'rgba(100, 255, 255, 0.6)';
+
+        this.pulseEffect = 0;
+        this.pulseDirection = 1;
+        this.pulseSpeed = 0.05;
     }
     
     update() {
@@ -4306,39 +4512,62 @@ class WaveBullet {
                 }
             }
         }
+
+        // 펄스 효과 업데이트 (이미지 크기 변화 효과)
+        this.pulseEffect += this.pulseSpeed * this.pulseDirection;
+        if (this.pulseEffect > 0.2) {
+            this.pulseDirection = -1;
+        } else if (this.pulseEffect < -0.2) {
+            this.pulseDirection = 1;
+        }
     }
     
     draw(offsetX, offsetY) {
-        // 파동 그리기 (원환)
-        const innerRadius = Math.max(0, this.currentRadius - this.waveWidth);
-        
-        // 그라데이션 생성
-        const gradient = ctx.createRadialGradient(
-            this.x + offsetX, this.y + offsetY, innerRadius,
-            this.x + offsetX, this.y + offsetY, this.currentRadius
-        );
-        gradient.addColorStop(0, 'rgba(100, 255, 255, 0.7)');
-        gradient.addColorStop(1, 'rgba(100, 255, 255, 0)');
-        
-        // 원환 그리기
-        ctx.fillStyle = gradient;
-        ctx.beginPath();
-        ctx.arc(this.x + offsetX, this.y + offsetY, this.currentRadius, 0, Math.PI * 2);
-        ctx.arc(this.x + offsetX, this.y + offsetY, innerRadius, 0, Math.PI * 2, true);
-        ctx.fill();
-        
-        // 안쪽 윤곽선
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(this.x + offsetX, this.y + offsetY, innerRadius, 0, Math.PI * 2);
-        ctx.stroke();
-        
-        // 바깥쪽 윤곽선
-        ctx.strokeStyle = 'rgba(50, 200, 255, 0.7)';
-        ctx.beginPath();
-        ctx.arc(this.x + offsetX, this.y + offsetY, this.currentRadius, 0, Math.PI * 2);
-        ctx.stroke();
+        if (weaponImagesLoaded && weaponImages.wave) {
+            // 파동 이미지의 투명도 계산 (반경에 따라 변화)
+            const progress = this.currentRadius / this.maxRadius;
+            const alpha = 1 - progress;
+            
+            // 바깥쪽 원 그리기 (배경 효과)
+            ctx.globalAlpha = alpha * 0.3;
+            ctx.strokeStyle = 'rgba(50, 200, 255, 0.7)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(this.x + offsetX, this.y + offsetY, this.currentRadius, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            // 안쪽 원 (실제 파동 효과)
+            const innerRadius = Math.max(0, this.currentRadius - this.waveWidth);
+            
+            // 파동 이미지 주변에 복수 배치 (원을 따라)
+            const segments = 8; // 원 주변에 배치할 이미지 수
+            const waveImgSize = this.waveWidth * 1.5 * (1 + this.pulseEffect); // 약간의 펄스 효과
+            
+            ctx.globalAlpha = alpha * 0.8;
+            
+            for (let i = 0; i < segments; i++) {
+                const angle = (Math.PI * 2 * i) / segments;
+                const midRadius = (innerRadius + this.currentRadius) / 2;
+                const posX = this.x + Math.cos(angle) * midRadius;
+                const posY = this.y + Math.sin(angle) * midRadius;
+                
+                ctx.save();
+                ctx.translate(posX + offsetX, posY + offsetY);
+                ctx.rotate(angle + Math.PI/2); // 파동 방향으로 회전
+                
+                ctx.drawImage(
+                    weaponImages.wave,
+                    -waveImgSize / 2,
+                    -waveImgSize / 2,
+                    waveImgSize,
+                    waveImgSize
+                );
+                
+                ctx.restore();
+            }
+            
+            ctx.globalAlpha = 1;
+        }
     }
 }
 
