@@ -3738,45 +3738,23 @@ class LightningBullet extends Bullet {
         this.chainRange = chainRange;
         this.targetEnemy = null;
         this.hasHit = false;
-        this.lightningPoints = [];
-        //this.generateLightningPattern();
         
-        // 애니메이션 관련 속성 추가
+        // 기존 패턴 하나 대신 여러 패턴 저장
+        this.lightningTrails = [];
+        this.generateLightningPattern();
+        
+        // 애니메이션 관련 속성
         this.currentFrame = 0;
         this.frameTime = 0;
-        this.frameDuration = 80; // 빠른 번개 애니메이션
-    }
-    
-    update() {
-        // 기본 이동
-        this.x += Math.cos(this.angle) * this.speed;
-        this.y += Math.sin(this.angle) * this.speed;
+        this.frameDuration = 80;
         
-        // 애니메이션 프레임 업데이트
-        this.frameTime += 16;
-        if (this.frameTime >= this.frameDuration) {
-            this.frameTime = 0;
-            this.currentFrame = (this.currentFrame + 1) % LIGHTNING_FRAMES;
-        }
-        
-        // 첫 번째 타겟을 맞히면 체인 효과 발동
-        if (!this.hasHit) {
-            for (let enemy of enemies) {
-                if (enemy.state === 'moving' && detectCollision(this, enemy)) {
-                    enemy.takeDamage(this.damage);
-                    this.hasHit = true;
-                    this.used = true;
-                    
-                    // 체인 효과 생성
-                    if (this.chainCount > 0) {
-                        this.chainLightning(enemy);
-                    }
-                    break;
-                }
-            }
-        }
+        // 잔상 관련 속성 추가
+        this.maxTrails = 5;              // 유지할 잔상 수
+        this.trailFadeSpeed = 0.04;      // 잔상 페이드아웃 속도
+
+        this.generateLightningPattern();
     }
-    
+
     chainLightning(sourceEnemy) {
         // 범위 내에 있는 다른 적 찾기
         const nearbyEnemies = enemies.filter(enemy => {
@@ -3813,66 +3791,165 @@ class LightningBullet extends Bullet {
         }
     }
     
+    generateLightningPattern() {
+        let lightningPoints = [];
+        lightningPoints.push({x: this.x, y: this.y});
+        
+        // 직선 경로에 지그재그 추가
+        const steps = 10;
+        const targetX = this.x + Math.cos(this.angle) * 1000;
+        const targetY = this.y + Math.sin(this.angle) * 1000;
+        
+        for (let i = 1; i <= steps; i++) {
+            const ratio = i / steps;
+            const pointX = this.x + (targetX - this.x) * ratio;
+            const pointY = this.y + (targetY - this.y) * ratio;
+            
+            // 지그재그 효과
+            const offset = 10 * (Math.random() - 0.5);
+            const perpX = -Math.sin(this.angle) * offset;
+            const perpY = Math.cos(this.angle) * offset;
+            
+            lightningPoints.push({
+                x: pointX + perpX,
+                y: pointY + perpY
+            });
+        }
+        
+        // 새 패턴을 배열에 추가하고 오래된 것 제거
+        this.lightningTrails.unshift({
+            points: lightningPoints,
+            alpha: 1.0,           // 시작 투명도
+            frame: this.currentFrame // 해당 잔상의 프레임
+        });
+        
+        // 최대 개수로 제한
+        if (this.lightningTrails.length > this.maxTrails) {
+            this.lightningTrails.pop();
+        }
+    }
+    
+    update() {
+        // 기본 이동
+        this.x += Math.cos(this.angle) * this.speed;
+        this.y += Math.sin(this.angle) * this.speed;
+        
+        // 애니메이션 프레임 업데이트
+        this.frameTime += 16;
+        if (this.frameTime >= this.frameDuration) {
+            this.frameTime = 0;
+            this.currentFrame = (this.currentFrame + 1) % LIGHTNING_FRAMES;
+            
+            // 새 프레임마다 패턴 생성
+            this.generateLightningPattern();
+        }
+        
+        // 모든 잔상의 알파값 감소
+        for (let i = 0; i < this.lightningTrails.length; i++) {
+            this.lightningTrails[i].alpha -= this.trailFadeSpeed;
+        }
+        
+        // 완전히 투명해진 잔상 제거
+        this.lightningTrails = this.lightningTrails.filter(trail => trail.alpha > 0);
+        
+        // 충돌 검사
+        if (!this.hasHit) {
+            for (let enemy of enemies) {
+                if (enemy.state === 'moving' && detectCollision(this, enemy)) {
+                    enemy.takeDamage(this.damage);
+                    this.hasHit = true;
+                    this.used = true;
+                    
+                    // 체인 효과 생성
+                    if (this.chainCount > 0) {
+                        this.chainLightning(enemy);
+                    }
+                    break;
+                }
+            }
+        }
+    }
+    
     draw(offsetX, offsetY) {
         if (weaponImagesLoaded && weaponImages.lightning) {
-            ctx.save();
-            
-            // 번개 경로를 따라 이미지 그리기
-            for (let i = 0; i < this.lightningPoints.length - 1; i++) {
-                const p1 = this.lightningPoints[i];
-                const p2 = this.lightningPoints[i + 1];
+            // 모든 잔상 그리기 (오래된 순으로)
+            for (let i = this.lightningTrails.length - 1; i >= 0; i--) {
+                const trail = this.lightningTrails[i];
                 
-                // 두 점 사이의 각도 계산
-                const dx = p2.x - p1.x;
-                const dy = p2.y - p1.y;
-                const distance = Math.sqrt(dx * dx + dy * dy);
-                const angle = Math.atan2(dy, dx);
+                // 잔상이 충분히 투명하면 건너뛰기
+                if (trail.alpha < 0.1) continue;
                 
-                // 두 점 사이의 중간점에 번개 이미지 그리기
-                const midX = (p1.x + p2.x) / 2;
-                const midY = (p1.y + p2.y) / 2;
+                ctx.save();
+                ctx.globalAlpha = trail.alpha;
                 
-                ctx.translate(midX + offsetX, midY + offsetY);
-                ctx.rotate(angle);
+                // 잔상마다 약간씩 다른 색상 적용 (더 다양한 시각 효과)
+                if (i > 0) {
+                    // 이전 잔상은 더 파란색으로
+                    ctx.filter = `hue-rotate(${i * 10}deg) saturate(${200 - i * 30}%)`;
+                }
                 
-                // 스프라이트 시트에서 현재 프레임 선택
-                ctx.drawImage(
-                    weaponImages.lightning,
-                    this.currentFrame * LIGHTNING_FRAME_WIDTH, 0,
-                    LIGHTNING_FRAME_WIDTH, LIGHTNING_FRAME_WIDTH / 2, // 높이는 너비의 절반
-                    -distance / 2, // 중앙에서 시작
-                    -20, // 이미지 높이의 절반
-                    distance, // 두 점 사이 거리만큼 늘리기
-                    40 // 고정 높이
-                );
+                // 각 잔상의 번개 라인을 따라 이미지 그리기
+                for (let j = 0; j < trail.points.length - 1; j++) {
+                    const p1 = trail.points[j];
+                    const p2 = trail.points[j + 1];
+                    
+                    // 두 점 사이의 각도와 거리 계산
+                    const dx = p2.x - p1.x;
+                    const dy = p2.y - p1.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    const angle = Math.atan2(dy, dx);
+                    
+                    // 두 점 사이의 중간점에 번개 이미지 그리기
+                    const midX = (p1.x + p2.x) / 2;
+                    const midY = (p1.y + p2.y) / 2;
+                    
+                    ctx.translate(midX + offsetX, midY + offsetY);
+                    ctx.rotate(angle);
+                    
+                    // 프레임 선택
+                    const frameToUse = (trail.frame + j) % LIGHTNING_FRAMES; // 각 세그먼트마다 다른 프레임
+                    
+                    ctx.drawImage(
+                        weaponImages.lightning,
+                        frameToUse * LIGHTNING_FRAME_WIDTH, 0,
+                        LIGHTNING_FRAME_WIDTH, LIGHTNING_FRAME_WIDTH / 2,
+                        -distance / 2,
+                        -20,
+                        distance,
+                        40
+                    );
+                    
+                    ctx.rotate(-angle);
+                    ctx.translate(-(midX + offsetX), -(midY + offsetY));
+                }
                 
-                ctx.rotate(-angle);
-                ctx.translate(-(midX + offsetX), -(midY + offsetY));
+                ctx.restore();
             }
             
-            ctx.restore();
+            // 추가 발광 효과 (가장 최근 번개만)
+            if (this.lightningTrails.length > 0) {
+                const latestTrail = this.lightningTrails[0];
+                
+                ctx.save();
+                ctx.globalAlpha = 0.5;
+                ctx.filter = "blur(8px)";
+                
+                for (let j = 0; j < latestTrail.points.length - 1; j++) {
+                    const p1 = latestTrail.points[j];
+                    const p2 = latestTrail.points[j + 1];
+                    
+                    ctx.strokeStyle = '#AAFFFF';
+                    ctx.lineWidth = 8;
+                    ctx.beginPath();
+                    ctx.moveTo(p1.x + offsetX, p1.y + offsetY);
+                    ctx.lineTo(p2.x + offsetX, p2.y + offsetY);
+                    ctx.stroke();
+                }
+                
+                ctx.restore();
+            }
         } else {
-            // 기존 폴백 코드
-            ctx.strokeStyle = '#88FFFF';
-            ctx.lineWidth = 3;
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
-            
-            ctx.beginPath();
-            ctx.moveTo(this.lightningPoints[0].x + offsetX, this.lightningPoints[0].y + offsetY);
-            
-            for (let i = 1; i < this.lightningPoints.length; i++) {
-                ctx.lineTo(
-                    this.lightningPoints[i].x + offsetX,
-                    this.lightningPoints[i].y + offsetY
-                );
-            }
-            
-            ctx.stroke();
-            
-            ctx.strokeStyle = 'rgba(136, 255, 255, 0.5)';
-            ctx.lineWidth = 6;
-            ctx.stroke();
+            // 폴백 코드...
         }
     }
 }
@@ -3892,15 +3969,58 @@ class ChainLightningEffect {
         this.maxAge = 15;
         this.used = false;
         this.hasHit = false;
-        this.lightningPoints = [];
         
-        // 번개 지그재그 패턴 생성
+        // 잔상 관련 속성
+        this.lightningTrails = [];
         this.generateLightningPattern();
+        this.trailFadeSpeed = 0.06;
+        this.maxTrails = 3;  // 체인 번개는 더 짧게 남음
+        
+        // 애니메이션 프레임
+        this.currentFrame = Math.floor(Math.random() * LIGHTNING_FRAMES);
+        this.frameTime = 0;
+        this.frameDuration = 100;
+    }
+
+    chainLightning(sourceEnemy) {
+        // 범위 내 다른 적 찾기
+        const nearbyEnemies = enemies.filter(enemy => {
+            if (enemy === sourceEnemy || enemy === this.targetEnemy || enemy.state !== 'moving') return false;
+            
+            const dx = enemy.x - sourceEnemy.x;
+            const dy = enemy.y - sourceEnemy.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            return distance <= this.chainRange;
+        });
+        
+        if (nearbyEnemies.length > 0) {
+            // 가장 가까운 적 선택
+            nearbyEnemies.sort((a, b) => {
+                const distA = Math.hypot(a.x - sourceEnemy.x, a.y - sourceEnemy.y);
+                const distB = Math.hypot(b.x - sourceEnemy.x, b.y - sourceEnemy.y);
+                return distA - distB;
+            });
+            
+            const nextEnemy = nearbyEnemies[0];
+            
+            // 체인 번개 효과 생성
+            bullets.push(
+                new ChainLightningEffect(
+                    sourceEnemy.x, sourceEnemy.y,
+                    nextEnemy.x, nextEnemy.y,
+                    this.damage * 0.8, // 데미지 약간 감소
+                    this.chainCount - 1,
+                    this.chainRange,
+                    nextEnemy
+                )
+            );
+        }
     }
     
     generateLightningPattern() {
-        this.lightningPoints = [];
-        this.lightningPoints.push({x: this.startX, y: this.startY});
+        let lightningPoints = [];
+        lightningPoints.push({x: this.startX, y: this.startY});
         
         // 두 점 사이에 지그재그 패턴 생성
         const steps = 6;
@@ -3911,21 +4031,53 @@ class ChainLightningEffect {
             
             // 지그재그 효과
             const perpAngle = Math.atan2(this.endY - this.startY, this.endX - this.startX) + Math.PI/2;
-            const offset = 15 * (Math.random() - 0.5) * (1 - ratio); // 도착점에 가까울수록 변동 감소
+            const offset = 15 * (Math.random() - 0.5) * (1 - ratio);
             const perpX = Math.cos(perpAngle) * offset;
             const perpY = Math.sin(perpAngle) * offset;
             
-            this.lightningPoints.push({
+            lightningPoints.push({
                 x: pointX + perpX,
                 y: pointY + perpY
             });
         }
         
-        this.lightningPoints.push({x: this.endX, y: this.endY});
+        lightningPoints.push({x: this.endX, y: this.endY});
+        
+        // 새 패턴을 배열에 추가
+        this.lightningTrails.unshift({
+            points: lightningPoints,
+            alpha: 1.0,
+            frame: this.currentFrame
+        });
+        
+        // 최대 개수로 제한
+        if (this.lightningTrails.length > this.maxTrails) {
+            this.lightningTrails.pop();
+        }
     }
     
     update() {
         this.age++;
+        
+        // 프레임 업데이트
+        this.frameTime += 16;
+        if (this.frameTime >= this.frameDuration) {
+            this.frameTime = 0;
+            this.currentFrame = (this.currentFrame + 1) % LIGHTNING_FRAMES;
+            
+            // 새 패턴 생성 
+            if (this.age < 10) { // 일정 시간 동안만 새 패턴 생성
+                this.generateLightningPattern();
+            }
+        }
+        
+        // 잔상 페이드아웃
+        for (let trail of this.lightningTrails) {
+            trail.alpha -= this.trailFadeSpeed;
+        }
+        
+        // 투명해진 잔상 제거
+        this.lightningTrails = this.lightningTrails.filter(trail => trail.alpha > 0);
         
         // 대상 적에게 데미지 입히기 (한 번만)
         if (!this.hasHit && this.targetEnemy && this.targetEnemy.state === 'moving') {
@@ -3939,8 +4091,102 @@ class ChainLightningEffect {
         }
         
         // 수명이 다하면 제거
-        if (this.age >= this.maxAge) {
+        if (this.age >= this.maxAge && this.lightningTrails.length === 0) {
             this.used = true;
+        }
+    }
+    
+    draw(offsetX, offsetY) {
+        // LightningBullet과 유사한 드로잉 로직
+        if (weaponImagesLoaded && weaponImages.lightning) {
+            // 모든 잔상 그리기
+            for (let i = this.lightningTrails.length - 1; i >= 0; i--) {
+                const trail = this.lightningTrails[i];
+                if (trail.alpha < 0.1) continue;
+                
+                ctx.save();
+                ctx.globalAlpha = trail.alpha;
+                
+                // 잔상마다 다른 색상 효과
+                if (i > 0) {
+                    ctx.filter = `hue-rotate(${i * 15}deg) saturate(${150 - i * 40}%)`;
+                }
+                
+                // 번개 라인을 따라 이미지 그리기
+                for (let j = 0; j < trail.points.length - 1; j++) {
+                    const p1 = trail.points[j];
+                    const p2 = trail.points[j + 1];
+                    
+                    const dx = p2.x - p1.x;
+                    const dy = p2.y - p1.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    const angle = Math.atan2(dy, dx);
+                    
+                    const midX = (p1.x + p2.x) / 2;
+                    const midY = (p1.y + p2.y) / 2;
+                    
+                    ctx.translate(midX + offsetX, midY + offsetY);
+                    ctx.rotate(angle);
+                    
+                    // 각 세그먼트마다 약간 다른 프레임
+                    const frameToUse = (trail.frame + j) % LIGHTNING_FRAMES;
+                    
+                    ctx.drawImage(
+                        weaponImages.lightning,
+                        frameToUse * LIGHTNING_FRAME_WIDTH, 0,
+                        LIGHTNING_FRAME_WIDTH, LIGHTNING_FRAME_WIDTH / 2,
+                        -distance / 2,
+                        -15, // 체인 번개는 약간 더 얇게
+                        distance,
+                        30
+                    );
+                    
+                    ctx.rotate(-angle);
+                    ctx.translate(-(midX + offsetX), -(midY + offsetY));
+                }
+                
+                ctx.restore();
+            }
+            
+            // 현재 잔상에 발광 효과 추가
+            if (this.lightningTrails.length > 0) {
+                const latestTrail = this.lightningTrails[0];
+                
+                ctx.save();
+                ctx.globalAlpha = 0.4 * latestTrail.alpha;
+                ctx.filter = "blur(6px)";
+                
+                for (let j = 0; j < latestTrail.points.length - 1; j++) {
+                    const p1 = latestTrail.points[j];
+                    const p2 = latestTrail.points[j + 1];
+                    
+                    ctx.strokeStyle = '#AAFFFF';
+                    ctx.lineWidth = 6;
+                    ctx.beginPath();
+                    ctx.moveTo(p1.x + offsetX, p1.y + offsetY);
+                    ctx.lineTo(p2.x + offsetX, p2.y + offsetY);
+                    ctx.stroke();
+                }
+                
+                ctx.restore();
+            }
+            
+            // 끝점에 전기 효과 추가 (적중 대상에 집중)
+            if (this.targetEnemy && this.lightningTrails.length > 0) {
+                const alpha = this.lightningTrails[0].alpha;
+                ctx.fillStyle = `rgba(200, 255, 255, ${alpha * 0.8})`;
+                ctx.beginPath();
+                ctx.arc(this.endX + offsetX, this.endY + offsetY, 10, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // 추가 글로우 효과
+                ctx.fillStyle = `rgba(150, 220, 255, ${alpha * 0.5})`;
+                ctx.beginPath();
+                ctx.arc(this.endX + offsetX, this.endY + offsetY, 15, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        } else {
+            // 폴백 코드...
         }
     }
     
@@ -3979,41 +4225,10 @@ class ChainLightningEffect {
             );
         }
     }
-    
-    draw(offsetX, offsetY) {
-        if (weaponImagesLoaded && weaponImages.lightning) {
-            const alpha = 1 - this.age / this.maxAge;
-            ctx.save();
-            ctx.globalAlpha = alpha;
-            
-            // 같은 방식으로 구현, 시작점과 끝점 사이에 번개 이미지 배치
-            const dx = this.endX - this.startX;
-            const dy = this.endY - this.startY;
-            const distance = Math.sqrt(dx * dx + dy * dy);
-            const angle = Math.atan2(dy, dx);
-            
-            // 중간점에 번개 이미지 그리기
-            const midX = (this.startX + this.endX) / 2;
-            const midY = (this.startY + this.endY) / 2;
-            
-            ctx.translate(midX + offsetX, midY + offsetY);
-            ctx.rotate(angle);
-            
-            // 스프라이트 시트에서 현재 프레임 선택 (번개 애니메이션)
-            ctx.drawImage(
-                weaponImages.lightning,
-                (this.age % LIGHTNING_FRAMES) * LIGHTNING_FRAME_WIDTH, 0,
-                LIGHTNING_FRAME_WIDTH, LIGHTNING_FRAME_WIDTH / 2,
-                -distance / 2,
-                -20,
-                distance,
-                40
-            );
-            
-            ctx.restore();
-        }
-    }
 }
+
+
+
 
 class BoomerangWeapon extends Weapon {
     constructor() {
