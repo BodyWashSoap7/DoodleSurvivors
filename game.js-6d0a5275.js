@@ -268,11 +268,88 @@ function loadMapTiles() {
     }, 5000);
 }
 
-// 게임 초기화 시 이미지 로딩 호출
-loadCharacterImages();
+// 이미지 로딩 관련 변수 추가
+const treasureImage = new Image();
+let treasureImageLoaded = false;
 
-// 게임 초기화 시 맵 타일 로드
-loadMapTiles();
+// 아티팩트 아이콘 이미지 관련 변수
+const artifactIcons = {};
+let artifactIconsLoaded = false;
+
+// 피격 이미지 로드 변수 추가
+const hitEffectImage = new Image();
+let hitEffectLoaded = false;
+const HIT_FRAME_COUNT = 4; // 프레임 수
+const HIT_FRAME_WIDTH = 64; // 각 프레임 너비
+
+// 이미지 로딩 함수 추가
+function loadGameImages() {
+    // 기존 이미지 로딩
+    loadCharacterImages();
+    loadMapTiles();
+    loadLevelUpIcons();
+    
+    // Treasure 이미지 로드
+    treasureImage.src = './img/treasure.png';
+    treasureImage.onload = function() {
+        treasureImageLoaded = true;
+        console.log('보물 이미지 로드 완료');
+    };
+    
+    // 피격 효과 이미지 로드
+    hitEffectImage.src = './img/hit_effect.png';
+    hitEffectImage.onload = function() {
+        hitEffectLoaded = true;
+        console.log('피격 효과 이미지 로드 완료');
+    };
+    hitEffectImage.onerror = function() {
+        console.error('피격 효과 이미지 로드 실패');
+    };
+    
+    // 아티팩트 아이콘 로드
+    loadArtifactIcons();
+}
+
+// 아티팩트 아이콘 로드 함수
+function loadArtifactIcons() {
+    const artifactTypes = [
+        'reducePlayerSize',
+        'increaseAttackPower',
+        'increaseFireRate',
+        'increaseMoveSpeed',
+        'enableHealthRegen',
+        'reduceEnemySpeed',
+        'reduceEnemyHealth',
+        'expGain'  // 경험치 획득용 아이콘 추가
+    ];
+    
+    let loadedCount = 0;
+    
+    artifactTypes.forEach(type => {
+        artifactIcons[type] = new Image();
+        artifactIcons[type].src = `./img/artifacts/${type}_icon.png`;
+        
+        artifactIcons[type].onload = function() {
+            loadedCount++;
+            if (loadedCount === artifactTypes.length) {
+                artifactIconsLoaded = true;
+                console.log('모든 아티팩트 아이콘 로드 완료');
+            }
+        };
+        
+        artifactIcons[type].onerror = function() {
+            console.error(`아티팩트 아이콘 로드 실패: ${type}`);
+            // 로드 실패 시 다음 이미지로 계속 진행
+            loadedCount++;
+            if (loadedCount === artifactTypes.length) {
+                artifactIconsLoaded = true;
+            }
+        };
+    });
+}
+
+// 게임 초기화 시 모든 이미지 로드 호출
+loadGameImages();
 
 // 적 스폰 관련 변수 추가
 const MAX_ENEMIES = 100; // 최대 적 수
@@ -447,6 +524,41 @@ document.addEventListener('keydown', (e) => {
         }
     }
 
+    // 레벨업/아티팩트 선택 화면에서의 키 입력 처리
+    else if (currentGameState === GAME_STATE.LEVEL_UP) {
+        // 옵션 수에 따라 다르게 처리
+        if (levelUpOptions.length === 1) {
+            selectedLevelUpOption = 0;
+            if (e.key === 'Enter') {
+                applyLevelUpChoice();
+                e.preventDefault();
+            }
+        } else if (levelUpOptions.length === 2) {
+            if (e.key === 'ArrowLeft') {
+                selectedLevelUpOption = 0;
+                e.preventDefault();
+            } else if (e.key === 'ArrowRight') {
+                selectedLevelUpOption = 1;
+                e.preventDefault();
+            } else if (e.key === 'Enter') {
+                applyLevelUpChoice();
+                e.preventDefault();
+            }
+        } else {
+            // 3-4개 옵션의 경우 기존 방향키 처리 사용
+            if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || 
+                e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                selectLevelUpOption(e.key);
+                e.preventDefault();
+            } else if (e.key === 'Enter') {
+                if (selectedLevelUpOption !== -1) {
+                    applyLevelUpChoice();
+                }
+                e.preventDefault();
+            }
+        }
+    }
+
     // ESC 키 이벤트 처리
     if (e.key === 'Escape') {
         if (currentGameState === GAME_STATE.PLAYING) {
@@ -513,39 +625,83 @@ function selectLevelUpOption(key) {
 // 레벨업 선택 적용 함수
 function applyLevelUpChoice() {
     // 선택된 옵션이 없으면 리턴
-    if (selectedLevelUpOption === -1) {
+    if (selectedLevelUpOption === -1 || !levelUpOptions[selectedLevelUpOption]) {
         return;
     }
     
     const option = levelUpOptions[selectedLevelUpOption];
     
-    switch(option.type) {
-        case 'attackPower':
-            player.attackPower += option.value;
-            break;
-        case 'maxHealth':
-            player.maxHealth += option.value;
-            player.health = player.maxHealth; // 체력 회복
-            break;
-        case 'fireRate':
-            player.fireRate += option.value;
-            // 모든 무기의 공격속도 업데이트
-            player.weapons.forEach(weapon => {
-                weapon.updateFireRate(player.fireRate);
-            });
-            break;
-        case 'projectileSpeed':
-            player.projectileSpeed += option.value;
-            break;
-        case 'moveSpeed':
-            player.speed += option.value;
-            break;
-        case 'pickupRadius':
-            player.pickupRadius += option.value;
-            break;
-        case 'expMultiplier':
-            player.expMultiplier += option.value;
-            break;
+    if (isArtifactSelection) {
+        // 아티팩트 효과 적용
+        switch(option.type) {
+            case 'reducePlayerSize':
+                player.size *= 0.75;
+                break;
+            case 'increaseAttackPower':
+                player.attackPower *= 1.5;
+                break;
+            case 'increaseFireRate':
+                player.fireRate *= 1.5;
+                player.weapons.forEach(weapon => {
+                    weapon.updateFireRate(player.fireRate);
+                });
+                break;
+            case 'increaseMoveSpeed':
+                player.speed *= 1.5;
+                break;
+            case 'enableHealthRegen':
+                player.healthRegeneration = 0.02; // 2% per second
+                break;
+            case 'reduceEnemySpeed':
+                player.enemySpeedReduction = 0.5; // 50% reduction
+                break;
+            case 'reduceEnemyHealth':
+                player.enemyHealthReduction = 0.25; // 25% reduction
+                break;
+            case 'expGain':
+                // 경험치 획득
+                player.exp += option.value;
+                // 레벨업 체크
+                const jewelTemp = new Jewel(0, 0);
+                jewelTemp.checkLevelUp();
+                break;
+        }
+        
+        // 아티팩트 ID 기록 (경험치 옵션이 아닌 경우)
+        if (option.artifactId && option.artifactId !== 0) {
+            player.acquiredArtifacts.push(option.artifactId);
+        }
+        
+        isArtifactSelection = false;
+    } else {
+        // 기존 레벨업 옵션 적용
+        switch(option.type) {
+            case 'attackPower':
+                player.attackPower += option.value;
+                break;
+            case 'maxHealth':
+                player.maxHealth += option.value;
+                player.health = player.maxHealth; // 체력 회복
+                break;
+            case 'fireRate':
+                player.fireRate += option.value;
+                player.weapons.forEach(weapon => {
+                    weapon.updateFireRate(player.fireRate);
+                });
+                break;
+            case 'projectileSpeed':
+                player.projectileSpeed += option.value;
+                break;
+            case 'moveSpeed':
+                player.speed += option.value;
+                break;
+            case 'pickupRadius':
+                player.pickupRadius += option.value;
+                break;
+            case 'expMultiplier':
+                player.expMultiplier += option.value;
+                break;
+        }
     }
     
     // 게임 재개
@@ -612,74 +768,142 @@ function loadLevelUpIcons() {
     });
 }
 
-// 게임 초기화 시 레벨업 아이콘 로드
-loadCharacterImages();
-loadMapTiles();
-loadLevelUpIcons();
 
-// 레벨업 화면 그리기 함수
+// allArtifacts 배열
+const allArtifacts = [
+    { id: 1, name: '작은 체구', description: '크기 25% 감소', effect: 'reducePlayerSize' },
+    { id: 2, name: '강력한 공격', description: '공격력 50% 증가', effect: 'increaseAttackPower' },
+    { id: 3, name: '빠른 손놀림', description: '공격속도 50% 증가', effect: 'increaseFireRate' },
+    { id: 4, name: '신속한 발걸음', description: '이동속도 50% 증가', effect: 'increaseMoveSpeed' },
+    { id: 5, name: '생명의 샘', description: '초당 체력 2% 회복', effect: 'enableHealthRegen' },
+    { id: 6, name: '적 둔화', description: '적 이동속도 50% 감소', effect: 'reduceEnemySpeed' },
+    { id: 7, name: '약화된 적', description: '적 체력 25% 감소', effect: 'reduceEnemyHealth' }
+];
+
+// 아티팩트 관련 전역 변수 추가
+let isArtifactSelection = false;
+
+// 아티팩트 선택지 생성 함수
+function generateArtifactOptions() {
+    // 이미 획득한 아티팩트 제외
+    const availableArtifacts = allArtifacts.filter(artifact => 
+        !player.acquiredArtifacts.includes(artifact.id));
+    
+    // 가능한 아티팩트가 없으면 경험치 제공
+    if (availableArtifacts.length === 0) {
+        const xpGain = Math.floor((player.nextLevelExp) * 0.3);
+        levelUpOptions = [{
+            type: 'expGain',  // 이 타입에 맞는 아이콘 이미지 필요
+            name: '경험치 획득',
+            description: `${xpGain} 경험치 획득 (30%)`,
+            value: xpGain,
+            artifactId: 0
+        }];
+    } else {
+        // 랜덤하게 4개 선택 (또는 가능한 모든 아티팩트)
+        const shuffled = [...availableArtifacts].sort(() => Math.random() - 0.5);
+        const selected = shuffled.slice(0, Math.min(4, availableArtifacts.length));
+        
+        // 레벨업 옵션 형식으로 변환
+        levelUpOptions = selected.map(artifact => ({
+            type: artifact.effect,
+            name: artifact.name,
+            description: artifact.description,
+            artifactId: artifact.id
+        }));
+    }
+    
+    selectedLevelUpOption = -1;
+    isArtifactSelection = true;
+}
+
 function drawLevelUpScreen() {
     // 배경
     ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     
     // 제목
-    ctx.fillStyle = '#66fcf1';
+    ctx.fillStyle = isArtifactSelection ? '#FFD700' : '#66fcf1';
     ctx.font = '36px Arial';
     ctx.textAlign = 'center';
-    ctx.fillText('LEVEL UP!', canvas.width / 2, 50);
+    ctx.fillText(
+        isArtifactSelection ? '보물 발견!' : 'LEVEL UP!', 
+        canvas.width / 2, 50
+    );
     
-    // 레벨 표시
-    ctx.fillStyle = '#ffff00';
-    ctx.font = '24px Arial';
-    ctx.fillText(`LEVEL ${player.level}`, canvas.width / 2, canvas.height - 40);
+    // 부제목
+    if (isArtifactSelection) {
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = '24px Arial';
+        ctx.fillText('아티팩트를 선택하세요', canvas.width / 2, 90);
+    } else {
+        // 레벨 표시
+        ctx.fillStyle = '#ffff00';
+        ctx.font = '24px Arial';
+        ctx.fillText(`LEVEL ${player.level}`, canvas.width / 2, canvas.height - 40);
+    }
     
     // 중앙 위치
     const centerX = canvas.width / 2;
     const centerY = canvas.height / 2;
     
-    // 옵션 박스 크기 (이미지를 담을 수 있도록 크기 조정)
+    // 옵션 박스 크기
     const boxWidth = 320;
     const boxHeight = 150;
     
-    // 위쪽 옵션 (상)
-    drawOptionBox(centerX - boxWidth/2, centerY - 160 - boxHeight/2, 
-                 boxWidth, boxHeight, levelUpOptions[0], selectedLevelUpOption === 0);
+    // 옵션 그리기 - 옵션 수에 따라 다른 레이아웃 사용
+    if (levelUpOptions.length === 1) {
+        // 하나만 있는 경우 중앙에 표시
+        drawOptionBox(centerX - boxWidth/2, centerY - boxHeight/2, 
+                     boxWidth, boxHeight, levelUpOptions[0], selectedLevelUpOption === 0);
+    } else if (levelUpOptions.length === 2) {
+        // 둘인 경우 좌우로 표시
+        drawOptionBox(centerX - boxWidth - 20, centerY - boxHeight/2,
+                     boxWidth, boxHeight, levelUpOptions[0], selectedLevelUpOption === 0);
+        drawOptionBox(centerX + 20, centerY - boxHeight/2,
+                     boxWidth, boxHeight, levelUpOptions[1], selectedLevelUpOption === 1);
+    } else {
+        // 3-4개인 경우 원래 레이아웃 사용
+        // 위쪽 옵션 (상)
+        if (levelUpOptions[0]) {
+            drawOptionBox(centerX - boxWidth/2, centerY - 160 - boxHeight/2, 
+                         boxWidth, boxHeight, levelUpOptions[0], selectedLevelUpOption === 0);
+        }
+        
+        // 왼쪽 옵션 (좌)
+        if (levelUpOptions[1]) {
+            drawOptionBox(centerX - 230 - boxWidth/2, centerY - boxHeight/2,
+                         boxWidth, boxHeight, levelUpOptions[1], selectedLevelUpOption === 1);
+        }
+        
+        // 오른쪽 옵션 (우)
+        if (levelUpOptions[2]) {
+            drawOptionBox(centerX + 230 - boxWidth/2, centerY - boxHeight/2,
+                         boxWidth, boxHeight, levelUpOptions[2], selectedLevelUpOption === 2);
+        }
+        
+        // 아래쪽 옵션 (하)
+        if (levelUpOptions[3]) {
+            drawOptionBox(centerX - boxWidth/2, centerY + 160 - boxHeight/2,
+                         boxWidth, boxHeight, levelUpOptions[3], selectedLevelUpOption === 3);
+        }
+    }
     
-    // 왼쪽 옵션 (좌)  
-    drawOptionBox(centerX - 230 - boxWidth/2, centerY - boxHeight/2,
-                 boxWidth, boxHeight, levelUpOptions[1], selectedLevelUpOption === 1);
-    
-    // 오른쪽 옵션 (우)
-    drawOptionBox(centerX + 230 - boxWidth/2, centerY - boxHeight/2,
-                 boxWidth, boxHeight, levelUpOptions[2], selectedLevelUpOption === 2);
-    
-    // 아래쪽 옵션 (하)
-    drawOptionBox(centerX - boxWidth/2, centerY + 160 - boxHeight/2,
-                 boxWidth, boxHeight, levelUpOptions[3], selectedLevelUpOption === 3);
-       
     // 방향키 그리기
-    drawArrowKeys(centerX, centerY);
+    if (levelUpOptions.length > 2) {
+        drawArrowKeys(centerX, centerY);
+    }
 
     // 플레이어 캐릭터 그리기 (중앙에)
-    if (player.image && player.image.complete) {
-        const playerDisplaySize = player.size * 4; // 레벨업 화면에서는 크게 표시
-        
-        // 플레이어의 현재 프레임과 애니메이션 상태에 맞는 스프라이트 위치
+    if (!isArtifactSelection && player.image && player.image.complete) {
+        const playerDisplaySize = player.size * 4;
         const spriteX = player.currentFrame * player.spriteWidth;
         const spriteY = player.animationState === 'idle' ? 0 : player.spriteHeight;
         
         ctx.save();
-        
-        // 플레이어 중앙에 그리기
         ctx.translate(centerX, centerY);
+        if (player.direction === 'right') ctx.scale(-1, 1);
         
-        // 플레이어 방향에 따른 좌우반전
-        if (player.direction === 'right') {
-            ctx.scale(-1, 1);
-        }
-        
-        // 캐릭터 이미지 그리기
         ctx.drawImage(
             player.image,
             spriteX, spriteY,
@@ -691,63 +915,102 @@ function drawLevelUpScreen() {
         );
         
         ctx.restore();
-    } else {
-        // 이미지가 로드되지 않은 경우 기본 원 그리기
-        ctx.fillStyle = 'white';
-        ctx.beginPath();
-        ctx.arc(centerX, centerY, player.size * 2, 0, Math.PI * 2);
-        ctx.fill();
+    } else if (isArtifactSelection) {
+        // PNG 이미지로 보물상자 그리기
+        if (treasureImageLoaded) {
+            const treasureSize = 64;
+            ctx.drawImage(
+                treasureImage,
+                centerX - treasureSize/2,
+                centerY - treasureSize/2,
+                treasureSize,
+                treasureSize
+            );
+        } else {
+            // 이미지가 로드되지 않은 경우 기본 사각형
+            ctx.fillStyle = '#DAA520';
+            ctx.fillRect(centerX - 32, centerY - 32, 64, 64);
+        }
     }
 }
 
-// 옵션 박스 그리기 함수
+//옵션 그리기 함수
 function drawOptionBox(x, y, width, height, option, isSelected) {
+    // 아티팩트 선택인지 레벨업 선택인지에 따라 색상 변경
+    const bgColor = isArtifactSelection ? 
+        (isSelected ? 'rgba(218, 165, 32, 0.8)' : 'rgba(139, 69, 19, 0.8)') :
+        (isSelected ? 'rgba(69, 162, 158, 0.8)' : 'rgba(31, 40, 51, 0.8)');
+    
+    const borderColor = isArtifactSelection ?
+        (isSelected ? '#FFD700' : '#CD853F') :
+        (isSelected ? '#66fcf1' : '#45a29e');
+    
     // 박스 배경
-    ctx.fillStyle = isSelected ? 'rgba(69, 162, 158, 0.8)' : 'rgba(31, 40, 51, 0.8)';
+    ctx.fillStyle = bgColor;
     ctx.fillRect(x, y, width, height);
     
     // 박스 테두리
-    ctx.strokeStyle = isSelected ? '#66fcf1' : '#45a29e';
+    ctx.strokeStyle = borderColor;
     ctx.lineWidth = isSelected ? 3 : 1;
     ctx.strokeRect(x, y, width, height);
     
-    // 아이콘 이미지 그리기 (왼쪽 중앙)
-    const iconSize = 128;
-    const iconX = x + 15; // 박스 왼쪽에서 15px 떨어진 위치
-    const iconY = y + (height - iconSize) / 2; // 세로 중앙 정렬
+    // 아이콘 위치
+    const iconSize = 64;
+    const iconX = x + 20;
+    const iconY = y + (height - iconSize) / 2;
     
-    // 이미지가 로드되었고 해당 타입의 아이콘이 있으면 그리기
-    if (levelUpIconsLoaded && levelUpIcons[option.type]) {
-        ctx.drawImage(levelUpIcons[option.type], iconX, iconY, iconSize, iconSize);
+    // 아이콘 그리기 (레벨업, 아티팩트 둘 다 PNG 사용)
+    if (isArtifactSelection) {
+        // 아티팩트 아이콘 (PNG 이미지)
+        if (artifactIconsLoaded && artifactIcons[option.type]) {
+            ctx.drawImage(artifactIcons[option.type], iconX, iconY, iconSize, iconSize);
+        } else {
+            // 대체 아이콘
+            ctx.fillStyle = isSelected ? '#FFD700' : '#CD853F';
+            ctx.fillRect(iconX, iconY, iconSize, iconSize);
+            ctx.strokeStyle = '#FFFFFF';
+            ctx.strokeRect(iconX, iconY, iconSize, iconSize);
+            
+            // 타입의 첫 글자
+            ctx.fillStyle = '#000000';
+            ctx.font = '32px Arial';
+            ctx.textAlign = 'center';
+            const letter = option.type.charAt(0).toUpperCase();
+            ctx.fillText(letter, iconX + iconSize/2, iconY + iconSize/2 + 10);
+        }
     } else {
-        // 이미지가 없을 경우 대체 표시 (임시 아이콘)
-        ctx.fillStyle = isSelected ? '#ffff00' : '#66fcf1';
-        ctx.fillRect(iconX, iconY, iconSize, iconSize);
-        ctx.strokeStyle = '#ffffff';
-        ctx.strokeRect(iconX, iconY, iconSize, iconSize);
-        
-        // 타입의 첫 글자를 크게 표시
-        ctx.fillStyle = '#000000';
-        ctx.font = '32px Arial';
-        ctx.textAlign = 'center';
-        const letter = option.type.charAt(0).toUpperCase();
-        ctx.fillText(letter, iconX + iconSize/2, iconY + iconSize/2 + 10);
+        // 레벨업 아이콘 (기존과 동일)
+        if (levelUpIconsLoaded && levelUpIcons[option.type]) {
+            ctx.drawImage(levelUpIcons[option.type], iconX, iconY, iconSize, iconSize);
+        } else {
+            // 대체 아이콘
+            ctx.fillStyle = isSelected ? '#ffff00' : '#66fcf1';
+            ctx.fillRect(iconX, iconY, iconSize, iconSize);
+            ctx.strokeStyle = '#ffffff';
+            ctx.strokeRect(iconX, iconY, iconSize, iconSize);
+            
+            // 타입의 첫 글자
+            ctx.fillStyle = '#000000';
+            ctx.font = '32px Arial';
+            ctx.textAlign = 'center';
+            const letter = option.type.charAt(0).toUpperCase();
+            ctx.fillText(letter, iconX + iconSize/2, iconY + iconSize/2 + 10);
+        }
     }
     
-    // 텍스트 영역 (아이콘 오른쪽)
-    const textX = iconX + iconSize + 15; // 아이콘 오른쪽에서 15px 떨어진 위치
-    const textWidth = width - (textX - x) - 10; // 남은 공간에서 오른쪽 여백 10px 제외
+    // 텍스트 영역
+    const textX = x + 120;
     
-    // 옵션 이름 (위쪽)
-    ctx.fillStyle = isSelected ? '#ffff00' : '#ffffff';
+    // 옵션 이름
+    ctx.fillStyle = isSelected ? '#FFFFFF' : (isArtifactSelection ? '#F0E68C' : '#ffffff');
     ctx.font = '24px Arial';
     ctx.textAlign = 'left';
     ctx.fillText(option.name, textX, y + height/2 - 10);
     
-    // 옵션 설명 (아래쪽)
-    ctx.fillStyle = isSelected ? '#ffffff' : '#c5c6c7';
+    // 옵션 설명
+    ctx.fillStyle = isSelected ? (isArtifactSelection ? '#F0E68C' : '#ffffff') : '#c5c6c7';
     ctx.font = '18px Arial';
-    ctx.fillText(option.description, textX, y + height/2 + 15);
+    ctx.fillText(option.description, textX, y + height/2 + 20);
 }
 
 // 방향키 안내 그리기 함수
@@ -1249,11 +1512,19 @@ function update() {
         }
     }
     
-    // 플레이어 피격 상태 업데이트
     if (player.isHit) {
         const currentTime = Date.now();
-        if (currentTime - player.hitStartTime >= player.hitDuration) {
-            player.isHit = false;
+        
+        // 프레임 업데이트
+        player.hitFrameTime += 16; // 약 60fps 기준
+        if (player.hitFrameTime >= player.hitFrameDuration) {
+            player.hitFrameTime = 0;
+            player.hitFrame = (player.hitFrame + 1) % HIT_FRAME_COUNT;
+            
+            // 애니메이션이 한 사이클 완료되면 피격 상태 종료
+            if (player.hitFrame === 0 && currentTime - player.hitStartTime >= player.hitDuration) {
+                player.isHit = false;
+            }
         }
     }
     
@@ -1354,6 +1625,24 @@ function update() {
             }
         }
     }
+
+    // 체력 재생 적용 (아티팩트 효과)
+    if (player.healthRegeneration > 0) {
+        const regenAmount = player.maxHealth * player.healthRegeneration / 60; // 60fps 기준
+        player.health = Math.min(player.health + regenAmount, player.maxHealth);
+    }
+    
+    // Treasure와의 충돌 확인
+    for (let i = terrain.length - 1; i >= 0; i--) {
+        const feature = terrain[i];
+        if (feature instanceof Treasure) {
+            feature.update();
+            if (detectCollision(player, feature) && !feature.collected) {
+                feature.collect();
+                terrain.splice(i, 1); // 획득 후 제거
+            }
+        }
+    }
 }
 
 // Draw Game Objects
@@ -1417,56 +1706,18 @@ function draw() {
         const spriteY = player.animationState === 'idle' ? 0 : player.spriteHeight;
         
         // 피격 상태일 때
-        if (player.isHit) {
-            // 임시 캔버스 생성
-            const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = playerSize * 2;
-            tempCanvas.height = playerSize * 2;
-            const tempCtx = tempCanvas.getContext('2d');
+        if (player.isHit && hitEffectLoaded) {
+            const playerSize = player.size * 2;
             
-            // 오른쪽 방향일 때 좌우반전 처리
-            if (player.direction === 'right') {
-                tempCtx.translate(tempCanvas.width, 0);
-                tempCtx.scale(-1, 1);
-            }
+            // 스프라이트 시트에서 현재 프레임 위치 계산
+            const spriteX = player.currentFrame * player.spriteWidth;
+            const spriteY = player.animationState === 'idle' ? 0 : player.spriteHeight;
             
-            // 플레이어 이미지를 임시 캔버스에 그리기
-            tempCtx.drawImage(
-                player.image,
-                spriteX, spriteY,
-                player.spriteWidth, player.spriteHeight,
-                0, 0,
-                playerSize * 2,
-                playerSize * 2
-            );
+            // 피격 효과의 현재 프레임 위치
+            const hitEffectX = player.hitFrame * HIT_FRAME_WIDTH;
             
-            // 좌우반전 원복
-            if (player.direction === 'right') {
-                tempCtx.setTransform(1, 0, 0, 1, 0, 0);
-            }
-            
-            // 피격 효과의 진행도 계산 (깜빡임 효과)
-            const currentTime = Date.now();
-            const hitProgress = (currentTime - player.hitStartTime) / player.hitDuration;
-            const blinkSpeed = 10; // 깜빡임 속도
-            const alpha = Math.abs(Math.sin(hitProgress * Math.PI * blinkSpeed)) * 0.8;
-            
-            // 빨간색 오버레이 효과 (투명한 부분 제외)
-            tempCtx.globalCompositeOperation = 'source-atop';
-            tempCtx.fillStyle = `rgba(255, 0, 0, ${alpha})`;
-            tempCtx.fillRect(0, 0, playerSize * 2, playerSize * 2);
-            
-            // 최종 이미지를 메인 캔버스에 그리기
-            ctx.drawImage(
-                tempCanvas,
-                canvas.width / 2 - playerSize,
-                canvas.height / 2 - playerSize
-            );
-        } else {
-            // 일반 상태일 때
+            // 캐릭터 그리기
             ctx.save();
-            
-            // 캔버스 중앙으로 이동
             ctx.translate(canvas.width / 2, canvas.height / 2);
             
             // 오른쪽 방향일 때 좌우반전
@@ -1474,13 +1725,49 @@ function draw() {
                 ctx.scale(-1, 1);
             }
             
-            // 이미지를 중앙에 그리기
+            // 캐릭터 이미지 그리기
             ctx.drawImage(
                 player.image,
                 spriteX, spriteY,
                 player.spriteWidth, player.spriteHeight,
                 -playerSize, // x를 -playerSize로 설정하여 중앙 정렬
                 -playerSize, // y를 -playerSize로 설정하여 중앙 정렬
+                playerSize * 2,
+                playerSize * 2
+            );
+            
+            // 피격 효과 스프라이트 그리기 (캐릭터 위에 덮어씌움)
+            ctx.drawImage(
+                hitEffectImage,
+                hitEffectX, 0,
+                HIT_FRAME_WIDTH, 64,
+                -playerSize, // 캐릭터와 같은 위치에 그리기
+                -playerSize,
+                playerSize * 2,
+                playerSize * 2
+            );
+            
+            ctx.restore();
+        } else if (player.image && player.image.complete) {
+            // 기존의 일반 상태 플레이어 그리기 코드 그대로 유지
+            const playerSize = player.size * 2;
+            
+            const spriteX = player.currentFrame * player.spriteWidth;
+            const spriteY = player.animationState === 'idle' ? 0 : player.spriteHeight;
+            
+            ctx.save();
+            ctx.translate(canvas.width / 2, canvas.height / 2);
+            
+            if (player.direction === 'right') {
+                ctx.scale(-1, 1);
+            }
+            
+            ctx.drawImage(
+                player.image,
+                spriteX, spriteY,
+                player.spriteWidth, player.spriteHeight,
+                -playerSize,
+                -playerSize,
                 playerSize * 2,
                 playerSize * 2
             );
@@ -1597,40 +1884,33 @@ function generateChunksAroundPlayer() {
     }
 }
 
-// generateChunk 함수 수정
+// generateChunk 함수
 function generateChunk(chunkX, chunkY) {
     const chunk = {
         items: [],
         terrain: [],
     };
 
-    // 적은 더 이상 청크 생성 시 스폰되지 않음
-    // 대신 spawnEnemyAroundPlayer 함수를 통해 지속적으로 생성됨
-
-    // Generate items (jewels)
-    const itemCount = 3; // Adjust as needed
+    // 아이템 생성 (jewels)
+    const itemCount = 3; // 필요에 따라 조정
     for (let i = 0; i < itemCount; i++) {
         const x = chunkX * CHUNK_SIZE + Math.random() * CHUNK_SIZE;
         const y = chunkY * CHUNK_SIZE + Math.random() * CHUNK_SIZE;
         const jewel = new Jewel(x, y);
         chunk.items.push(jewel);
-        jewels.push(jewel); // Add to the main jewels array
+        jewels.push(jewel); // 메인 jewels 배열에 추가
     }
 
-    // Generate terrain features (e.g., trees)
-    for (let x = 0; x < CHUNK_SIZE; x += 50) {
-        for (let y = 0; y < CHUNK_SIZE; y += 50) {
-            const worldX = chunkX * CHUNK_SIZE + x;
-            const worldY = chunkY * CHUNK_SIZE + y;
-            if ((worldX + worldY) % 200 === 0) {
-                const tree = new Tree(worldX, worldY);
-                chunk.terrain.push(tree);
-                terrain.push(tree); // Add to the main terrain array
-            }
-        }
+    // Treasure 생성 (10% 확률)
+    if (Math.random() < 0.1) {
+        const x = chunkX * CHUNK_SIZE + Math.random() * CHUNK_SIZE;
+        const y = chunkY * CHUNK_SIZE + Math.random() * CHUNK_SIZE;
+        const treasure = new Treasure(x, y);
+        chunk.terrain.push(treasure);
+        terrain.push(treasure); // 메인 terrain 배열에 추가
     }
 
-    // Store the chunk
+    // 청크 저장
     const chunkKey = `${chunkX},${chunkY}`;
     chunks[chunkKey] = chunk;
 }
@@ -1703,9 +1983,9 @@ function spawnEnemyAroundPlayer() {
     if (isValidSpawnPosition(spawnX, spawnY)) {
         // 적 생성
         const enemySize = 20;
-        //const enemySpeed = 1 + Math.random() * 0.5 + (player.level - 1) * 0.1;
-        const enemySpeed = 0.5 + Math.random() * 0.1
-        const enemyHealth = 5 + Math.floor((player.level - 1) * 1.5);
+    // 아티팩트 효과 적용
+        const enemySpeed = (0.5 + Math.random() * 0.1) * (1 - player.enemySpeedReduction);
+        const enemyHealth = Math.floor((5 + Math.floor((player.level - 1) * 1.5)) * (1 - player.enemyHealthReduction));
         const enemyAttack = 10 + Math.floor((player.level - 1) * 0.5);
         
         const enemy = new Enemy(spawnX, spawnY, enemySize, enemySpeed, enemyHealth, enemyAttack);
@@ -1824,6 +2104,7 @@ function fireWeapon() {
 }
 
 function resetGame() {
+    //플레이어 능력치 초기화
     player.x = 0;
     player.y = 0;
     player.health = player.maxHealth;
@@ -1833,6 +2114,13 @@ function resetGame() {
     player.prevLevelExp = 0;
     player.weapons = [new BasicWeapon()];
     
+    // 아티팩트 관련 속성 초기화
+    player.acquiredArtifacts = [];
+    player.healthRegeneration = 0;
+    player.enemySpeedReduction = 0;
+    player.enemyHealthReduction = 0;
+
+    //오브젝트 초기화
     bullets = [];
     enemies = [];
     jewels = [];
@@ -1855,6 +2143,9 @@ function resetGame() {
     // 피격 상태 초기화
     player.isHit = false;
     player.hitStartTime = 0;
+    player.hitFrame = 0;
+    player.hitFrameTime = 0;
+    hitFrameDuration = 100;
 
     // 방향 초기화
     player.direction = 'left';
@@ -2298,6 +2589,11 @@ class Enemy {
         if (Math.random() < 0.1) {
             jewels.push(new Jewel(this.x, this.y));
         }
+
+        // 5% 확률로 보물 드롭
+        if (Math.random() < 0.05) {
+            terrain.push(new Treasure(this.x, this.y));
+        }
         
         // 레벨업 체크 (Jewel 클래스의 checkLevelUp 메서드를 재사용)
         const jewelTemp = new Jewel(0, 0);
@@ -2690,9 +2986,10 @@ class Enemy {
             player.hitStartTime = currentTime;
             
             // 공격 애니메이션 시작
-            this.isAttacking = true;
-            this.attackStartTime = currentTime;
-            this.attackAnimationProgress = 0;
+            player.isHit = true;
+            player.hitStartTime = currentTime;
+            player.hitFrame = 0;
+            player.hitFrameTime = 0;
             
             // 공격 파티클 생성
             this.createAttackParticles();
@@ -2790,18 +3087,51 @@ class Jewel {
     }
 }
 
-class Tree {
+// Treasure 클래스
+class Treasure {
     constructor(x, y) {
         this.x = x;
         this.y = y;
-        this.size = 20;
+        this.size = 32; // 이미지 크기의 절반
+        this.collected = false;
+    }
+
+    update() {
+        // 애니메이션 효과 제거
     }
 
     draw(offsetX, offsetY) {
-        ctx.fillStyle = 'green';
-        ctx.beginPath();
-        ctx.arc(this.x + offsetX, this.y + offsetY, this.size, 0, Math.PI * 2);
-        ctx.fill();
+        const drawX = this.x + offsetX;
+        const drawY = this.y + offsetY;
+        
+        // 이미지가 로드되었으면 그리기
+        if (treasureImageLoaded) {
+            // 이미지 크기 (64x64)
+            const imgSize = this.size * 2;
+            
+            ctx.drawImage(
+                treasureImage,
+                drawX - imgSize/2,
+                drawY - imgSize/2,
+                imgSize,
+                imgSize
+            );
+        } else {
+            // 이미지가 로드되지 않은 경우 기본 도형 그리기
+            ctx.fillStyle = '#DAA520';
+            ctx.fillRect(drawX - this.size/2, drawY - this.size/2, this.size, this.size);
+        }
+    }
+
+    collect() {
+        if (!this.collected) {
+            this.collected = true;
+            // 아티팩트 선택 화면 표시
+            currentGameState = GAME_STATE.LEVEL_UP;
+            pauseStartTime = Date.now();
+            previousGameState = GAME_STATE.PLAYING;
+            generateArtifactOptions();
+        }
     }
 }
 
