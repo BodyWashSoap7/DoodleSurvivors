@@ -179,7 +179,7 @@ class AssetManager {
 
   loadWeaponImages() {
     const weaponTypes = [
-      'bullet', 'orbit', 'flame', 'lightning', 'lightningChain', 
+      'bullet', 'orbit', 'flame', 'lightningChain', 
       'lightningImpact', 'boomerang', 'soul', 'axe', 'wave', 'bible'
     ];
     
@@ -595,18 +595,6 @@ class OrbitBullet extends Bullet {
       );
       
       ctx.restore();
-    } else {
-      // 폴백 코드
-      ctx.fillStyle = '#66fcf1';
-      ctx.beginPath();
-      ctx.arc(this.x + offsetX, this.y + offsetY, this.size, 0, Math.PI * 2);
-      ctx.fill();
-      
-      ctx.strokeStyle = 'rgba(102, 252, 241, 0.4)';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(this.x + offsetX, this.y + offsetY, this.size + 5, 0, Math.PI * 2);
-      ctx.stroke();
     }
   }
 }
@@ -734,15 +722,6 @@ class FlameBullet extends Bullet {
         drawSize
       );
       
-      ctx.restore();
-    } else {
-      // 폴백 코드
-      ctx.save();
-      ctx.globalAlpha = this.alpha;
-      ctx.fillStyle = 'orange';
-      ctx.beginPath();
-      ctx.arc(this.x + offsetX, this.y + offsetY, this.size, 0, Math.PI * 2);
-      ctx.fill();
       ctx.restore();
     }
   }
@@ -939,27 +918,6 @@ class ChainLightningEffect {
       );
       
       ctx.restore();
-    } else {
-      // 폴백 코드 (기존 코드와 동일)
-      ctx.strokeStyle = `rgba(136, 255, 255, ${alpha})`;
-      ctx.lineWidth = 3;
-      
-      // 두 끝점을 직선으로 연결
-      ctx.beginPath();
-      ctx.moveTo(this.startX + offsetX, this.startY + offsetY);
-      ctx.lineTo(this.endX + offsetX, this.endY + offsetY);
-      ctx.stroke();
-      
-      // 빛나는 효과
-      ctx.strokeStyle = `rgba(136, 255, 255, ${alpha * 0.5})`;
-      ctx.lineWidth = 6;
-      ctx.stroke();
-      
-      // 끝점에 전기 효과 추가
-      ctx.fillStyle = `rgba(200, 255, 255, ${alpha})`;
-      ctx.beginPath();
-      ctx.arc(this.endX + offsetX, this.endY + offsetY, 8, 0, Math.PI * 2);
-      ctx.fill();
     }
   }
 }
@@ -2225,9 +2183,6 @@ function drawLevelUpScreen() {
         treasureSize,
         treasureSize
       );
-    } else {
-      ctx.fillStyle = '#DAA520';
-      ctx.fillRect(centerX - 32, centerY - 32, 64, 64);
     }
   }
 }
@@ -2260,32 +2215,10 @@ function drawOptionBox(x, y, width, height, option, isSelected) {
   if (isArtifactSelection) {
     if (assetManager.loaded.artifactIcons && assetManager.images.artifactIcons[option.type]) {
       ctx.drawImage(assetManager.images.artifactIcons[option.type], iconX, iconY, iconSize, iconSize);
-    } else {
-      // 대체 아이콘
-      ctx.fillStyle = isSelected ? '#FFD700' : '#CD853F';
-      ctx.fillRect(iconX, iconY, iconSize, iconSize);
-      ctx.strokeStyle = '#FFFFFF';
-      ctx.strokeRect(iconX, iconY, iconSize, iconSize);
-      
-      ctx.fillStyle = '#000000';
-      ctx.font = '32px Arial';
-      ctx.textAlign = 'center';
-      ctx.fillText(option.type.charAt(0).toUpperCase(), iconX + iconSize/2, iconY + iconSize/2 + 10);
     }
   } else {
     if (assetManager.loaded.levelUpIcons && assetManager.images.levelUpIcons[option.type]) {
       ctx.drawImage(assetManager.images.levelUpIcons[option.type], iconX, iconY, iconSize, iconSize);
-    } else {
-      // 대체 아이콘
-      ctx.fillStyle = isSelected ? '#ffff00' : '#66fcf1';
-      ctx.fillRect(iconX, iconY, iconSize, iconSize);
-      ctx.strokeStyle = '#ffffff';
-      ctx.strokeRect(iconX, iconY, iconSize, iconSize);
-      
-      ctx.fillStyle = '#000000';
-      ctx.font = '32px Arial';
-      ctx.textAlign = 'center';
-      ctx.fillText(option.type.charAt(0).toUpperCase(), iconX + iconSize/2, iconY + iconSize/2 + 10);
     }
   }
   
@@ -2462,11 +2395,6 @@ function drawStartScreen() {
       previewSize * 4,
       previewSize * 4
     );
-  } else {
-    ctx.fillStyle = '#AAAAAA';
-    ctx.beginPath();
-    ctx.arc(previewX, previewY - 150, previewSize, 0, Math.PI * 2);
-    ctx.fill();
   }
   
   // 메뉴 옵션
@@ -2489,12 +2417,6 @@ function drawStartScreen() {
     ctx.fillStyle = '#FFFFFF';
   }
   ctx.fillText('설정', canvas.width / 2, canvas.height / 2 + 100);
-  
-  // 안내
-  ctx.fillStyle = '#AAAAAA';
-  ctx.font = '16px Arial';
-  ctx.fillText('방향키로 조작', canvas.width / 2, canvas.height * 3/4 + 50);
-  ctx.fillText('Enter로 선택', canvas.width / 2, canvas.height * 3/4 + 80);
 }
 
 function drawSettingsScreen() {
@@ -2547,20 +2469,7 @@ function drawSettingsScreen() {
       previewSize * 2,
       previewSize * 2
     );
-  } else {
-    ctx.fillStyle = '#AAAAAA';
-    ctx.beginPath();
-    ctx.arc(centerX, centerY, previewSize, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillText('로딩 중...', centerX, centerY);
   }
-  
-  // 안내 메시지
-  ctx.fillStyle = '#AAAAAA';
-  ctx.font = '16px Arial';
-  ctx.fillText('Enter를 눌러 캐릭터 선택', canvas.width / 2, canvas.height * 3/4 + 20);
-  ctx.fillText('ESC를 눌러 취소', canvas.width / 2, canvas.height * 3/4 + 50);
 }
 
 function drawGameOverScreen() {
@@ -2763,12 +2672,6 @@ function draw() {
       
       ctx.restore();
     }
-  } else {
-    // 이미지 로드 전 기본 원 그리기
-    ctx.fillStyle = 'white';
-    ctx.beginPath();
-    ctx.arc(canvas.width / 2, canvas.height / 2, player.size, 0, Math.PI * 2);
-    ctx.fill();
   }
   
   // 플레이어 체력바
@@ -2817,11 +2720,6 @@ function draw() {
 
 // 배경 그리기
 function drawBackground(offsetX, offsetY) {
-  // 맵 타일 로드 확인
-  if (!assetManager.loaded.mapTiles) {
-    drawGridBackground(offsetX, offsetY);
-    return;
-  }
   
   // 타일 위치 계산
   const playerTileX = Math.floor(player.x / 100); // TILE_SIZE 100
@@ -2862,29 +2760,6 @@ function drawBackground(offsetX, offsetY) {
         }
       }
     }
-  }
-}
-
-// 그리드 배경 (폴백용)
-function drawGridBackground(offsetX, offsetY) {
-  const gridSize = 50;
-  ctx.strokeStyle = '#333';
-  ctx.lineWidth = 1;
-
-const startY = -offsetY % gridSize;
-
-  for (let x = startX; x < canvas.width; x += gridSize) {
-    ctx.beginPath();
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x, canvas.height);
-    ctx.stroke();
-  }
-
-  for (let y = startY; y < canvas.height; y += gridSize) {
-    ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(canvas.width, y);
-    ctx.stroke();
   }
 }
 
@@ -3550,7 +3425,6 @@ document.addEventListener('keydown', (e) => {
     }
   }
 
-  // ESC 키 처리
   // ESC 키 처리
   if (e.key === 'Escape') {
     if (currentGameState === GAME_STATE.PLAYING) {
