@@ -375,6 +375,11 @@ const player = {
   magnetActive: false,
   magnetDuration: 0,
   magnetMaxDuration: 2000, // 2초
+
+  // 무적 상태 관련 속성
+  invincible: false,
+  invincibilityDuration: 500, // 무적 시간 (0.5초)
+  invincibilityStartTime: 0,
   
   // 플레이어 초기화
   init(characterIndex) {
@@ -1649,7 +1654,8 @@ class Enemy {
   attackPlayer(player) {
     const currentTime = Date.now();
     
-    if (currentTime - this.lastAttackTime >= this.attackCooldown) {
+    // 공격 쿨다운 확인 + 플레이어가 무적 상태가 아닌 경우에만 데미지
+    if (currentTime - this.lastAttackTime >= this.attackCooldown && !player.invincible) {
       player.health -= this.attackStrength;
       this.lastAttackTime = currentTime;
       
@@ -1658,6 +1664,10 @@ class Enemy {
       player.hitStartTime = currentTime;
       player.hitFrame = 0;
       player.hitFrameTime = 0;
+      
+      // 무적 상태 활성화
+      player.invincible = true;
+      player.invincibilityStartTime = currentTime;
       
       // 화면 흔들림
       const damageRatio = this.attackStrength / player.maxHealth;
@@ -2117,6 +2127,10 @@ function resetGame() {
   player.nextLevelExp = 50;
   player.prevLevelExp = 0;
   player.weapons = [new BasicWeapon()];
+
+  // 무적 상태 초기화
+  player.invincible = false;
+  player.invincibilityStartTime = 0;
   
   // 아티팩트 초기화
   player.acquiredArtifacts = [];
@@ -3383,6 +3397,17 @@ function update() {
           }
         }
       }
+    }
+  }
+
+  // 플레이어 무적 상태 업데이트
+  if (player.invincible) {
+    const currentTime = Date.now();
+    const invincibilityElapsed = currentTime - player.invincibilityStartTime;
+    
+    // 무적 시간이 끝났는지 확인
+    if (invincibilityElapsed >= player.invincibilityDuration) {
+      player.invincible = false;
     }
   }
 
