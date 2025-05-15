@@ -87,7 +87,8 @@ class AssetManager {
       artifactIcons: {},
       hitEffect: null,
       treasure: null,
-      enemy: null
+      enemy: null,
+      jewels: []
     };
     this.loaded = {
       players: false,
@@ -97,7 +98,8 @@ class AssetManager {
       artifactIcons: false,
       hitEffect: false,
       treasure: false,
-      enemy: false
+      enemy: false,
+      jewels: false
     };
   }
 
@@ -108,6 +110,7 @@ class AssetManager {
     this.loadLevelUpIcons();
     this.loadArtifactIcons();
     this.loadMiscImages();
+    this.loadJewelImages();
     
     // 모든 이미지가 로드되었는지 주기적으로 확인
     const checkAllLoaded = () => {
@@ -282,6 +285,38 @@ class AssetManager {
     };
   }
 
+  // jewel 이미지 로드 함수
+  loadJewelImages() {
+    const jewelTypes = 5; // 총 5가지 타입의 jewel
+    this.images.jewels = [];
+    let loadedCount = 0;
+    
+    for (let i = 0; i < jewelTypes; i++) {
+      const img = new Image();
+      img.src = `./img/jewel_${i}.png`; // 이미지 파일 경로: ./img/jewel_0.png, jewel_1.png, ...
+      img.onload = () => {
+        loadedCount++;
+        if (loadedCount === jewelTypes) {
+          this.loaded.jewels = true;
+          console.log('보석 이미지 로드 완료');
+        }
+      };
+      img.onerror = () => {
+        console.error(`보석 이미지 로드 실패: jewel_${i}.png`);
+        loadedCount++;
+      };
+      this.images.jewels.push(img);
+    }
+    
+    // 5초 후에도 로드가 안 되면 진행
+    setTimeout(() => {
+      if (!this.loaded.jewels && loadedCount > 0) {
+        this.loaded.jewels = true;
+        console.log('시간 초과로 인한 보석 이미지 로드 중단');
+      }
+    }, 5000);
+  }
+
   isAllLoaded() {
     return Object.values(this.loaded).every(status => status);
   }
@@ -335,6 +370,11 @@ const player = {
   healthRegeneration: 0,
   enemySpeedReduction: 0,
   enemyHealthReduction: 0,
+
+    // 자석 효과 관련 속성
+  magnetActive: false,
+  magnetDuration: 0,
+  magnetMaxDuration: 2000, // 2초
   
   // 플레이어 초기화
   init(characterIndex) {
@@ -1632,31 +1672,114 @@ class Enemy {
 //----------------------
 
 class Jewel extends GameObject {
-  constructor(x, y) {
+  constructor(x, y, type = 0) {
     super(x, y, 8);
+    this.type = type; // 0: 소, 1: 중, 2: 대, 3: 자석, 4: 체력
     this.collected = false;
+    this.pulseTime = 0;
+    
+    // 타입별 속성 설정
+    switch(this.type) {
+      case 0: // 소 jewel
+        this.size = 6;
+        this.expValue = 20;
+        break;
+      case 1: // 중 jewel
+        this.size = 9;
+        this.expValue = 100; // 5배
+        break;
+      case 2: // 대 jewel
+        this.size = 12;
+        this.expValue = 250;
+        break;
+      case 3: // 자석 jewel
+        this.size = 10;
+        this.expValue = 50;
+        break;
+      case 4: // 체력 jewel
+        this.size = 10;
+        this.expValue = 30;
+        break;
+    }
   }
 
   update() {
-    // 주변 아이템 끌어당기기
+    // 맥동 애니메이션 효과
+    this.pulseTime += 0.05;
+    
+    // 플레이어 주변 아이템 끌어당기기
     if (detectCollision(this, { x: player.x, y: player.y, size: player.pickupRadius })) {
       const angle = Math.atan2(player.y - this.y, player.x - this.x);
-      this.x += Math.cos(angle) * 2;
-      this.y += Math.sin(angle) * 2;
+      
+      // 기본 속도 계수 (자석 보석은 더 빠름)
+      const speedFactor = this.type === 3 ? 3 : 2;
+      
+      // 최대 이동 속도 설정 (픽셀/프레임)
+      const maxSpeed = 5;
+      
+      // 이동 거리 계산 및 상한 적용
+      const moveDistance = Math.min(speedFactor, maxSpeed);
+      
+      // 이동 적용
+      this.x += Math.cos(angle) * moveDistance;
+      this.y += Math.sin(angle) * moveDistance;
     }
   }
 
   draw(offsetX, offsetY) {
-    ctx.fillStyle = 'cyan';
-    ctx.beginPath();
-    ctx.arc(this.x + offsetX, this.y + offsetY, this.size, 0, Math.PI * 2);
-    ctx.fill();
+    if (assetManager.loaded.jewels && assetManager.images.jewels[this.type]) {
+      // 맥동 효과 계산
+      const pulseFactor = 1 + Math.sin(this.pulseTime) * 0.2;
+      const drawSize = this.size * 3 * pulseFactor; // 이미지 크기 조정
+      
+      ctx.drawImage(
+        assetManager.images.jewels[this.type],
+        0, 0,
+        64, 64,
+        this.x + offsetX - drawSize/2,
+        this.y + offsetY - drawSize/2,
+        drawSize,
+        drawSize
+      );
+    } else {
+      // 이미지가 로드되지 않았을 경우 기본 원으로 표시 (폴백)
+      const colors = ['cyan', 'lightgreen', 'gold', 'magenta', 'red'];
+      ctx.fillStyle = colors[this.type];
+      ctx.beginPath();
+      ctx.arc(this.x + offsetX, this.y + offsetY, this.size, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 
   collect() {
-    const expGained = Math.floor(20 * player.expMultiplier);
-    player.exp += expGained;
-    score += 5;
+    if (this.collected) return;
+    this.collected = true;
+    
+    // 보석 타입에 따른 효과 적용
+    switch(this.type) {
+      case 0: // 소 jewel
+      case 1: // 중 jewel
+      case 2: // 대 jewel
+        const expGained = Math.floor(this.expValue * player.expMultiplier);
+        player.exp += expGained;
+        score += this.type + 5; // 큰 보석일수록 더 많은 점수
+        break;
+        
+      case 3: // 자석 jewel - 자석 효과 활성화
+        player.exp += Math.floor(this.expValue * player.expMultiplier);
+        score += 10;
+        
+        // 자석 효과 활성화
+        player.magnetActive = true;
+        player.magnetDuration = player.magnetMaxDuration;
+        
+      case 4: // 체력 jewel - 최대 체력의 30% 회복
+        const healAmount = Math.floor(player.maxHealth * 0.3);
+        player.health = Math.min(player.health + healAmount, player.maxHealth);
+        score += 15;
+        break;
+    }
+    
     checkLevelUp();
   }
 }
@@ -2008,7 +2131,7 @@ function resetGame() {
   gameObjects.terrain = [];
   gameObjects.chunks = {};
   score = 0;
-  
+
   // 능력치 초기화
   player.attackPower = 1;
   player.fireRate = 1;
@@ -2853,12 +2976,29 @@ function generateChunk(chunkX, chunkY) {
     terrain: [],
   };
 
-  // 아이템 생성
+  // 기본 보석 생성
   const itemCount = 3;
   for (let i = 0; i < itemCount; i++) {
     const x = chunkX * CHUNK_SIZE + Math.random() * CHUNK_SIZE;
     const y = chunkY * CHUNK_SIZE + Math.random() * CHUNK_SIZE;
-    const jewel = new Jewel(x, y);
+    
+    // 적절한 가중치로 보석 타입 무작위화
+    let jewelType = 0; // 기본값: 소형 보석
+    const rand = Math.random();
+    
+    if (rand < 0.7) {
+      jewelType = 0; // 70% 확률로 소형 보석
+    } else if (rand < 0.85) {
+      jewelType = 1; // 15% 확률로 중형 보석
+    } else if (rand < 0.93) {
+      jewelType = 2; // 8% 확률로 대형 보석
+    } else if (rand < 0.97) {
+      jewelType = 4; // 4% 확률로 체력 회복 보석
+    } else {
+      jewelType = 3; // 3% 확률로 자석 보석
+    }
+    
+    const jewel = new Jewel(x, y, jewelType);
     chunk.items.push(jewel);
     gameObjects.jewels.push(jewel);
   }
@@ -3200,6 +3340,48 @@ function update() {
       if (detectCollision(player, jewel)) {
         jewel.collect();
         gameObjects.jewels.splice(i, 1);
+      }
+    }
+  }
+
+  // 자석 효과 업데이트
+  if (player.magnetActive) {
+    // 지속 시간 감소
+    player.magnetDuration -= 16; // 프레임당 시간 감소 (60fps 기준)
+    
+    if (player.magnetDuration <= 0) {
+      player.magnetActive = false;
+    } else {
+      // 모든 보석을 플레이어에게 끌어당기기
+      for (let jewel of gameObjects.jewels) {
+        const dx = player.x - jewel.x;
+        const dy = player.y - jewel.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        
+        if (dist < 1000) { // 자석 효과의 범위
+          // 거리에 따라 끌어당김 강도 조절
+          const strength = 0.1 + (1 - Math.min(dist, 500) / 500) * 0.3;
+          
+          // 최대 속도 상한 설정 (픽셀/프레임)
+          const maxSpeed = 8;
+          
+          // 이동량 계산 및 상한 적용
+          const moveX = dx * strength;
+          const moveY = dy * strength;
+          const moveDistance = Math.sqrt(moveX * moveX + moveY * moveY);
+          
+          // 속도가 최대값을 초과하는 경우 정규화
+          if (moveDistance > maxSpeed && moveDistance > 0) {
+            const normalizedX = moveX / moveDistance * maxSpeed;
+            const normalizedY = moveY / moveDistance * maxSpeed;
+            jewel.x += normalizedX;
+            jewel.y += normalizedY;
+          } else {
+            // 속도가 최대값 이하인 경우 그대로 적용
+            jewel.x += moveX;
+            jewel.y += moveY;
+          }
+        }
       }
     }
   }
