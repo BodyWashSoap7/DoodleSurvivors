@@ -798,20 +798,21 @@ class ChainLightningEffect {
     
     // 스프라이트 애니메이션 관련 속성
     this.frameCount = 4;
-    this.currentFrame = 0;
+    this.currentFrame = Math.floor(Math.random() * 4); // 랜덤 시작 프레임
     this.frameTime = 0;
     this.frameDuration = 80;
-    this.frameWidth = 64;
+    this.frameWidth = 256; // 프레임 너비 (전체 스프라이트 시트 너비)
+    this.frameHeight = 64; // 각 프레임 높이
   }
   
   update() {
     this.age++;
     
-    // 애니메이션 프레임 업데이트
+    // 애니메이션 프레임 업데이트 - 랜덤 프레임 선택
     this.frameTime += 16;
     if (this.frameTime >= this.frameDuration) {
       this.frameTime = 0;
-      this.currentFrame = (this.currentFrame + 1) % this.frameCount;
+      this.currentFrame = Math.floor(Math.random() * this.frameCount);
     }
     
     // 대상 적에게 데미지 입히기
@@ -868,34 +869,41 @@ class ChainLightningEffect {
   }
   
   draw(offsetX, offsetY) {
+    // 로드 상태 확인 및 디버깅
+    if (!assetManager.loaded.weapons || !assetManager.images.weapons.lightningChain) {
+      console.error("Lightning chain image not loaded or undefined");
+      return;
+    }
+    
     // 투명도는 수명에 따라 감소
     const alpha = 1 - this.age / this.maxAge;
     
-    if (assetManager.loaded.weapons && assetManager.images.weapons.lightningChain) {
-      ctx.save();
-      ctx.globalAlpha = alpha;
-      
-      // 두 끝점 사이의 중간점 찾기
-      const midX = (this.startX + this.endX) / 2 + offsetX;
-      const midY = (this.startY + this.endY) / 2 + offsetY;
-      
-      // 두 점 사이의 각도 계산
-      const angle = Math.atan2(this.endY - this.startY, this.endX - this.startX);
-      
-      // 두 점 사이의 거리 계산
-      const distance = Math.hypot(this.endX - this.startX, this.endY - this.startY);
-      
-      // 체인 번개 이미지 그리기
-      const drawSize = 25;
-      
-      ctx.translate(midX, midY);
-      ctx.rotate(angle);
-      
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    
+    // 두 끝점 사이의 중간점 찾기
+    const midX = (this.startX + this.endX) / 2 + offsetX;
+    const midY = (this.startY + this.endY) / 2 + offsetY;
+    
+    // 두 점 사이의 각도 계산
+    const angle = Math.atan2(this.endY - this.startY, this.endX - this.startX);
+    
+    // 두 점 사이의 거리 계산
+    const distance = Math.hypot(this.endX - this.startX, this.endY - this.startY);
+    
+    // 체인 번개 이미지 그리기
+    const drawSize = 25;
+    
+    ctx.translate(midX, midY);
+    ctx.rotate(angle);
+    
+    try {
       // 스프라이트 시트에서 현재 프레임 그리기
+      // 가로 스트립으로 변경 - 세로로 쌓인 스프라이트시트라면 이 부분을 수정해야 함
       ctx.drawImage(
         assetManager.images.weapons.lightningChain,
-        this.currentFrame * this.frameWidth, 0,
-        this.frameWidth, this.frameWidth,
+        0, this.currentFrame * this.frameHeight, // y축으로 프레임 선택
+        this.frameWidth, this.frameHeight,
         -distance / 2,
         -drawSize / 2,
         distance,
@@ -907,18 +915,21 @@ class ChainLightningEffect {
       ctx.translate(distance / 2, 0);
       ctx.rotate(-angle);
       
+      // 임팩트 효과도 무작위 프레임 사용
       ctx.drawImage(
         assetManager.images.weapons.lightningImpact,
-        this.currentFrame * this.frameWidth, 0,
-        this.frameWidth, this.frameWidth,
+        this.currentFrame * 64, 0, // 임팩트는 기존 스프라이트 사용
+        64, 64,
         -impactSize / 2,
         -impactSize / 2,
         impactSize,
         impactSize
       );
-      
-      ctx.restore();
+    } catch (error) {
+      console.error("Error drawing lightning:", error);
     }
+    
+    ctx.restore();
   }
 }
 
