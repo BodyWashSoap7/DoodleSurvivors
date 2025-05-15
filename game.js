@@ -897,37 +897,35 @@ class ChainLightningEffect {
     ctx.translate(midX, midY);
     ctx.rotate(angle);
     
-    try {
-      // 스프라이트 시트에서 현재 프레임 그리기
-      // 가로 스트립으로 변경 - 세로로 쌓인 스프라이트시트라면 이 부분을 수정해야 함
-      ctx.drawImage(
-        assetManager.images.weapons.lightningChain,
-        0, this.currentFrame * this.frameHeight, // y축으로 프레임 선택
-        this.frameWidth, this.frameHeight,
-        -distance / 2,
-        -drawSize / 2,
-        distance,
-        drawSize
-      );
-      
-      // 충격 효과 그리기
-      const impactSize = drawSize * 1.5;
-      ctx.translate(distance / 2, 0);
-      ctx.rotate(-angle);
-      
-      // 임팩트 효과도 무작위 프레임 사용
-      ctx.drawImage(
-        assetManager.images.weapons.lightningImpact,
-        this.currentFrame * 64, 0, // 임팩트는 기존 스프라이트 사용
-        64, 64,
-        -impactSize / 2,
-        -impactSize / 2,
-        impactSize,
-        impactSize
-      );
-    } catch (error) {
-      console.error("Error drawing lightning:", error);
-    }
+
+    // 스프라이트 시트에서 현재 프레임 그리기
+    // 가로 스트립
+    ctx.drawImage(
+      assetManager.images.weapons.lightningChain,
+      0, this.currentFrame * this.frameHeight, // y축으로 프레임 선택
+      this.frameWidth, this.frameHeight,
+      -distance / 2,
+      -drawSize / 2,
+      distance,
+      drawSize
+    );
+    
+    // 충격 효과 그리기
+    const impactSize = drawSize * 1.5;
+    ctx.translate(distance / 2, 0);
+    ctx.rotate(-angle);
+    
+    // 임팩트 효과도 무작위 프레임 사용
+    ctx.drawImage(
+      assetManager.images.weapons.lightningImpact,
+      this.currentFrame * 64, 0, // 임팩트는 기존 스프라이트 사용
+      64, 64,
+      -impactSize / 2,
+      -impactSize / 2,
+      impactSize,
+      impactSize
+    );
+
     
     ctx.restore();
   }
@@ -1121,24 +1119,35 @@ class Enemy {
     this.animationTime = 0;
     this.wobbleAmount = 0;
     this.currentSize = 0;
-    this.deathParticles = [];
 
     // 공격 관련 속성
     this.attackStrength = attackStrength;
     this.lastAttackTime = 0;
     this.attackCooldown = 500;
-    this.isAttacking = false;
-    this.attackAnimationProgress = 0;
-    this.attackAnimationDuration = 300;
-    this.attackStartTime = 0;
-    this.attackParticles = [];
-    this.attackShockwave = 0;
+    
+    // 피격 효과 관련 속성
+    this.isHit = false;
+    this.hitTime = 0;
+    this.hitDuration = 200; // 피격 효과 지속 시간(ms)
+    this.hitBrightness = 0; // 현재 밝기 효과 (0-1)
   }
   
   update() {
     const currentTime = Date.now();
     const deltaTime = 16;
     this.animationTime += deltaTime;
+    
+    // 피격 효과 업데이트
+    if (this.isHit) {
+      const elapsedHitTime = currentTime - this.hitTime;
+      if (elapsedHitTime >= this.hitDuration) {
+        this.isHit = false;
+        this.hitBrightness = 0;
+      } else {
+        // 시간에 따라 밝기 감소 (1에서 0으로)
+        this.hitBrightness = 1 - (elapsedHitTime / this.hitDuration);
+      }
+    }
     
     // 상태별 업데이트
     switch(this.state) {
@@ -1203,38 +1212,6 @@ class Enemy {
       this.frameTime = 0;
       this.currentFrame = (this.currentFrame + 1) % this.frameCount;
     }
-
-    // 공격 애니메이션 업데이트
-    if (this.isAttacking) {
-      const elapsed = Date.now() - this.attackStartTime;
-      this.attackAnimationProgress = Math.min(elapsed / this.attackAnimationDuration, 1);
-      
-      // 공격 중 크기 효과
-      const sizeMultiplier = 1 + Math.sin(this.attackAnimationProgress * Math.PI) * 0.5;
-      this.currentSize = this.originalSize * sizeMultiplier;
-      
-      if (this.attackAnimationProgress >= 1) {
-        this.isAttacking = false;
-        this.currentSize = this.originalSize;
-      }
-      
-      // 파티클 및 충격파 업데이트
-      this.updateAttackParticles();
-      this.attackShockwave *= 0.9;
-    }
-  }
-  
-  updateAttackParticles() {
-    for (let particle of this.attackParticles) {
-      particle.x += particle.vx;
-      particle.y += particle.vy;
-      particle.life -= 0.05;
-      particle.size *= 0.95;
-      particle.vx *= 0.93;
-      particle.vy *= 0.93;
-    }
-    
-    this.attackParticles = this.attackParticles.filter(p => p.life > 0);
   }
   
   updateDying(currentTime) {
@@ -1243,9 +1220,6 @@ class Enemy {
     
     // 크기 감소 애니메이션
     this.currentSize = this.size * (1 - this.easeInQuad(progress));
-    
-    // 파티클 업데이트
-    this.updateDeathParticles();
     
     if (progress >= 1) {
       this.state = 'dead';
@@ -1256,19 +1230,6 @@ class Enemy {
   startDying() {
     this.state = 'dying';
     this.stateStartTime = Date.now();
-    
-    // 죽음 파티클 생성
-    for (let i = 0; i < 8; i++) {
-      const angle = (Math.PI * 2 * i) / 8;
-      this.deathParticles.push({
-        x: this.x,
-        y: this.y,
-        vx: Math.cos(angle) * 3,
-        vy: Math.sin(angle) * 3,
-        size: 5,
-        life: 1
-      });
-    }
     
     // 경험치 및 점수 획득
     player.exp += Math.floor(3 * player.expMultiplier);
@@ -1287,17 +1248,6 @@ class Enemy {
     checkLevelUp();
   }
 
-  updateDeathParticles() {
-    for (let particle of this.deathParticles) {
-      particle.x += particle.vx;
-      particle.y += particle.vy;
-      particle.life -= 0.05;
-      particle.size *= 0.95;
-      particle.vx *= 0.95;
-      particle.vy *= 0.95;
-    }
-  }
-
   draw(offsetX, offsetY) {
     const drawX = this.x + offsetX;
     const drawY = this.y + offsetY;
@@ -1310,30 +1260,8 @@ class Enemy {
         this.drawMoving(drawX, drawY);
         break;
       case 'dying':
-        this.drawDying(drawX, drawY, offsetX, offsetY);
+        this.drawDying(drawX, drawY);
         break;
-    }
-
-    // 공격 파티클 그리기
-    if (this.attackParticles.length > 0) {
-      ctx.save();
-      ctx.globalCompositeOperation = 'lighter';
-      
-      for (let particle of this.attackParticles) {
-        ctx.fillStyle = particle.color;
-        ctx.globalAlpha = particle.life;
-        ctx.beginPath();
-        ctx.arc(
-          particle.x + offsetX,
-          particle.y + offsetY,
-          particle.size,
-          0,
-          Math.PI * 2
-        );
-        ctx.fill();
-      }
-      
-      ctx.restore();
     }
   }
 
@@ -1379,13 +1307,7 @@ class Enemy {
       }
       
       ctx.restore();
-    } else {
-      ctx.fillStyle = 'red';
-      ctx.beginPath();
-      ctx.arc(drawX, drawY, this.currentSize, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    
+    }    
     ctx.globalAlpha = 1;
   }
 
@@ -1405,12 +1327,151 @@ class Enemy {
       
       ctx.save();
       
+      // 방향에 따라 다르게 처리
       if (this.direction === 'right') {
         ctx.translate(drawX + displaySize / 2 + this.wobbleAmount, 0);
         ctx.scale(-1, 1);
+        
+        // 피격 효과를 위한 캔버스 생성
+        if (this.isHit && this.hitBrightness > 0) {
+          // 임시 캔버스 생성
+          const tempCanvas = document.createElement('canvas');
+          tempCanvas.width = displaySize;
+          tempCanvas.height = displaySize;
+          const tempCtx = tempCanvas.getContext('2d');
+          
+          // 1. 임시 캔버스에 원본 이미지 그리기
+          tempCtx.drawImage(
+            assetManager.images.enemy,
+            spriteX, 0,
+            this.spriteWidth, this.spriteHeight,
+            0,
+            0,
+            displaySize,
+            displaySize
+          );
+          
+          // 2. 이미지가 있는 부분에만 밝기 효과 적용
+          tempCtx.globalCompositeOperation = 'source-atop';
+          tempCtx.fillStyle = 'white';
+          tempCtx.globalAlpha = this.hitBrightness * 0.7;
+          tempCtx.fillRect(0, 0, displaySize, displaySize);
+          
+          // 3. 원본 이미지 그리기
+          ctx.drawImage(
+            assetManager.images.enemy,
+            spriteX, 0,
+            this.spriteWidth, this.spriteHeight,
+            0,
+            drawY - displaySize / 2,
+            displaySize,
+            displaySize
+          );
+          
+          // 4. 효과가 적용된 이미지 오버레이
+          ctx.globalCompositeOperation = 'lighter';
+          ctx.drawImage(
+            tempCanvas,
+            0,
+            drawY - displaySize / 2
+          );
+          ctx.globalCompositeOperation = 'source-over';
+        } else {
+          // 일반 상태: 그냥 이미지만 그리기
+          ctx.drawImage(
+            assetManager.images.enemy,
+            spriteX, 0,
+            this.spriteWidth, this.spriteHeight,
+            0,
+            drawY - displaySize / 2,
+            displaySize,
+            displaySize
+          );
+        }
+      } else {
+        // 왼쪽 방향일 때 처리
+        if (this.isHit && this.hitBrightness > 0) {
+          // 임시 캔버스 생성
+          const tempCanvas = document.createElement('canvas');
+          tempCanvas.width = displaySize;
+          tempCanvas.height = displaySize;
+          const tempCtx = tempCanvas.getContext('2d');
+          
+          // 1. 임시 캔버스에 원본 이미지 그리기
+          tempCtx.drawImage(
+            assetManager.images.enemy,
+            spriteX, 0,
+            this.spriteWidth, this.spriteHeight,
+            0,
+            0,
+            displaySize,
+            displaySize
+          );
+          
+          // 2. 이미지가 있는 부분에만 밝기 효과 적용
+          tempCtx.globalCompositeOperation = 'source-atop';
+          tempCtx.fillStyle = 'white';
+          tempCtx.globalAlpha = this.hitBrightness * 0.7;
+          tempCtx.fillRect(0, 0, displaySize, displaySize);
+          
+          // 3. 원본 이미지 그리기
+          ctx.drawImage(
+            assetManager.images.enemy,
+            spriteX, 0,
+            this.spriteWidth, this.spriteHeight,
+            drawX - displaySize / 2 + this.wobbleAmount,
+            drawY - displaySize / 2,
+            displaySize,
+            displaySize
+          );
+          
+          // 4. 효과가 적용된 이미지 오버레이
+          ctx.globalCompositeOperation = 'lighter';
+          ctx.drawImage(
+            tempCanvas,
+            drawX - displaySize / 2 + this.wobbleAmount,
+            drawY - displaySize / 2
+          );
+          ctx.globalCompositeOperation = 'source-over';
+        } else {
+          // 일반 상태: 그냥 이미지만 그리기
+          ctx.drawImage(
+            assetManager.images.enemy,
+            spriteX, 0,
+            this.spriteWidth, this.spriteHeight,
+            drawX - displaySize / 2 + this.wobbleAmount,
+            drawY - displaySize / 2,
+            displaySize,
+            displaySize
+          );
+        }
+      }
+      
+      ctx.restore();
+    }
+    
+    // 체력바
+    if (this.state === 'moving') {
+      this.drawHealthBar(drawX, drawY);
+    }
+  }
+
+  drawDying(drawX, drawY) {
+    const progress = (Date.now() - this.stateStartTime) / this.deathDuration;
+    ctx.globalAlpha = 1 - progress;
+    
+    // 간단하게 적 크기만 축소
+    if (assetManager.loaded.enemy) {
+      const displaySize = this.currentSize * 2.5;
+      
+      ctx.save();
+      
+      if (this.direction === 'right') {
+        ctx.translate(drawX + displaySize / 2, 0);
+        ctx.scale(-1, 1);
         ctx.drawImage(
           assetManager.images.enemy,
-          spriteX, 0,
+          0, 0,
           this.spriteWidth, this.spriteHeight,
           0,
           drawY - displaySize / 2,
@@ -1420,9 +1481,9 @@ class Enemy {
       } else {
         ctx.drawImage(
           assetManager.images.enemy,
-          spriteX, 0,
+          0, 0,
           this.spriteWidth, this.spriteHeight,
-          drawX - displaySize / 2 + this.wobbleAmount,
+          drawX - displaySize / 2,
           drawY - displaySize / 2,
           displaySize,
           displaySize
@@ -1430,100 +1491,7 @@ class Enemy {
       }
       
       ctx.restore();
-    } else {
-      ctx.fillStyle = 'red';
-      ctx.beginPath();
-      ctx.arc(drawX + this.wobbleAmount, drawY, currentSize, 0, Math.PI * 2);
-      ctx.fill();
-      
-      ctx.strokeStyle = '#8B0000';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-    }
-    
-    // 체력바
-    if (this.state === 'moving') {
-      this.drawHealthBar(drawX, drawY);
-    }
-
-    // 공격 효과
-    if (this.isAttacking) {
-      // 붉은 광선 효과
-      ctx.save();
-      ctx.strokeStyle = 'rgba(255, 0, 0, 0.7)';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.arc(drawX, drawY, this.size * 1.5, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.restore();
-      
-      // 충격파 효과
-      if (this.attackShockwave > 0.1) {
-        ctx.save();
-        ctx.strokeStyle = `rgba(255, 0, 0, ${this.attackShockwave * 0.5})`;
-        ctx.lineWidth = 5;
-        ctx.beginPath();
-        const shockwaveRadius = this.size * 2 * (1 + (1 - this.attackShockwave));
-        ctx.arc(drawX, drawY, shockwaveRadius, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.restore();
-      }
-      
-      // 색상 변화
-      ctx.save();
-      ctx.globalCompositeOperation = 'lighter';
-      ctx.fillStyle = `rgba(255, 0, 0, ${0.5 * Math.sin(this.attackAnimationProgress * Math.PI)})`;
-      ctx.beginPath();
-      ctx.arc(drawX, drawY, this.currentSize, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-      
-      // 에너지 링
-      const ringCount = 3;
-      for (let i = 0; i < ringCount; i++) {
-        const ringProgress = (this.attackAnimationProgress + i * 0.2) % 1;
-        const ringRadius = this.size * (1 + ringProgress * 2);
-        const ringAlpha = (1 - ringProgress) * 0.7;
-        
-        ctx.save();
-        ctx.strokeStyle = `rgba(255, 100, 0, ${ringAlpha})`;
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.arc(drawX, drawY, ringRadius, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.restore();
-      }
-    }
-  }
-
-  drawDying(drawX, drawY, offsetX, offsetY) {
-    const progress = (Date.now() - this.stateStartTime) / this.deathDuration;
-    ctx.globalAlpha = 1 - progress;
-    
-    // 파티클 그리기
-    ctx.fillStyle = 'orange';
-    for (let particle of this.deathParticles) {
-      if (particle.life > 0) {
-        ctx.globalAlpha = particle.life;
-        ctx.beginPath();
-        ctx.arc(
-          particle.x + offsetX, 
-          particle.y + offsetY, 
-          Math.max(particle.size, 0.1),
-          0, 
-          Math.PI * 2
-        );
-        ctx.fill();
-      }
-    }
-    
-    // 축소되는 적 본체
-    ctx.globalAlpha = 1 - progress;
-    ctx.fillStyle = 'red';
-    ctx.beginPath();
-    ctx.arc(drawX, drawY, Math.max(this.currentSize, 0.1), 0, Math.PI * 2);
-    ctx.fill();
-    
+    }    
     ctx.globalAlpha = 1;
   }
 
@@ -1555,6 +1523,11 @@ class Enemy {
   takeDamage(damage) {
     if (this.state === 'moving') {
       this.health -= damage;
+      
+      // 피격 효과 시작
+      this.isHit = true;
+      this.hitTime = Date.now();
+      this.hitBrightness = 1;
       
       if (this.health <= 0) {
         this.startDying();
@@ -1646,34 +1619,10 @@ class Enemy {
       player.hitFrame = 0;
       player.hitFrameTime = 0;
       
-      // 공격 효과
-      this.createAttackParticles();
-      this.attackShockwave = 1;
-      
       // 화면 흔들림
       const damageRatio = this.attackStrength / player.maxHealth;
       screenShakeTime = 400 + damageRatio * 2000;
       screenShakeIntensity = 5 + damageRatio * 10;
-    }
-  }
-
-  createAttackParticles() {
-    this.attackParticles = [];
-    const particleCount = 12;
-    
-    for (let i = 0; i < particleCount; i++) {
-      const angle = (Math.PI * 2 * i) / particleCount;
-      const speed = 2 + Math.random() * 3;
-      
-      this.attackParticles.push({
-        x: this.x,
-        y: this.y,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed,
-        size: 3 + Math.random() * 4,
-        life: 1,
-        color: Math.random() > 0.5 ? '#ff0000' : '#ff6600'
-      });
     }
   }
 }
