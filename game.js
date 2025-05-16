@@ -20,7 +20,6 @@ const gameObjects = {
 
 // Game state
 let score = 0;
-let keys = {};
 let currentGameState = 0;
 let previousGameState = null;
 let loadingStartTime = 0;
@@ -31,10 +30,16 @@ let totalPausedTime = 0;
 let pauseStartTime = 0;
 let elapsedTime = 0;
 
+// 마우스 상태 변수
+let mouseX = 0;
+let mouseY = 0;
+let mouseWorldX = 0;
+let mouseWorldY = 0;
+let isMouseDown = false;
+let hoveredLevelUpOption = -1;
+
 // 메뉴 관련 변수들
-let selectedMenuOption = 0;
-let selectedPauseOption = 0;
-let selectedConfirmOption = 0;
+
 let confirmDialogType = "";
 
 // 캐릭터 선택 관련 변수
@@ -43,7 +48,6 @@ let previousCharacterIndex = 0; // 설정 화면 진입 전 캐릭터 인덱스
 
 // 레벨업 관련 변수들 
 let levelUpOptions = [];
-let selectedLevelUpOption = -1;
 let isArtifactSelection = false;
 
 // 게임 효과 관련 변수들
@@ -1909,7 +1913,7 @@ function generateLevelUpOptions() {
   levelUpOptions = [];
   const shuffled = [...availableUpgrades].sort(() => Math.random() - 0.5);
   levelUpOptions = shuffled.slice(0, 4);
-  selectedLevelUpOption = -1;
+  hoveredLevelUpOption = -1; // 초기에는 선택된 옵션 없음
 }
 
 // 아티팩트 옵션 생성
@@ -1974,17 +1978,21 @@ function generateArtifactOptions() {
     }
   }
   
-  selectedLevelUpOption = -1;
+  hoveredLevelUpOption = -1; // 초기에는 선택된 옵션 없음
   isArtifactSelection = true;
 }
 
 // 레벨업 선택 적용
-function applyLevelUpChoice() {
-  if (selectedLevelUpOption === -1 || !levelUpOptions[selectedLevelUpOption]) {
+function applyLevelUpChoice(optionIndex) {
+  console.log("Applying level up choice:", optionIndex); // 디버깅용
+  
+  if (optionIndex === undefined || optionIndex === -1 || !levelUpOptions[optionIndex]) {
+    console.log("Invalid option index:", optionIndex);
     return;
   }
   
-  const option = levelUpOptions[selectedLevelUpOption];
+  const option = levelUpOptions[optionIndex];
+  console.log("Selected option:", option);
 
   if (option.type === 'weapon') {
     addWeapon(option.weaponType);
@@ -2066,6 +2074,7 @@ function applyLevelUpChoice() {
   }
   
   // 게임 재개
+  console.log("Resuming game after level up choice");
   currentGameState = GAME_STATE.PLAYING;
   totalPausedTime += Date.now() - pauseStartTime;
 }
@@ -2212,43 +2221,104 @@ function drawLevelUpScreen() {
   const boxWidth = 320;
   const boxHeight = 150;
   
-  // 옵션 그리기 - 옵션 수에 따라 레이아웃 변경
+  // 호버된 옵션 확인 변수
+  let hoveredOption = -1;
+  
+  // 옵션 위치 계산 및 마우스 호버 검사
   if (levelUpOptions.length === 1) {
-    drawOptionBox(centerX - boxWidth/2, centerY - boxHeight/2, 
-                 boxWidth, boxHeight, levelUpOptions[0], selectedLevelUpOption === 0);
-  } else if (levelUpOptions.length === 2) {
-    drawOptionBox(centerX - boxWidth - 20, centerY - boxHeight/2,
-                 boxWidth, boxHeight, levelUpOptions[0], selectedLevelUpOption === 0);
-    drawOptionBox(centerX + 20, centerY - boxHeight/2,
-                 boxWidth, boxHeight, levelUpOptions[1], selectedLevelUpOption === 1);
-  } else {
-    // 3-4개 배치
+    // 단일 옵션의 경우
+    const optionX = centerX - boxWidth/2;
+    const optionY = centerY - boxHeight/2;
+    
+    if (mouseX >= optionX && mouseX <= optionX + boxWidth &&
+        mouseY >= optionY && mouseY <= optionY + boxHeight) {
+      hoveredOption = 0;
+    }
+    
+    drawOptionBox(optionX, optionY, boxWidth, boxHeight, 
+                 levelUpOptions[0], hoveredOption === 0);
+  } 
+  else if (levelUpOptions.length === 2) {
+    // 두 개 옵션의 경우
+    const option1X = centerX - boxWidth - 20;
+    const option1Y = centerY - boxHeight/2;
+    const option2X = centerX + 20;
+    const option2Y = centerY - boxHeight/2;
+    
+    if (mouseX >= option1X && mouseX <= option1X + boxWidth &&
+        mouseY >= option1Y && mouseY <= option1Y + boxHeight) {
+      hoveredOption = 0;
+    }
+    else if (mouseX >= option2X && mouseX <= option2X + boxWidth &&
+             mouseY >= option2Y && mouseY <= option2Y + boxHeight) {
+      hoveredOption = 1;
+    }
+    
+    drawOptionBox(option1X, option1Y, boxWidth, boxHeight, 
+                 levelUpOptions[0], hoveredOption === 0);
+    drawOptionBox(option2X, option2Y, boxWidth, boxHeight, 
+                 levelUpOptions[1], hoveredOption === 1);
+  } 
+  else {
+    // 3-4개 옵션의 경우
     if (levelUpOptions[0]) {
-      drawOptionBox(centerX - boxWidth/2, centerY - 160 - boxHeight/2, 
-                   boxWidth, boxHeight, levelUpOptions[0], selectedLevelUpOption === 0);
+      const option1X = centerX - boxWidth/2;
+      const option1Y = centerY - 160 - boxHeight/2;
+      
+      if (mouseX >= option1X && mouseX <= option1X + boxWidth &&
+          mouseY >= option1Y && mouseY <= option1Y + boxHeight) {
+        hoveredOption = 0;
+      }
+      
+      drawOptionBox(option1X, option1Y, boxWidth, boxHeight, 
+                   levelUpOptions[0], hoveredOption === 0);
     }
     
     if (levelUpOptions[1]) {
-      drawOptionBox(centerX - 230 - boxWidth/2, centerY - boxHeight/2,
-                   boxWidth, boxHeight, levelUpOptions[1], selectedLevelUpOption === 1);
+      const option2X = centerX - 230 - boxWidth/2;
+      const option2Y = centerY - boxHeight/2;
+      
+      if (mouseX >= option2X && mouseX <= option2X + boxWidth &&
+          mouseY >= option2Y && mouseY <= option2Y + boxHeight) {
+        hoveredOption = 1;
+      }
+      
+      drawOptionBox(option2X, option2Y, boxWidth, boxHeight, 
+                   levelUpOptions[1], hoveredOption === 1);
     }
     
     if (levelUpOptions[2]) {
-      drawOptionBox(centerX + 230 - boxWidth/2, centerY - boxHeight/2,
-                   boxWidth, boxHeight, levelUpOptions[2], selectedLevelUpOption === 2);
+      const option3X = centerX + 230 - boxWidth/2;
+      const option3Y = centerY - boxHeight/2;
+      
+      if (mouseX >= option3X && mouseX <= option3X + boxWidth &&
+          mouseY >= option3Y && mouseY <= option3Y + boxHeight) {
+        hoveredOption = 2;
+      }
+      
+      drawOptionBox(option3X, option3Y, boxWidth, boxHeight, 
+                   levelUpOptions[2], hoveredOption === 2);
     }
     
     if (levelUpOptions[3]) {
-      drawOptionBox(centerX - boxWidth/2, centerY + 160 - boxHeight/2,
-                   boxWidth, boxHeight, levelUpOptions[3], selectedLevelUpOption === 3);
+      const option4X = centerX - boxWidth/2;
+      const option4Y = centerY + 160 - boxHeight/2;
+      
+      if (mouseX >= option4X && mouseX <= option4X + boxWidth &&
+          mouseY >= option4Y && mouseY <= option4Y + boxHeight) {
+        hoveredOption = 3;
+      }
+      
+      drawOptionBox(option4X, option4Y, boxWidth, boxHeight, 
+                   levelUpOptions[3], hoveredOption === 3);
     }
   }
-  
-  // 방향키 안내
-  if (levelUpOptions.length > 2) {
-    drawArrowKeys(centerX, centerY);
-  }
 
+  // '마우스로 클릭하여 선택하세요' 안내 텍스트
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = '18px Arial';
+  ctx.fillText('마우스로 클릭하여 선택하세요', canvas.width / 2, canvas.height - 80);
+  
   // 플레이어 또는 보물 이미지
   if (!isArtifactSelection && player.image && player.image.complete) {
     const playerDisplaySize = player.size * 4;
@@ -2282,17 +2352,24 @@ function drawLevelUpScreen() {
       );
     }
   }
+  
+  // 선택된 옵션 저장 (클릭 처리를 위해)
+  if (hoveredOption !== -1) {
+    hoveredLevelUpOption = hoveredOption;
+  } else {
+    hoveredLevelUpOption = -1;
+  }
 }
 
-function drawOptionBox(x, y, width, height, option, isSelected) {
+function drawOptionBox(x, y, width, height, option, isHovered) {
   // 아티팩트/레벨업에 따른 색상
   const bgColor = isArtifactSelection ? 
-    (isSelected ? 'rgba(218, 165, 32, 0.8)' : 'rgba(139, 69, 19, 0.8)') :
-    (isSelected ? 'rgba(69, 162, 158, 0.8)' : 'rgba(31, 40, 51, 0.8)');
+    (isHovered ? 'rgba(218, 165, 32, 0.8)' : 'rgba(139, 69, 19, 0.8)') :
+    (isHovered ? 'rgba(69, 162, 158, 0.8)' : 'rgba(31, 40, 51, 0.8)');
   
   const borderColor = isArtifactSelection ?
-    (isSelected ? '#FFD700' : '#CD853F') :
-    (isSelected ? '#66fcf1' : '#45a29e');
+    (isHovered ? '#FFD700' : '#CD853F') :
+    (isHovered ? '#66fcf1' : '#45a29e');
   
   // 박스 배경
   ctx.fillStyle = bgColor;
@@ -2300,7 +2377,7 @@ function drawOptionBox(x, y, width, height, option, isSelected) {
   
   // 박스 테두리
   ctx.strokeStyle = borderColor;
-  ctx.lineWidth = isSelected ? 3 : 1;
+  ctx.lineWidth = isHovered ? 3 : 1;
   ctx.strokeRect(x, y, width, height);
   
   // 아이콘 위치 및 크기
@@ -2323,69 +2400,53 @@ function drawOptionBox(x, y, width, height, option, isSelected) {
   const textX = x + 120;
   
   // 이름
-  ctx.fillStyle = isSelected ? '#FFFFFF' : (isArtifactSelection ? '#F0E68C' : '#ffffff');
+  ctx.fillStyle = isHovered ? '#FFFFFF' : (isArtifactSelection ? '#F0E68C' : '#ffffff');
   ctx.font = '24px Arial';
   ctx.textAlign = 'left';
   ctx.fillText(option.name, textX, y + height/2 - 10);
   
   // 설명
-  ctx.fillStyle = isSelected ? (isArtifactSelection ? '#F0E68C' : '#ffffff') : '#c5c6c7';
+  ctx.fillStyle = isHovered ? (isArtifactSelection ? '#F0E68C' : '#ffffff') : '#c5c6c7';
   ctx.font = '18px Arial';
   ctx.fillText(option.description, textX, y + height/2 + 20);
-}
-
-function drawArrowKeys(centerX, centerY) {
-  const keySize = 30;
-  const keySpacing = 40;
   
-  drawKey(centerX - keySize/2, centerY - keySpacing - keySize/2, keySize, '↑', selectedLevelUpOption === 0);
-  drawKey(centerX - keySpacing - keySize/2, centerY - keySize/2, keySize, '←', selectedLevelUpOption === 1);
-  drawKey(centerX + keySpacing - keySize/2, centerY - keySize/2, keySize, '→', selectedLevelUpOption === 2);
-  drawKey(centerX - keySize/2, centerY + keySpacing - keySize/2, keySize, '↓', selectedLevelUpOption === 3);
-}
-
-function drawKey(x, y, size, arrow, isSelected) {
-  ctx.fillStyle = isSelected ? '#ffff00' : '#666666';
-  ctx.fillRect(x, y, size, size);
-  
-  ctx.strokeStyle = isSelected ? '#66fcf1' : '#999999';
-  ctx.lineWidth = 2;
-  ctx.strokeRect(x, y, size, size);
-  
-  ctx.fillStyle = isSelected ? '#000000' : '#ffffff';
-  ctx.font = '20px Arial';
-  ctx.textAlign = 'center';
-  ctx.fillText(arrow, x + size/2, y + size/2 + 6);
+  // 호버 효과가 있는 경우 클릭 안내 추가
+  if (isHovered) {
+    ctx.fillStyle = isArtifactSelection ? '#FFD700' : '#66fcf1';
+    ctx.font = '14px Arial';
+    ctx.fillText('Click to Select', x + width - 80, y + height - 15);
+  }
 }
 
 function drawPauseScreen() {
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  // 마우스에 기반한 hover 효과로 전환:
+  const buttonX = canvas.width / 2 - 75;
+  const resumeButtonY = canvas.height / 2 - 20;
+  const menuButtonY = canvas.height / 2 + 30;
+  const buttonWidth = 150;
+  const buttonHeight = 40;
   
-  ctx.fillStyle = '#66fcf1';
-  ctx.font = '48px Arial';
-  ctx.textAlign = 'center';
-  ctx.fillText('PAUSED', canvas.width / 2, canvas.height / 2 - 80);
+  // 마우스가 버튼 위에 있는지 확인
+  const isResumeHovered = mouseX >= buttonX && mouseX <= buttonX + buttonWidth &&
+                           mouseY >= resumeButtonY && mouseY <= resumeButtonY + buttonHeight;
+  const isMenuHovered = mouseX >= buttonX && mouseX <= buttonX + buttonWidth &&
+                         mouseY >= menuButtonY && mouseY <= menuButtonY + buttonHeight;
   
-  ctx.font = '24px Arial';
+  // 재개 버튼 그리기
+  ctx.fillStyle = isResumeHovered ? '#66fcf1' : '#45a29e';
+  ctx.fillRect(buttonX, resumeButtonY, buttonWidth, buttonHeight);
+  ctx.strokeStyle = '#ffffff';
+  ctx.strokeRect(buttonX, resumeButtonY, buttonWidth, buttonHeight);
+  ctx.fillStyle = isResumeHovered ? '#0b0c10' : '#ffffff';
+  ctx.fillText('RESUME', canvas.width / 2, resumeButtonY + buttonHeight/2 + 5);
   
-  // Resume Game 옵션
-  if (selectedPauseOption === 0) {
-    ctx.fillStyle = '#FFFF00';
-    drawArrow(canvas.width / 2 - 100, canvas.height / 2 - 8);
-  } else {
-    ctx.fillStyle = '#FFFFFF';
-  }
-  ctx.fillText('RESUME', canvas.width / 2, canvas.height / 2);
-  
-  // Back to Main Menu 옵션
-  if (selectedPauseOption === 1) {
-    ctx.fillStyle = '#FFFF00';
-    drawArrow(canvas.width / 2 - 100, canvas.height / 2 + 42);
-  } else {
-    ctx.fillStyle = '#FFFFFF';
-  }
-  ctx.fillText('MAIN MENU', canvas.width / 2, canvas.height / 2 + 50);
+  // 메인 메뉴 버튼 그리기
+  ctx.fillStyle = isMenuHovered ? '#66fcf1' : '#45a29e';
+  ctx.fillRect(buttonX, menuButtonY, buttonWidth, buttonHeight);
+  ctx.strokeStyle = '#ffffff';
+  ctx.strokeRect(buttonX, menuButtonY, buttonWidth, buttonHeight);
+  ctx.fillStyle = isMenuHovered ? '#0b0c10' : '#ffffff';
+  ctx.fillText('MAIN MENU', canvas.width / 2, menuButtonY + buttonHeight/2 + 5);
 }
 
 function drawConfirmDialog() {
@@ -2420,20 +2481,34 @@ function drawConfirmDialog() {
   const buttonY = dialogY + 130;
   const buttonSpacing = 150;
   
-  // 예 버튼
-  ctx.fillStyle = selectedConfirmOption === 0 ? '#FFFF00' : '#FFFFFF';
+  // 마우스에 기반한 hover 효과
+  const buttonWidth = 100;
+  const buttonHeight = 40;
+  const yesButtonX = canvas.width / 2 - buttonSpacing / 2 - buttonWidth / 2;
+  const noButtonX = canvas.width / 2 + buttonSpacing / 2 - buttonWidth / 2;
+  const buttonsY = buttonY - 20;
+  
+  // 마우스가 버튼 위에 있는지 확인
+  const isYesHovered = mouseX >= yesButtonX && mouseX <= yesButtonX + buttonWidth &&
+                       mouseY >= buttonsY && mouseY <= buttonsY + buttonHeight;
+  const isNoHovered = mouseX >= noButtonX && mouseX <= noButtonX + buttonWidth &&
+                     mouseY >= buttonsY && mouseY <= buttonsY + buttonHeight;
+  
+  // 확인 버튼 그리기
+  ctx.fillStyle = isYesHovered ? '#66fcf1' : '#45a29e';
+  ctx.fillRect(yesButtonX, buttonsY, buttonWidth, buttonHeight);
+  ctx.strokeStyle = '#ffffff';
+  ctx.strokeRect(yesButtonX, buttonsY, buttonWidth, buttonHeight);
+  ctx.fillStyle = isYesHovered ? '#0b0c10' : '#ffffff';
   ctx.fillText('확인', canvas.width / 2 - buttonSpacing / 2, buttonY);
   
-  // 아니오 버튼
-  ctx.fillStyle = selectedConfirmOption === 1 ? '#FFFF00' : '#FFFFFF';
+  // 취소 버튼 그리기
+  ctx.fillStyle = isNoHovered ? '#66fcf1' : '#45a29e';
+  ctx.fillRect(noButtonX, buttonsY, buttonWidth, buttonHeight);
+  ctx.strokeStyle = '#ffffff';
+  ctx.strokeRect(noButtonX, buttonsY, buttonWidth, buttonHeight);
+  ctx.fillStyle = isNoHovered ? '#0b0c10' : '#ffffff';
   ctx.fillText('취소', canvas.width / 2 + buttonSpacing / 2, buttonY);
-  
-  // 화살표
-  if (selectedConfirmOption === 0) {
-    drawArrow(canvas.width / 2 - buttonSpacing / 2 - 30, buttonY - 8);
-  } else {
-    drawArrow(canvas.width / 2 + buttonSpacing / 2 - 30, buttonY - 8);
-  }
 }
 
 function drawLoadingScreen() {
@@ -2497,23 +2572,55 @@ function drawStartScreen() {
   // 메뉴 옵션
   ctx.font = '24px Arial';
   
-  // Start Game 옵션
-  if (selectedMenuOption === 0) {
-    ctx.fillStyle = '#FFFF00';
-    drawArrow(canvas.width / 2 - 80, canvas.height / 2 + 42);
-  } else {
-    ctx.fillStyle = '#FFFFFF';
-  }
-  ctx.fillText('시작', canvas.width / 2, canvas.height / 2 + 50);
+  // 마우스에 기반한 hover 효과
+  const startButtonX = canvas.width / 2 - 75;
+  const startButtonY = canvas.height / 2 + 30;
+  const buttonWidth = 150;
+  const buttonHeight = 40;
+  const settingsButtonY = canvas.height / 2 + 80;
   
-  // Settings 옵션
-  if (selectedMenuOption === 1) {
-    ctx.fillStyle = '#FFFF00';
-    drawArrow(canvas.width / 2 - 80, canvas.height / 2 + 92);
-  } else {
-    ctx.fillStyle = '#FFFFFF';
-  }
-  ctx.fillText('설정', canvas.width / 2, canvas.height / 2 + 100);
+  // 마우스가 시작 버튼 위에 있는지 확인
+  const isStartHovered = mouseX >= startButtonX && mouseX <= startButtonX + buttonWidth &&
+                         mouseY >= startButtonY && mouseY <= startButtonY + buttonHeight;
+  
+  // 마우스가 설정 버튼 위에 있는지 확인
+  const isSettingsHovered = mouseX >= startButtonX && mouseX <= startButtonX + buttonWidth &&
+                           mouseY >= settingsButtonY && mouseY <= settingsButtonY + buttonHeight;
+  
+  // 시작 버튼 그리기
+  ctx.fillStyle = isStartHovered ? '#66fcf1' : '#45a29e';
+  ctx.fillRect(startButtonX, startButtonY, buttonWidth, buttonHeight);
+  ctx.strokeStyle = '#ffffff';
+  ctx.strokeRect(startButtonX, startButtonY, buttonWidth, buttonHeight);
+  ctx.fillStyle = isStartHovered ? '#0b0c10' : '#ffffff';
+  ctx.fillText('시작', canvas.width / 2, startButtonY + buttonHeight/2 + 5);
+  
+  // 설정 버튼 그리기
+  ctx.fillStyle = isSettingsHovered ? '#66fcf1' : '#45a29e';
+  ctx.fillRect(startButtonX, settingsButtonY, buttonWidth, buttonHeight);
+  ctx.strokeStyle = '#ffffff';
+  ctx.strokeRect(startButtonX, settingsButtonY, buttonWidth, buttonHeight);
+  ctx.fillStyle = isSettingsHovered ? '#0b0c10' : '#ffffff';
+  ctx.fillText('설정', canvas.width / 2, settingsButtonY + buttonHeight/2 + 5);
+}
+
+// 버튼 그리기 함수
+function drawButton(x, y, width, height, text, isSelected) {
+  // 버튼 배경
+  ctx.fillStyle = isSelected ? '#66fcf1' : '#45a29e';
+  ctx.fillRect(x, y, width, height);
+  
+  // 버튼 테두리
+  ctx.strokeStyle = '#1f2833';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x, y, width, height);
+  
+  // 버튼 텍스트
+  ctx.fillStyle = isSelected ? '#0b0c10' : '#ffffff';
+  ctx.font = '24px Arial';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, x + width/2, y + height/2);
 }
 
 function drawSettingsScreen() {
@@ -2581,7 +2688,7 @@ function drawGameOverScreen() {
   ctx.fillStyle = '#FFFFFF';
   ctx.font = '24px Arial';
   ctx.fillText(`최종 점수: ${score}`, canvas.width / 2, canvas.height / 2);
-  ctx.fillText('Enter를 눌러 다시 시작하세요', canvas.width / 2, canvas.height / 2 + 50);
+  ctx.fillText('클릭하여 다시 시작하세요', canvas.width / 2, canvas.height / 2 + 50);
 }
 
 function drawHUD() {
@@ -2858,17 +2965,6 @@ function drawBackground(offsetX, offsetY) {
       }
     }
   }
-}
-
-// 화살표 그리기 함수
-function drawArrow(x, y) {
-  ctx.fillStyle = '#FFFF00';
-  ctx.beginPath();
-  ctx.moveTo(x, y);
-  ctx.lineTo(x - 15, y - 8);
-  ctx.lineTo(x - 15, y + 8);
-  ctx.closePath();
-  ctx.fill();
 }
 
 // 시간 포맷팅 함수
@@ -3225,20 +3321,26 @@ function update() {
   let dy = 0;
   let playerMoved = false;
   
-  // 방향 계산
-  if (keys['ArrowUp']) { dy -= 1; }
-  if (keys['ArrowDown']) { dy += 1; }
-  if (keys['ArrowLeft']) { dx -= 1; }
-  if (keys['ArrowRight']) { dx += 1; }
+  // 월드 좌표와 플레이어 좌표 차이로 방향 계산
+  const targetX = mouseWorldX;
+  const targetY = mouseWorldY;
   
-  // 벡터 정규화
-  if (dx !== 0 || dy !== 0) {
+  // 플레이어와 마우스 사이의 거리 계산
+  const distX = targetX - player.x;
+  const distY = targetY - player.y;
+  const distance = Math.sqrt(distX * distX + distY * distY);
+  
+  // 일정 거리 이상일 때만 이동 (정확히 마우스 위치에 도달하면 멈춤)
+  if (distance > 5) {
     playerMoved = true;
-    const magnitude = Math.sqrt(dx * dx + dy * dy);
-    dx = (dx / magnitude) * player.speed;
-    dy = (dy / magnitude) * player.speed;
-    player.x += dx;
-    player.y += dy;
+    
+    // 정규화된 방향 벡터 계산
+    dx = distX / distance;
+    dy = distY / distance;
+    
+    // 플레이어 이동
+    player.x += dx * player.speed;
+    player.y += dy * player.speed;
     
     // 방향 업데이트
     if (dx < 0) {
@@ -3431,168 +3533,12 @@ function update() {
 }
 
 //----------------------
-// 키보드 입력 처리
+// 키보드, 마우스 입력 처리
 //----------------------
 
-// 키보드 이벤트 핸들러
 document.addEventListener('keydown', (e) => {
-  keys[e.key] = true;
   
-  // 시작 화면 메뉴 네비게이션
-  if (currentGameState === GAME_STATE.START_SCREEN) {
-    if (e.key === 'ArrowUp') {
-      selectedMenuOption = 0;
-      e.preventDefault();
-    } else if (e.key === 'ArrowDown') {
-      selectedMenuOption = 1;
-      e.preventDefault();
-    } else if (e.key === 'Enter') {
-      if (selectedMenuOption === 0) {
-        startGame();
-      } else if (selectedMenuOption === 1) {
-        // 설정 화면으로 들어갈 때 현재 캐릭터 인덱스 저장
-        previousCharacterIndex = player.characterType - 1;
-        currentCharacterIndex = previousCharacterIndex;
-        currentGameState = GAME_STATE.SETTINGS;
-      }
-      e.preventDefault();
-    }
-  } 
-  // 설정 화면에서 캐릭터 변경
-  else if (currentGameState === GAME_STATE.SETTINGS) {
-    if (e.key === 'ArrowLeft') {
-      // 이전 캐릭터
-      currentCharacterIndex = (currentCharacterIndex - 1 + assetManager.images.players.length) % assetManager.images.players.length;
-      
-      // 임시로 캐릭터 업데이트 (미리보기용)
-      player.characterType = currentCharacterIndex + 1;
-      player.image = assetManager.images.players[currentCharacterIndex].image;
-      player.spriteWidth = assetManager.images.players[currentCharacterIndex].spriteWidth;
-      player.spriteHeight = assetManager.images.players[currentCharacterIndex].spriteHeight;
-      player.frameCount = assetManager.images.players[currentCharacterIndex].frameCount;
-      
-      // 애니메이션 초기화
-      previewAnimation.currentFrame = 0;
-      previewAnimation.frameTime = 0;
-      e.preventDefault();
-    } else if (e.key === 'ArrowRight') {
-      // 다음 캐릭터
-      currentCharacterIndex = (currentCharacterIndex + 1) % assetManager.images.players.length;
-      
-      // 임시로 캐릭터 업데이트 (미리보기용)
-      player.characterType = currentCharacterIndex + 1;
-      player.image = assetManager.images.players[currentCharacterIndex].image;
-      player.spriteWidth = assetManager.images.players[currentCharacterIndex].spriteWidth;
-      player.spriteHeight = assetManager.images.players[currentCharacterIndex].spriteHeight;
-      player.frameCount = assetManager.images.players[currentCharacterIndex].frameCount;
-      
-      // 애니메이션 초기화
-      previewAnimation.currentFrame = 0;
-      previewAnimation.frameTime = 0;
-      e.preventDefault();
-    } else if (e.key === 'Enter') {
-      // Enter 키 - 캐릭터 변경을 적용하고 시작 화면으로 돌아가기
-      previousCharacterIndex = currentCharacterIndex; // 현재 선택을 이전 선택으로 업데이트
-      currentGameState = GAME_STATE.START_SCREEN;
-      e.preventDefault();
-    } else if (e.key === 'Escape') {
-      // ESC 키 - 캐릭터 변경을 취소하고 시작 화면으로 돌아가기
-      // 이전 캐릭터로 되돌리기
-      currentCharacterIndex = previousCharacterIndex;
-      player.init(previousCharacterIndex); // player 객체의 init 메서드 호출로 캐릭터 복원
-      currentGameState = GAME_STATE.START_SCREEN;
-      e.preventDefault();
-    }
-  }
-  // 일시정지 메뉴 네비게이션
-  else if (currentGameState === GAME_STATE.PAUSED) {
-    if (e.key === 'ArrowUp') {
-      selectedPauseOption = 0;
-      e.preventDefault();
-    } else if (e.key === 'ArrowDown') {
-      selectedPauseOption = 1;
-      e.preventDefault();
-    } else if (e.key === 'Enter') {
-      if (selectedPauseOption === 0) {
-        resumeGame();
-      } else if (selectedPauseOption === 1) {
-        currentGameState = GAME_STATE.CONFIRM_DIALOG;
-        confirmDialogType = "exit_to_menu";
-        selectedConfirmOption = 1; // 기본값: "취소" 선택
-      }
-      e.preventDefault();
-    }
-  }
-  // 확인 대화상자 네비게이션
-  else if (currentGameState === GAME_STATE.CONFIRM_DIALOG) {
-    if (e.key === 'ArrowLeft') {
-      selectedConfirmOption = 0; // 예
-      e.preventDefault();
-    } else if (e.key === 'ArrowRight') {
-      selectedConfirmOption = 1; // 아니오
-      e.preventDefault();
-    } else if (e.key === 'Enter') {
-      if (confirmDialogType === "exit_to_menu") {
-        if (selectedConfirmOption === 0) {
-          currentGameState = GAME_STATE.START_SCREEN;
-        } else {
-          currentGameState = GAME_STATE.PAUSED;
-        }
-      }
-      e.preventDefault();
-    }
-  }
-  // 레벨업 화면 네비게이션
-  else if (currentGameState === GAME_STATE.LEVEL_UP) {
-    // 옵션 수에 따라 다르게 처리
-    if (levelUpOptions.length === 1) {
-      selectedLevelUpOption = 0;
-      if (e.key === 'Enter') {
-        applyLevelUpChoice();
-        e.preventDefault();
-      }
-    } else if (levelUpOptions.length === 2) {
-      if (e.key === 'ArrowLeft') {
-        selectedLevelUpOption = 0;
-        e.preventDefault();
-      } else if (e.key === 'ArrowRight') {
-        selectedLevelUpOption = 1;
-        e.preventDefault();
-      } else if (e.key === 'Enter') {
-        applyLevelUpChoice();
-        e.preventDefault();
-      }
-    } else {
-      // 3-4개 옵션
-      if (e.key === 'ArrowUp') {
-        selectedLevelUpOption = 0;
-        e.preventDefault();
-      } else if (e.key === 'ArrowLeft') {
-        selectedLevelUpOption = 1;
-        e.preventDefault();
-      } else if (e.key === 'ArrowRight') {
-        selectedLevelUpOption = 2;
-        e.preventDefault();
-      } else if (e.key === 'ArrowDown') {
-        selectedLevelUpOption = 3;
-        e.preventDefault();
-      } else if (e.key === 'Enter') {
-        if (selectedLevelUpOption !== -1) {
-          applyLevelUpChoice();
-        }
-        e.preventDefault();
-      }
-    }
-  }
-  // 게임 오버 화면 처리
-  else if (currentGameState === GAME_STATE.GAME_OVER) {
-    if (e.key === 'Enter') {
-      restartGame();
-      e.preventDefault();
-    }
-  }
-
-  // ESC 키 처리
+  // 키보드 조작
   if (e.key === 'Escape') {
     if (currentGameState === GAME_STATE.PLAYING) {
       pauseGame();
@@ -3605,19 +3551,251 @@ document.addEventListener('keydown', (e) => {
       currentGameState = GAME_STATE.PAUSED;
       pauseStartTime = Date.now();
     }
-    // 설정 화면에서의 ESC 키 처리는 이미 위에서 처리했으므로 여기서는 제외
-    e.preventDefault();
-  }
-  
-  // 스크롤 방지
-  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'Enter', 'Escape'].includes(e.key)) {
     e.preventDefault();
   }
 });
 
-document.addEventListener('keyup', (e) => {
+document.removeEventListener('keyup', (e) => {
   keys[e.key] = false;
 });
+
+// 마우스 조작
+
+function setupMouseHandlers() {
+  canvas.addEventListener('mousemove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    // 캔버스 스케일링을 고려한 마우스 좌표 계산
+    mouseX = (e.clientX - rect.left) * (canvas.width / parseInt(canvas.style.width, 10));
+    mouseY = (e.clientY - rect.top) * (canvas.height / parseInt(canvas.style.height, 10));
+    
+    // 월드 좌표 계산
+    mouseWorldX = player.x + (mouseX - canvas.width / 2);
+    mouseWorldY = player.y + (mouseY - canvas.height / 2);
+  });
+  
+  canvas.addEventListener('click', (e) => {
+    // 클릭 처리
+    handleMouseClick();
+    e.preventDefault();
+  });
+}
+
+function handleMouseClick() {
+  console.log("Mouse clicked, game state:", currentGameState); // 디버깅용
+
+  switch(currentGameState) {
+    case GAME_STATE.START_SCREEN:
+      handleStartScreenClick();
+      break;
+    case GAME_STATE.SETTINGS:
+      handleSettingsScreenClick();
+      break;
+    case GAME_STATE.PAUSED:
+      handlePauseScreenClick();
+      break;
+    case GAME_STATE.CONFIRM_DIALOG:
+      handleConfirmDialogClick();
+      break;
+    case GAME_STATE.LEVEL_UP:
+      handleLevelUpScreenClick();
+      break;
+    case GAME_STATE.GAME_OVER:
+      restartGame();
+      break;
+  }
+}
+
+function handleStartScreenClick() {
+  const centerX = canvas.width / 2;
+  const startY = canvas.height / 2 + 50;
+  const settingsY = canvas.height / 2 + 100;
+  const buttonWidth = 150;
+  const buttonHeight = 40;
+  
+  // '시작' 버튼 클릭 감지
+  if (mouseX > centerX - buttonWidth/2 && mouseX < centerX + buttonWidth/2 &&
+      mouseY > startY - buttonHeight/2 && mouseY < startY + buttonHeight/2) {
+    startGame();
+  }
+  // '설정' 버튼 클릭 감지
+  else if (mouseX > centerX - buttonWidth/2 && mouseX < centerX + buttonWidth/2 &&
+           mouseY > settingsY - buttonHeight/2 && mouseY < settingsY + buttonHeight/2) {
+    previousCharacterIndex = player.characterType - 1;
+    currentCharacterIndex = previousCharacterIndex;
+    currentGameState = GAME_STATE.SETTINGS;
+  }
+}
+
+function handleSettingsScreenClick() {
+  const centerX = canvas.width / 2;
+  const centerY = canvas.height / 2 + 70;
+  const buttonSize = 40;
+  
+  // 왼쪽 화살표 클릭 감지
+  if (mouseX > centerX - 120 - buttonSize/2 && mouseX < centerX - 120 + buttonSize/2 &&
+      mouseY > centerY - buttonSize/2 && mouseY < centerY + buttonSize/2) {
+    // 이전 캐릭터
+    currentCharacterIndex = (currentCharacterIndex - 1 + assetManager.images.players.length) % assetManager.images.players.length;
+    updatePreviewCharacter();
+  }
+  // 오른쪽 화살표 클릭 감지
+  else if (mouseX > centerX + 120 - buttonSize/2 && mouseX < centerX + 120 + buttonSize/2 &&
+           mouseY > centerY - buttonSize/2 && mouseY < centerY + buttonSize/2) {
+    // 다음 캐릭터
+    currentCharacterIndex = (currentCharacterIndex + 1) % assetManager.images.players.length;
+    updatePreviewCharacter();
+  }
+  // 캐릭터 이미지 클릭 감지 (확인으로 처리)
+  else if (mouseX > centerX - 100 && mouseX < centerX + 100 &&
+           mouseY > centerY - 100 && mouseY < centerY + 100) {
+    previousCharacterIndex = currentCharacterIndex;
+    currentGameState = GAME_STATE.START_SCREEN;
+  }
+}
+
+function updatePreviewCharacter() {
+  // 캐릭터 미리보기 업데이트
+  player.characterType = currentCharacterIndex + 1;
+  player.image = assetManager.images.players[currentCharacterIndex].image;
+  player.spriteWidth = assetManager.images.players[currentCharacterIndex].spriteWidth;
+  player.spriteHeight = assetManager.images.players[currentCharacterIndex].spriteHeight;
+  player.frameCount = assetManager.images.players[currentCharacterIndex].frameCount;
+  
+  // 애니메이션 초기화
+  previewAnimation.currentFrame = 0;
+  previewAnimation.frameTime = 0;
+}
+
+function handlePauseScreenClick() {
+  const centerX = canvas.width / 2;
+  const resumeY = canvas.height / 2;
+  const menuY = canvas.height / 2 + 50;
+  const buttonWidth = 150;
+  const buttonHeight = 40;
+  
+  // 'RESUME' 버튼 클릭 감지
+  if (mouseX > centerX - buttonWidth/2 && mouseX < centerX + buttonWidth/2 &&
+      mouseY > resumeY - buttonHeight/2 && mouseY < resumeY + buttonHeight/2) {
+    resumeGame();
+  }
+  // 'MAIN MENU' 버튼 클릭 감지
+  else if (mouseX > centerX - buttonWidth/2 && mouseX < centerX + buttonWidth/2 &&
+           mouseY > menuY - buttonHeight/2 && mouseY < menuY + buttonHeight/2) {
+    currentGameState = GAME_STATE.CONFIRM_DIALOG;
+    confirmDialogType = "exit_to_menu";
+    selectedConfirmOption = 1; // 기본값: "취소" 선택
+  }
+}
+
+function handleConfirmDialogClick() {
+  const centerX = canvas.width / 2;
+  const buttonY = (canvas.height / 2) + 130;
+  const buttonSpacing = 150;
+  const buttonWidth = 100;
+  const buttonHeight = 40;
+  
+  // '확인' 버튼 클릭 감지
+  if (mouseX > centerX - buttonSpacing/2 - buttonWidth/2 && mouseX < centerX - buttonSpacing/2 + buttonWidth/2 &&
+      mouseY > buttonY - buttonHeight/2 && mouseY < buttonY + buttonHeight/2) {
+    if (confirmDialogType === "exit_to_menu") {
+      currentGameState = GAME_STATE.START_SCREEN;
+    }
+  }
+  // '취소' 버튼 클릭 감지
+  else if (mouseX > centerX + buttonSpacing/2 - buttonWidth/2 && mouseX < centerX + buttonSpacing/2 + buttonWidth/2 &&
+           mouseY > buttonY - buttonHeight/2 && mouseY < buttonY + buttonHeight/2) {
+    currentGameState = GAME_STATE.PAUSED;
+  }
+}
+
+function handleLevelUpScreenClick() {
+  console.log("Level up screen clicked, hovered option:", hoveredLevelUpOption); // 디버깅용
+  
+  // 각 옵션의 위치와 크기 계산
+  const centerX = canvas.width / 2;
+  const centerY = canvas.height / 2;
+  const boxWidth = 320;
+  const boxHeight = 150;
+  
+  // 클릭한 옵션 찾기
+  let clickedOption = -1;
+  
+  if (levelUpOptions.length === 1) {
+    const optionX = centerX - boxWidth/2;
+    const optionY = centerY - boxHeight/2;
+    
+    if (mouseX >= optionX && mouseX <= optionX + boxWidth &&
+        mouseY >= optionY && mouseY <= optionY + boxHeight) {
+      clickedOption = 0;
+    }
+  } 
+  else if (levelUpOptions.length === 2) {
+    const option1X = centerX - boxWidth - 20;
+    const option1Y = centerY - boxHeight/2;
+    const option2X = centerX + 20;
+    const option2Y = centerY - boxHeight/2;
+    
+    if (mouseX >= option1X && mouseX <= option1X + boxWidth &&
+        mouseY >= option1Y && mouseY <= option1Y + boxHeight) {
+      clickedOption = 0;
+    }
+    else if (mouseX >= option2X && mouseX <= option2X + boxWidth &&
+             mouseY >= option2Y && mouseY <= option2Y + boxHeight) {
+      clickedOption = 1;
+    }
+  } 
+  else {
+    // 옵션 1 (상단)
+    if (levelUpOptions[0]) {
+      const option1X = centerX - boxWidth/2;
+      const option1Y = centerY - 160 - boxHeight/2;
+      
+      if (mouseX >= option1X && mouseX <= option1X + boxWidth &&
+          mouseY >= option1Y && mouseY <= option1Y + boxHeight) {
+        clickedOption = 0;
+      }
+    }
+    
+    // 옵션 2 (좌측)
+    if (levelUpOptions[1]) {
+      const option2X = centerX - 230 - boxWidth/2;
+      const option2Y = centerY - boxHeight/2;
+      
+      if (mouseX >= option2X && mouseX <= option2X + boxWidth &&
+          mouseY >= option2Y && mouseY <= option2Y + boxHeight) {
+        clickedOption = 1;
+      }
+    }
+    
+    // 옵션 3 (우측)
+    if (levelUpOptions[2]) {
+      const option3X = centerX + 230 - boxWidth/2;
+      const option3Y = centerY - boxHeight/2;
+      
+      if (mouseX >= option3X && mouseX <= option3X + boxWidth &&
+          mouseY >= option3Y && mouseY <= option3Y + boxHeight) {
+        clickedOption = 2;
+      }
+    }
+    
+    // 옵션 4 (하단)
+    if (levelUpOptions[3]) {
+      const option4X = centerX - boxWidth/2;
+      const option4Y = centerY + 160 - boxHeight/2;
+      
+      if (mouseX >= option4X && mouseX <= option4X + boxWidth &&
+          mouseY >= option4Y && mouseY <= option4Y + boxHeight) {
+        clickedOption = 3;
+      }
+    }
+  }
+  
+  // 클릭한 옵션이 있으면 적용
+  if (clickedOption !== -1) {
+    console.log("Applying level up option:", clickedOption, levelUpOptions[clickedOption]); // 디버깅용
+    applyLevelUpChoice(clickedOption);
+  }
+}
 
 // 창이 비활성화될 때 게임 일시정지
 window.addEventListener('blur', () => {
@@ -3728,6 +3906,9 @@ window.onload = function() {
   assetManager.loadAll(() => {
     // 플레이어 첫 번째 캐릭터로 초기화
     player.init(0); 
+    
+    // 마우스 핸들러 설정
+    setupMouseHandlers();
     
     // 게임 루프 시작
     requestAnimationFrame(gameLoop);
