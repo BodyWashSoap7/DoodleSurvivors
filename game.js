@@ -3309,6 +3309,11 @@ function update() {
     const totalElapsed = currentTime - gameStartTime - totalPausedTime;
     elapsedTime = Math.floor(totalElapsed / 1000);
   }
+
+  // 마우스 월드 좌표 재계산 - 이 코드를 추가
+  const rect = canvas.getBoundingClientRect();
+  mouseWorldX = player.x + (mouseX - canvas.width / 2);
+  mouseWorldY = player.y + (mouseY - canvas.height / 2);
   
   // 플레이어 이동
   let dx = 0;
@@ -3324,17 +3329,25 @@ function update() {
   const distY = targetY - player.y;
   const distance = Math.sqrt(distX * distX + distY * distY);
   
-  // 일정 거리 이상일 때만 이동 (정확히 마우스 위치에 도달하면 멈춤)
-  if (distance > 5) {
+  // 거리에 따른 속도 계수 계산
+  let speedFactor = 0;
+  if (distance > 15) {
+    if (distance >= 50) {
+      speedFactor = 1; // 최대 속도
+    } else {
+      // 15-50 범위에서 선형적으로 속도 증가
+      speedFactor = (distance - 15) / (50 - 15);
+    }
+    
     playerMoved = true;
     
     // 정규화된 방향 벡터 계산
     dx = distX / distance;
     dy = distY / distance;
     
-    // 플레이어 이동
-    player.x += dx * player.speed;
-    player.y += dy * player.speed;
+    // 플레이어 이동 (속도 계수 적용)
+    player.x += dx * player.speed * speedFactor;
+    player.y += dy * player.speed * speedFactor;
     
     // 방향 업데이트
     if (dx < 0) {
