@@ -678,10 +678,10 @@ class OrbitBullet extends Bullet {
 }
 
 // 화염방사기 무기 클래스
-class FlamethrowerWeapon extends Weapon {
+class FlameWeapon extends Weapon {
   constructor() {
     super({
-      type: 'flamethrower',
+      type: 'flame',
       baseAttackSpeed: 100,
       damage: 3
     });
@@ -1130,8 +1130,8 @@ const WeaponFactory = {
         return new BasicWeapon();
       case 'orbit':
         return new OrbitWeapon();
-      case 'flamethrower':
-        return new FlamethrowerWeapon();
+      case 'flame':
+        return new FlameWeapon();
       case 'lightning':
         return new LightningWeapon();
       case 'boomerang':
@@ -1153,7 +1153,7 @@ const WeaponFactory = {
     if (weapon instanceof OrbitWeapon) {
       weapon.bulletCount += 1;
       weapon.orbitRadius += 10;
-    } else if (weapon instanceof FlamethrowerWeapon) {
+    } else if (weapon instanceof FlameWeapon) {
       weapon.range += 50;
       weapon.coneAngle += Math.PI / 12;
     } else if (weapon instanceof LightningWeapon) {
@@ -1918,7 +1918,7 @@ function generateLevelUpOptions() {
     
     // 무기 옵션들
     { type: 'weapon', weaponType: 'orbit', name: '회전 구체', description: '플레이어 주변을 회전하며 공격' },
-    { type: 'weapon', weaponType: 'flamethrower', name: '화염방사기', description: '넓은 범위의 지속 데미지' },
+    { type: 'weapon', weaponType: 'flame', name: '화염방사기', description: '넓은 범위의 지속 데미지' },
     { type: 'weapon', weaponType: 'lightning', name: '번개 사슬', description: '적들 사이를 튀는 번개' },
     { type: 'weapon', weaponType: 'boomerang', name: '부메랑', description: '던졌다가 돌아오는 무기' },
     { type: 'weapon', weaponType: 'soul', name: '영혼 폭발', description: '주변의 모든 적에게 데미지' },
@@ -2240,136 +2240,36 @@ function drawLevelUpScreen() {
     ctx.fillText(`LEVEL ${player.level}`, canvas.width / 2, canvas.height - 40);
   }
   
-  // 중앙 위치 및 박스 크기
+  // 중앙 위치 및 박스 크기 - 세로로 거의 화면에 꽉 차게
   const centerX = canvas.width / 2;
   const centerY = canvas.height / 2;
-  const boxWidth = 320;
-  const boxHeight = 150;
+  const verticalMargin = 80; // 상단과 하단 여백
+  const boxHeight = canvas.height - verticalMargin * 2; // 세로로 화면에 거의 꽉 차게
+  const boxWidth = 180; // 너비는 좀 더 좁게 설정
   
   // 호버된 옵션 확인 변수
   let hoveredOption = -1;
   
   // 옵션 위치 계산 및 마우스 호버 검사
-  if (levelUpOptions.length === 1) {
-    // 단일 옵션의 경우
-    const optionX = centerX - boxWidth/2;
-    const optionY = centerY - boxHeight/2;
-    
-    if (mouseX >= optionX && mouseX <= optionX + boxWidth &&
-        mouseY >= optionY && mouseY <= optionY + boxHeight) {
-      hoveredOption = 0;
-    }
-    
-    drawOptionBox(optionX, optionY, boxWidth, boxHeight, 
-                 levelUpOptions[0], hoveredOption === 0);
-  } 
-  else if (levelUpOptions.length === 2) {
-    // 두 개 옵션의 경우
-    const option1X = centerX - boxWidth - 20;
-    const option1Y = centerY - boxHeight/2;
-    const option2X = centerX + 20;
-    const option2Y = centerY - boxHeight/2;
-    
-    if (mouseX >= option1X && mouseX <= option1X + boxWidth &&
-        mouseY >= option1Y && mouseY <= option1Y + boxHeight) {
-      hoveredOption = 0;
-    }
-    else if (mouseX >= option2X && mouseX <= option2X + boxWidth &&
-             mouseY >= option2Y && mouseY <= option2Y + boxHeight) {
-      hoveredOption = 1;
-    }
-    
-    drawOptionBox(option1X, option1Y, boxWidth, boxHeight, 
-                 levelUpOptions[0], hoveredOption === 0);
-    drawOptionBox(option2X, option2Y, boxWidth, boxHeight, 
-                 levelUpOptions[1], hoveredOption === 1);
-  } 
-  else {
-    // 3-4개 옵션의 경우
-    if (levelUpOptions[0]) {
-      const option1X = centerX - boxWidth/2;
-      const option1Y = centerY - 160 - boxHeight/2;
-      
-      if (mouseX >= option1X && mouseX <= option1X + boxWidth &&
-          mouseY >= option1Y && mouseY <= option1Y + boxHeight) {
-        hoveredOption = 0;
-      }
-      
-      drawOptionBox(option1X, option1Y, boxWidth, boxHeight, 
-                   levelUpOptions[0], hoveredOption === 0);
-    }
-    
-    if (levelUpOptions[1]) {
-      const option2X = centerX - 230 - boxWidth/2;
-      const option2Y = centerY - boxHeight/2;
-      
-      if (mouseX >= option2X && mouseX <= option2X + boxWidth &&
-          mouseY >= option2Y && mouseY <= option2Y + boxHeight) {
-        hoveredOption = 1;
-      }
-      
-      drawOptionBox(option2X, option2Y, boxWidth, boxHeight, 
-                   levelUpOptions[1], hoveredOption === 1);
-    }
-    
-    if (levelUpOptions[2]) {
-      const option3X = centerX + 230 - boxWidth/2;
-      const option3Y = centerY - boxHeight/2;
-      
-      if (mouseX >= option3X && mouseX <= option3X + boxWidth &&
-          mouseY >= option3Y && mouseY <= option3Y + boxHeight) {
-        hoveredOption = 2;
-      }
-      
-      drawOptionBox(option3X, option3Y, boxWidth, boxHeight, 
-                   levelUpOptions[2], hoveredOption === 2);
-    }
-    
-    if (levelUpOptions[3]) {
-      const option4X = centerX - boxWidth/2;
-      const option4Y = centerY + 160 - boxHeight/2;
-      
-      if (mouseX >= option4X && mouseX <= option4X + boxWidth &&
-          mouseY >= option4Y && mouseY <= option4Y + boxHeight) {
-        hoveredOption = 3;
-      }
-      
-      drawOptionBox(option4X, option4Y, boxWidth, boxHeight, 
-                   levelUpOptions[3], hoveredOption === 3);
-    }
-  }
+  // 간격 조정
+  const spacing = 15;
+  const optionCount = levelUpOptions.length;
+  const totalWidth = (boxWidth * optionCount) + (spacing * (optionCount - 1));
+  const startX = centerX - totalWidth / 2;
   
-  // 플레이어 또는 보물 이미지
-  if (!isArtifactSelection && player.image && player.image.complete) {
-    const playerDisplaySize = player.size * 4;
-    const spriteX = player.currentFrame * player.spriteWidth;
-    const spriteY = player.animationState === 'idle' ? 0 : player.spriteHeight;
-    
-    ctx.save();
-    ctx.translate(centerX, centerY);
-    if (player.direction === 'right') ctx.scale(-1, 1);
-    
-    ctx.drawImage(
-      player.image,
-      spriteX, spriteY,
-      player.spriteWidth, player.spriteHeight,
-      -playerDisplaySize / 2,
-      -playerDisplaySize / 2,
-      playerDisplaySize,
-      playerDisplaySize
-    );
-    
-    ctx.restore();
-  } else if (isArtifactSelection) {
-    if (assetManager.loaded.treasure) {
-      const treasureSize = 64;
-      ctx.drawImage(
-        assetManager.images.treasure,
-        centerX - treasureSize/2,
-        centerY - treasureSize/2,
-        treasureSize,
-        treasureSize
-      );
+  // 각 옵션 박스 그리기
+  for (let i = 0; i < optionCount; i++) {
+    if (levelUpOptions[i]) {
+      const optionX = startX + (boxWidth + spacing) * i;
+      const optionY = verticalMargin; // 상단에 붙임
+      
+      if (mouseX >= optionX && mouseX <= optionX + boxWidth &&
+          mouseY >= optionY && mouseY <= optionY + boxHeight) {
+        hoveredOption = i;
+      }
+      
+      drawOptionBox(optionX, optionY, boxWidth, boxHeight, 
+                   levelUpOptions[i], hoveredOption === i);
     }
   }
   
@@ -2401,9 +2301,9 @@ function drawOptionBox(x, y, width, height, option, isHovered) {
   ctx.strokeRect(x, y, width, height);
   
   // 아이콘 위치 및 크기
-  const iconSize = 64;
-  const iconX = x + 20;
-  const iconY = y + (height - iconSize) / 2;
+  const iconSize = 80; // 더 크게
+  const iconX = x + (width - iconSize) / 2; // 가운데 정렬
+  const iconY = y + 40; // 상단에 위치하되 약간 여백 줌
   
   // 아이콘 그리기
   if (isArtifactSelection) {
@@ -2421,19 +2321,39 @@ function drawOptionBox(x, y, width, height, option, isHovered) {
     }
   }
   
-  // 옵션 텍스트
-  const textX = x + 120;
+  // 옵션 텍스트 - 아이콘 아래에 위치
+  const textStartY = iconY + iconSize + 30; // 아이콘과 텍스트 사이 간격
   
   // 이름
   ctx.fillStyle = isHovered ? '#FFFFFF' : (isArtifactSelection ? '#F0E68C' : '#ffffff');
   ctx.font = '24px Arial';
-  ctx.textAlign = 'left';
-  ctx.fillText(option.name, textX, y + height/2 - 10);
+  ctx.textAlign = 'center';
+  ctx.fillText(option.name, x + width/2, textStartY);
   
   // 설명
   ctx.fillStyle = isHovered ? (isArtifactSelection ? '#F0E68C' : '#ffffff') : '#c5c6c7';
   ctx.font = '18px Arial';
-  ctx.fillText(option.description, textX, y + height/2 + 20);
+  ctx.textAlign = 'center';
+  
+  // 설명이 길면 여러 줄로 나누기
+  const maxLineWidth = width - 20;
+  const words = option.description.split(' ');
+  let line = '';
+  let lineY = textStartY + 30;
+  
+  for (let i = 0; i < words.length; i++) {
+    const testLine = line + words[i] + ' ';
+    const metrics = ctx.measureText(testLine);
+    
+    if (metrics.width > maxLineWidth && i > 0) {
+      ctx.fillText(line, x + width/2, lineY);
+      line = words[i] + ' ';
+      lineY += 25; // 줄 간격
+    } else {
+      line = testLine;
+    }
+  }
+  ctx.fillText(line, x + width/2, lineY);
 }
 
 function drawPauseScreen() {
@@ -3785,79 +3705,29 @@ function handleLevelUpScreenClick() {
   
   // 각 옵션의 위치와 크기 계산
   const centerX = canvas.width / 2;
-  const centerY = canvas.height / 2;
-  const boxWidth = 320;
-  const boxHeight = 150;
+  const verticalMargin = 80; // drawLevelUpScreen과 일치시킴
+  const boxHeight = canvas.height - verticalMargin * 2;
+  const boxWidth = 180; // drawLevelUpScreen과 일치시킴
   
   // 클릭한 옵션 찾기
   let clickedOption = -1;
   
-  if (levelUpOptions.length === 1) {
-    const optionX = centerX - boxWidth/2;
-    const optionY = centerY - boxHeight/2;
-    
-    if (mouseX >= optionX && mouseX <= optionX + boxWidth &&
-        mouseY >= optionY && mouseY <= optionY + boxHeight) {
-      clickedOption = 0;
-    }
-  } 
-  else if (levelUpOptions.length === 2) {
-    const option1X = centerX - boxWidth - 20;
-    const option1Y = centerY - boxHeight/2;
-    const option2X = centerX + 20;
-    const option2Y = centerY - boxHeight/2;
-    
-    if (mouseX >= option1X && mouseX <= option1X + boxWidth &&
-        mouseY >= option1Y && mouseY <= option1Y + boxHeight) {
-      clickedOption = 0;
-    }
-    else if (mouseX >= option2X && mouseX <= option2X + boxWidth &&
-             mouseY >= option2Y && mouseY <= option2Y + boxHeight) {
-      clickedOption = 1;
-    }
-  } 
-  else {
-    // 옵션 1 (상단)
-    if (levelUpOptions[0]) {
-      const option1X = centerX - boxWidth/2;
-      const option1Y = centerY - 160 - boxHeight/2;
+  // 간격 조정
+  const spacing = 15;
+  const optionCount = levelUpOptions.length;
+  const totalWidth = (boxWidth * optionCount) + (spacing * (optionCount - 1));
+  const startX = centerX - totalWidth / 2;
+  
+  // 각 옵션 박스 클릭 감지
+  for (let i = 0; i < optionCount; i++) {
+    if (levelUpOptions[i]) {
+      const optionX = startX + (boxWidth + spacing) * i;
+      const optionY = verticalMargin;
       
-      if (mouseX >= option1X && mouseX <= option1X + boxWidth &&
-          mouseY >= option1Y && mouseY <= option1Y + boxHeight) {
-        clickedOption = 0;
-      }
-    }
-    
-    // 옵션 2 (좌측)
-    if (levelUpOptions[1]) {
-      const option2X = centerX - 230 - boxWidth/2;
-      const option2Y = centerY - boxHeight/2;
-      
-      if (mouseX >= option2X && mouseX <= option2X + boxWidth &&
-          mouseY >= option2Y && mouseY <= option2Y + boxHeight) {
-        clickedOption = 1;
-      }
-    }
-    
-    // 옵션 3 (우측)
-    if (levelUpOptions[2]) {
-      const option3X = centerX + 230 - boxWidth/2;
-      const option3Y = centerY - boxHeight/2;
-      
-      if (mouseX >= option3X && mouseX <= option3X + boxWidth &&
-          mouseY >= option3Y && mouseY <= option3Y + boxHeight) {
-        clickedOption = 2;
-      }
-    }
-    
-    // 옵션 4 (하단)
-    if (levelUpOptions[3]) {
-      const option4X = centerX - boxWidth/2;
-      const option4Y = centerY + 160 - boxHeight/2;
-      
-      if (mouseX >= option4X && mouseX <= option4X + boxWidth &&
-          mouseY >= option4Y && mouseY <= option4Y + boxHeight) {
-        clickedOption = 3;
+      if (mouseX >= optionX && mouseX <= optionX + boxWidth &&
+          mouseY >= optionY && mouseY <= optionY + boxHeight) {
+        clickedOption = i;
+        break; // 하나만 선택 가능하므로 찾으면 루프 종료
       }
     }
   }
