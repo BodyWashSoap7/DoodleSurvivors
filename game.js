@@ -2313,11 +2313,6 @@ function drawLevelUpScreen() {
                    levelUpOptions[3], hoveredOption === 3);
     }
   }
-
-  // '마우스로 클릭하여 선택하세요' 안내 텍스트
-  ctx.fillStyle = '#FFFFFF';
-  ctx.font = '18px Arial';
-  ctx.fillText('마우스로 클릭하여 선택하세요', canvas.width / 2, canvas.height - 80);
   
   // 플레이어 또는 보물 이미지
   if (!isArtifactSelection && player.image && player.image.complete) {
@@ -2409,17 +2404,16 @@ function drawOptionBox(x, y, width, height, option, isHovered) {
   ctx.fillStyle = isHovered ? (isArtifactSelection ? '#F0E68C' : '#ffffff') : '#c5c6c7';
   ctx.font = '18px Arial';
   ctx.fillText(option.description, textX, y + height/2 + 20);
-  
-  // 호버 효과가 있는 경우 클릭 안내 추가
-  if (isHovered) {
-    ctx.fillStyle = isArtifactSelection ? '#FFD700' : '#66fcf1';
-    ctx.font = '14px Arial';
-    ctx.fillText('Click to Select', x + width - 80, y + height - 15);
-  }
 }
 
 function drawPauseScreen() {
-  // 마우스에 기반한 hover 효과로 전환:
+  // 배경이 어두워짐
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.textAlign = 'center';
+  
+  // 마우스에 기반한 hover 효과
   const buttonX = canvas.width / 2 - 75;
   const resumeButtonY = canvas.height / 2 - 20;
   const menuButtonY = canvas.height / 2 + 30;
@@ -2451,7 +2445,7 @@ function drawPauseScreen() {
 
 function drawConfirmDialog() {
   // 배경
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   
   // 대화상자 배경
@@ -3562,6 +3556,10 @@ document.removeEventListener('keyup', (e) => {
 // 마우스 조작
 
 function setupMouseHandlers() {
+  // 드래그 감지용 변수 추가
+  let isDragging = false;
+  let isMouseDown = false;
+  
   canvas.addEventListener('mousemove', (e) => {
     const rect = canvas.getBoundingClientRect();
     // 캔버스 스케일링을 고려한 마우스 좌표 계산
@@ -3571,12 +3569,37 @@ function setupMouseHandlers() {
     // 월드 좌표 계산
     mouseWorldX = player.x + (mouseX - canvas.width / 2);
     mouseWorldY = player.y + (mouseY - canvas.height / 2);
+    
+    // 마우스 다운 상태에서 움직이면 드래그 상태로 설정
+    if (isMouseDown) {
+      isDragging = true;
+    }
   });
   
-  canvas.addEventListener('click', (e) => {
-    // 클릭 처리
-    handleMouseClick();
+  // 마우스 다운 이벤트
+  canvas.addEventListener('mousedown', (e) => {
+    isMouseDown = true;
+    isDragging = false; // 드래그 상태 초기화
     e.preventDefault();
+  });
+  
+  // 마우스 업 이벤트
+  canvas.addEventListener('mouseup', (e) => {
+    // 드래그 상태가 아닐 때만 클릭으로 처리
+    if (isMouseDown && !isDragging) {
+      handleMouseClick();
+    }
+    
+    // 상태 초기화
+    isMouseDown = false;
+    isDragging = false;
+    e.preventDefault();
+  });
+  
+  // 마우스가 캔버스를 벗어나면 상태 초기화
+  canvas.addEventListener('mouseout', (e) => {
+    isMouseDown = false;
+    isDragging = false;
   });
 }
 
@@ -3689,21 +3712,27 @@ function handlePauseScreenClick() {
 
 function handleConfirmDialogClick() {
   const centerX = canvas.width / 2;
-  const buttonY = (canvas.height / 2) + 130;
   const buttonSpacing = 150;
   const buttonWidth = 100;
   const buttonHeight = 40;
   
-  // '확인' 버튼 클릭 감지
-  if (mouseX > centerX - buttonSpacing/2 - buttonWidth/2 && mouseX < centerX - buttonSpacing/2 + buttonWidth/2 &&
-      mouseY > buttonY - buttonHeight/2 && mouseY < buttonY + buttonHeight/2) {
+  // Get the actual button y-position (matching what's drawn in drawConfirmDialog)
+  const dialogY = (canvas.height - 200) / 2; // The dialog Y position
+  const buttonsY = dialogY + 130 - 20; // Same as in drawConfirmDialog
+  
+  // '확인' 버튼 클릭 감지 (left button)
+  const yesButtonX = centerX - buttonSpacing / 2 - buttonWidth / 2;
+  if (mouseX >= yesButtonX && mouseX <= yesButtonX + buttonWidth &&
+      mouseY >= buttonsY && mouseY <= buttonsY + buttonHeight) {
     if (confirmDialogType === "exit_to_menu") {
       currentGameState = GAME_STATE.START_SCREEN;
     }
   }
-  // '취소' 버튼 클릭 감지
-  else if (mouseX > centerX + buttonSpacing/2 - buttonWidth/2 && mouseX < centerX + buttonSpacing/2 + buttonWidth/2 &&
-           mouseY > buttonY - buttonHeight/2 && mouseY < buttonY + buttonHeight/2) {
+  
+  // '취소' 버튼 클릭 감지 (right button)
+  const noButtonX = centerX + buttonSpacing / 2 - buttonWidth / 2;
+  if (mouseX >= noButtonX && mouseX <= noButtonX + buttonWidth &&
+      mouseY >= buttonsY && mouseY <= buttonsY + buttonHeight) {
     currentGameState = GAME_STATE.PAUSED;
   }
 }
