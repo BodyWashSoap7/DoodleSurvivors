@@ -87,6 +87,7 @@ class AssetManager {
       players: [],
       mapTiles: [],
       weapons: {},
+      weaponIcons: {},
       levelUpIcons: {},
       artifactIcons: {},
       hitEffect: null,
@@ -98,6 +99,7 @@ class AssetManager {
       players: false,
       mapTiles: false,
       weapons: false,
+      weaponIcons: false,
       levelUpIcons: false,
       artifactIcons: false,
       hitEffect: false,
@@ -111,6 +113,7 @@ class AssetManager {
     this.loadPlayerImages();
     this.loadMapTiles();
     this.loadWeaponImages();
+    this.loadWeaponIcons();
     this.loadLevelUpIcons();
     this.loadArtifactIcons();
     this.loadMiscImages();
@@ -210,6 +213,32 @@ class AssetManager {
     }
   }
 
+  loadWeaponIcons() {
+    const weaponTypes = [
+      'basic', 'orbit', 'flame', 'lightning', 
+      'boomerang', 'soul', 'axe', 'wave', 'bible'
+    ];
+    
+    let loadedCount = 0;
+    
+    for (const type of weaponTypes) {
+      const img = new Image();
+      img.src = `./img/weapon_icons/${type}_icon.png`; // 무기 아이콘 경로
+      img.onload = () => {
+        loadedCount++;
+        if (loadedCount === weaponTypes.length) {
+          this.loaded.weaponIcons = true;
+          console.log('무기 아이콘 로드 완료');
+        }
+      };
+      img.onerror = () => {
+        console.error(`무기 아이콘 로드 실패: ${type}`);
+        loadedCount++;
+      };
+      this.images.weaponIcons[type] = img;
+    }
+  }
+  
   loadLevelUpIcons() {
     const iconTypes = [
       'attackPower', 'maxHealth', 'fireRate', 'projectileSpeed',
@@ -2200,16 +2229,12 @@ function drawLevelUpScreen() {
   ctx.font = '36px Arial';
   ctx.textAlign = 'center';
   ctx.fillText(
-    isArtifactSelection ? '보물 발견!' : 'LEVEL UP!', 
+    isArtifactSelection ? '아티팩트 발견!' : 'LEVEL UP!', 
     canvas.width / 2, 50
   );
   
   // 부제목
-  if (isArtifactSelection) {
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = '24px Arial';
-    ctx.fillText('아티팩트를 선택하세요', canvas.width / 2, 90);
-  } else {
+  if (!isArtifactSelection) {
     ctx.fillStyle = '#ffff00';
     ctx.font = '24px Arial';
     ctx.fillText(`LEVEL ${player.level}`, canvas.width / 2, canvas.height - 40);
@@ -2386,7 +2411,12 @@ function drawOptionBox(x, y, width, height, option, isHovered) {
       ctx.drawImage(assetManager.images.artifactIcons[option.type], iconX, iconY, iconSize, iconSize);
     }
   } else {
-    if (assetManager.loaded.levelUpIcons && assetManager.images.levelUpIcons[option.type]) {
+    // 무기 옵션인 경우
+    if (option.type === 'weapon' && assetManager.loaded.weaponIcons && assetManager.images.weaponIcons[option.weaponType]) {
+      ctx.drawImage(assetManager.images.weaponIcons[option.weaponType], iconX, iconY, iconSize, iconSize);
+    } 
+    // 일반 레벨업 옵션인 경우
+    else if (assetManager.loaded.levelUpIcons && assetManager.images.levelUpIcons[option.type]) {
       ctx.drawImage(assetManager.images.levelUpIcons[option.type], iconX, iconY, iconSize, iconSize);
     }
   }
