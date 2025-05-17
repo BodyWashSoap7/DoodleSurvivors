@@ -92,8 +92,11 @@ class AssetManager {
       artifactIcons: {},
       hitEffect: null,
       treasure: null,
+      jewels: [],
       enemy: null,
-      jewels: []
+      bossEnemy: null,
+      fastEnemy: null,
+      enemyBullet: null
     };
     this.loaded = {
       players: false,
@@ -104,8 +107,11 @@ class AssetManager {
       artifactIcons: false,
       hitEffect: false,
       treasure: false,
+      jewels: false,
       enemy: false,
-      jewels: false
+      bossEnemy: false,
+      fastEnemy: false,
+      enemyBullet: false
     };
   }
 
@@ -307,6 +313,22 @@ class AssetManager {
     this.images.enemy.onload = () => {
       this.loaded.enemy = true;
       console.log('적 스프라이트 시트 로드 완료');
+    };
+
+    // 보스 적 이미지
+    this.images.bossEnemy = new Image();
+    this.images.bossEnemy.src = './img/boss_enemy_sprites.png';
+    this.images.bossEnemy.onload = () => {
+      this.loaded.bossEnemy = true;
+      console.log('보스 적 스프라이트 시트 로드 완료');
+    };
+
+    // 빠른 적 이미지
+    this.images.fastEnemy = new Image();
+    this.images.fastEnemy.src = './img/fast_enemy_sprites.png';
+    this.images.fastEnemy.onload = () => {
+      this.loaded.fastEnemy = true;
+      console.log('빠른 적 스프라이트 시트 로드 완료');
     };
     
     // 피격 효과 이미지
@@ -1171,6 +1193,63 @@ const WeaponFactory = {
 // Enemy 클래스
 //----------------------
 
+// 적 타입 정의
+const ENEMY_TYPES = {
+  NORMAL: {
+    name: "Normal",
+    size: 20,
+    speedBase: 0.5,
+    speedVariance: 0.1,
+    healthBase: 5,
+    healthPerLevel: 1.5,
+    attackBase: 10,
+    attackPerLevel: 0.5,
+    expValue: 3,
+    scoreValue: 10,
+    spawnWeight: 70 // 스폰 가중치
+  },
+  FAST: {
+    name: "Fast",
+    size: 15,
+    speedBase: 0.8,
+    speedVariance: 0.2,
+    healthBase: 3,
+    healthPerLevel: 1.0,
+    attackBase: 5,
+    attackPerLevel: 0.3,
+    expValue: 2,
+    scoreValue: 8,
+    spawnWeight: 20
+  },
+  TANK: {
+    name: "Tank",
+    size: 25,
+    speedBase: 0.3,
+    speedVariance: 0.05,
+    healthBase: 10,
+    healthPerLevel: 2.5,
+    attackBase: 15,
+    attackPerLevel: 0.7,
+    expValue: 5,
+    scoreValue: 15,
+    spawnWeight: 10
+  },
+  BOSS: {
+    name: "Boss",
+    size: 40,
+    speedBase: 0.3,
+    speedVariance: 0.0,
+    healthBase: 100,
+    healthPerLevel: 10,
+    attackBase: 20,
+    attackPerLevel: 1.5,
+    expValue: 50,
+    scoreValue: 100,
+    spawnWeight: 0, // 특별 조건에서만 스폰
+    isBoss: true
+  }
+};
+
 class Enemy {
   constructor(x, y, size, speed, health, attackStrength) {
     this.x = x;
@@ -1309,16 +1388,21 @@ class Enemy {
     this.state = 'dying';
     this.stateStartTime = Date.now();
     
-    // 경험치 및 점수 획득
-    player.exp += Math.floor(3 * player.expMultiplier);
-    score += 10;
+    // 경험치 및 점수 획득 (타입별로 다른 값 적용)
+    const expValue = this.expValue || 3; // 기본값 3
+    const scoreValue = this.scoreValue || 10; // 기본값 10
+    
+    player.exp += Math.floor(expValue * player.expMultiplier);
+    score += scoreValue;
     
     // 아이템 드롭
-    if (Math.random() < 0.1) {
+    // 일반 보석 드롭 확률 (보스는 BossEnemy 클래스에서 처리)
+    if (!this.isBoss && Math.random() < 0.1) {
       gameObjects.jewels.push(new Jewel(this.x, this.y));
     }
-
-    if (Math.random() < 0.05) {
+  
+    // 보물 드롭 (보스가 아닌 경우 더 낮은 확률)
+    if (!this.isBoss && Math.random() < 0.05) {
       gameObjects.terrain.push(new Treasure(this.x, this.y));
     }
     
@@ -1707,6 +1791,125 @@ class Enemy {
       screenShakeTime = 400 + damageRatio * 2000;
       screenShakeIntensity = 5 + damageRatio * 10;
     }
+  }
+}
+
+// 보스급 적 클래스 
+// 보스급 적 클래스 
+class BossEnemy extends Enemy {
+  constructor(x, y) {
+    // 보스는 더 크고, 느리고, 체력이 많음
+    super(x, y, 40, 0.3, 100, 20);
+    this.isBoss = true;
+    this.expValue = 50;
+    this.scoreValue = 100;
+    
+    // 보스 전용 속성 추가
+    this.attackRange = 200;
+    this.specialAttackCooldown = 5000;
+    this.lastSpecialAttack = 0;
+    this.color = "darkred"; // 보스는 진한 빨간색
+  }
+  
+  // 보스 전용 메서드 오버라이드
+  update() {
+    super.update(); // 기본 업데이트 실행
+    
+    // 특수 공격 로직
+    const currentTime = Date.now();
+    if (this.state === 'moving' && 
+        currentTime - this.lastSpecialAttack >= this.specialAttackCooldown) {
+      this.specialAttack();
+      this.lastSpecialAttack = currentTime;
+    }
+  }
+  
+  specialAttack() {
+    // 원형으로 8방향 총알 발사
+    for (let i = 0; i < 8; i++) {
+      const angle = (Math.PI * 2 * i) / 8;
+      gameObjects.bullets.push(
+        new EnemyBullet(this.x, this.y, 5, 3, angle, 15)
+      );
+    }
+  }
+  
+  // 보스 시각적 효과 재정의
+  drawMoving(drawX, drawY) {
+    // 부모 클래스의 drawMoving 메서드를 호출하기 전에 크기를 조정
+    const originalSize = this.size;
+    this.size = this.originalSize * 1.5; // 보스는 1.5배 크기
+    
+    super.drawMoving(drawX, drawY);
+    
+    // 크기 복원
+    this.size = originalSize;
+    
+    // 보스 특수 효과 (예: 오오라)
+    ctx.globalAlpha = 0.3;
+    ctx.fillStyle = 'rgba(255, 0, 0, 0.3)';
+    ctx.beginPath();
+    ctx.arc(drawX, drawY, this.size * 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1.0;
+  }
+  
+  // 죽었을 때 추가 보상
+  startDying() {
+    // 부모 클래스의 메서드 실행
+    super.startDying();
+    
+    // 체력 회복 보석 100% 드롭
+    gameObjects.jewels.push(new Jewel(this.x, this.y, 4));
+    
+    // 아이템 더 많이 드롭
+    for (let i = 0; i < 3; i++) {
+      if (Math.random() < 0.7) {
+        gameObjects.jewels.push(new Jewel(this.x + (Math.random() * 30 - 15), 
+                                          this.y + (Math.random() * 30 - 15),
+                                          Math.floor(Math.random() * 3)));
+      }
+    }
+    
+    // 보물 상자 드롭 확률 증가
+    if (Math.random() < 0.5) {
+      gameObjects.terrain.push(new Treasure(this.x, this.y));
+    }
+  }
+}
+
+
+// 적이 발사하는 총알 클래스
+class EnemyBullet extends Bullet {
+  constructor(x, y, size, speed, angle, damage) {
+    super(x, y, size, speed, angle, damage);
+    this.fromEnemy = true; // 적의 총알 표시
+  }
+  
+  update() {
+    this.x += Math.cos(this.angle) * this.speed;
+    this.y += Math.sin(this.angle) * this.speed;
+    
+    // 플레이어와 충돌 체크
+    if (detectCollision(this, player) && !player.invincible) {
+      player.health -= this.damage;
+      this.used = true;
+      
+      // 플레이어 피격 효과
+      player.isHit = true;
+      player.hitStartTime = Date.now();
+      
+      // 무적 상태 활성화
+      player.invincible = true;
+      player.invincibilityStartTime = Date.now();
+    }
+  }
+  
+  draw(offsetX, offsetY) {
+    ctx.fillStyle = 'red'; // 적의 총알은 빨간색
+    ctx.beginPath();
+    ctx.arc(this.x + offsetX, this.y + offsetY, this.size, 0, Math.PI * 2);
+    ctx.fill();
   }
 }
 
@@ -2636,23 +2839,32 @@ function drawGameOverScreen() {
 }
 
 function drawHUD() {
+  // 텍스트에 테두리를 그리는 헬퍼 함수
+  function drawTextWithStroke(text, x, y, fillColor, strokeColor, lineWidth = 3) {
+    ctx.lineWidth = lineWidth;
+    ctx.strokeStyle = strokeColor;
+    ctx.fillStyle = fillColor;
+    
+    // 테두리 그리기
+    ctx.strokeText(text, x, y);
+    // 실제 텍스트 그리기
+    ctx.fillText(text, x, y);
+  }
+  
   // 경과 시간 (화면 상단 가운데)
   ctx.font = '20px Arial';
-  ctx.fillStyle = '#66fcf1';
   ctx.textAlign = 'center';
-  ctx.fillText(formatTime(elapsedTime), canvas.width / 2, 30);
+  drawTextWithStroke(formatTime(elapsedTime), canvas.width / 2, 30, '#66fcf1', '#000000');
   
   // 점수 (화면 왼쪽 위)
   ctx.font = '18px Arial';
-  ctx.fillStyle = '#66fcf1';
   ctx.textAlign = 'left';
-  ctx.fillText(`Score: ${score}`, 20, 30);
+  drawTextWithStroke(`Score: ${score}`, 20, 30, '#66fcf1', '#000000');
   
   // 레벨 (화면 하단)
   ctx.font = '24px Arial';
-  ctx.fillStyle = '#ffff00';
   ctx.textAlign = 'center';
-  ctx.fillText(`LEVEL ${player.level}`, canvas.width / 2, canvas.height - 40);
+  drawTextWithStroke(`LEVEL ${player.level}`, canvas.width / 2, canvas.height - 40, '#ffff00', '#000000');
   
   // 경험치 바 (화면 최하단)
   const expBarHeight = 20;
@@ -2674,9 +2886,8 @@ function drawHUD() {
   
   // 경험치 텍스트
   ctx.font = '14px Arial';
-  ctx.fillStyle = '#ffffff';
   ctx.textAlign = 'center';
-  ctx.fillText(`${player.exp} / ${player.nextLevelExp}`, canvas.width / 2, expBarY + 15);
+  drawTextWithStroke(`${player.exp} / ${player.nextLevelExp}`, canvas.width / 2, expBarY + 15, '#ffffff', '#000000', 2);
 }
 
 function draw() {
@@ -3134,19 +3345,73 @@ function spawnEnemyAroundPlayer() {
   
   // 스폰 위치 유효성 확인
   if (isValidSpawnPosition(spawnX, spawnY)) {
-    // 적 생성
-    const enemySize = 20;
-    // 아티팩트 효과 적용
-    const enemySpeed = (0.5 + Math.random() * 0.1) * (1 - player.enemySpeedReduction);
-    const enemyHealth = Math.floor((5 + Math.floor((player.level - 1) * 1.5)) * (1 - player.enemyHealthReduction));
-    const enemyAttack = 10 + Math.floor((player.level - 1) * 0.5);
+    // 적 타입 선택
+    let selectedType;
     
-    const enemy = new Enemy(spawnX, spawnY, enemySize, enemySpeed, enemyHealth, enemyAttack);
+    // 보스는 일정 시간/레벨 이후 5% 확률로 등장
+    if (elapsedTime > 300 && player.level >= 10 && Math.random() < 0.05) {
+      selectedType = ENEMY_TYPES.BOSS;
+    } else {
+      // 가중치 기반 선택
+      const totalWeight = Object.values(ENEMY_TYPES)
+        .filter(type => type.spawnWeight > 0)
+        .reduce((sum, type) => sum + type.spawnWeight, 0);
+      
+      let randomWeight = Math.random() * totalWeight;
+      for (const type of Object.values(ENEMY_TYPES)) {
+        if (type.spawnWeight <= 0) continue;
+        
+        randomWeight -= type.spawnWeight;
+        if (randomWeight <= 0) {
+          selectedType = type;
+          break;
+        }
+      }
+      // 기본값
+      if (!selectedType) selectedType = ENEMY_TYPES.NORMAL;
+    }
+    
+    // 선택된 타입으로 적 생성
+    let enemy;
+    
+    // 보스 타입인 경우
+    if (selectedType.isBoss) {
+      enemy = new BossEnemy(spawnX, spawnY);
+    } 
+    // 일반 적 타입
+    else {
+      // 아티팩트 효과 적용
+      const enemySpeed = (selectedType.speedBase + Math.random() * selectedType.speedVariance) 
+                         * (1 - player.enemySpeedReduction);
+      const enemyHealth = Math.floor((selectedType.healthBase + Math.floor((player.level - 1) * selectedType.healthPerLevel)) 
+                         * (1 - player.enemyHealthReduction));
+      const enemyAttack = selectedType.attackBase + Math.floor((player.level - 1) * selectedType.attackPerLevel);
+      
+      enemy = new Enemy(spawnX, spawnY, selectedType.size, enemySpeed, enemyHealth, enemyAttack);
+      
+      // 추가 속성 설정
+      enemy.type = selectedType.name;
+      enemy.expValue = selectedType.expValue;
+      enemy.scoreValue = selectedType.scoreValue;
+      
+      // 적 타입별 색상이나 스프라이트 설정
+      if (selectedType.name === "Fast") {
+        enemy.color = "lightgreen"; // 빠른 적은 초록색 (스프라이트가 없는 경우)
+        enemy.spriteIndex = 1;      // 스프라이트 시트에서의 인덱스
+      } else if (selectedType.name === "Tank") {
+        enemy.color = "purple";     // 탱크 적은 보라색
+        enemy.spriteIndex = 2;
+      } else {
+        enemy.color = "red";        // 일반 적은 빨간색
+        enemy.spriteIndex = 0;
+      }
+    }
+    
     gameObjects.enemies.push(enemy);
-    
     lastEnemySpawnTime = currentTime;
   }
 }
+
 
 function countEnemiesInSector(centerAngle, sectorAngle) {
   let count = 0;
