@@ -72,7 +72,7 @@ const GAME_STATE = {
 const MAX_ENEMIES = 100;
 const MIN_SPAWN_DISTANCE = 150;
 const MAX_SPAWN_DISTANCE = 450;
-const ENEMY_SPAWN_INTERVAL = 50;
+const ENEMY_SPAWN_INTERVAL = 500;
 const ENEMY_SPATIAL_GRID_SIZE = 100;
 let enemySpatialGrid = {};
 
@@ -401,11 +401,11 @@ const player = {
   image: null,
   
   size: 15,
-  speed: 3,
+  speed: 2,
   attackPower: 1,
   fireRate: 1,
   projectileSpeed: 1,
-  pickupRadius: 100,
+  pickupRadius: 30,
   expMultiplier: 1,
   
   // 애니메이션 관련 속성
@@ -1217,13 +1217,13 @@ const ENEMY_TYPES = {
   FAST: {
     name: "Fast",
     size: 15,
-    speedBase: 0.8,
+    speedBase: 1.5,
     speedVariance: 0.2,
     healthBase: 3,
     healthPerLevel: 1.0,
     attackBase: 5,
     attackPerLevel: 0.3,
-    expValue: 2,
+    expValue: 5,
     scoreValue: 8,
     spawnWeight: 20
   },
@@ -1232,11 +1232,11 @@ const ENEMY_TYPES = {
     size: 25,
     speedBase: 0.3,
     speedVariance: 0.05,
-    healthBase: 10,
+    healthBase: 20,
     healthPerLevel: 2.5,
     attackBase: 15,
     attackPerLevel: 0.7,
-    expValue: 5,
+    expValue: 15,
     scoreValue: 15,
     spawnWeight: 10
   },
@@ -1249,7 +1249,7 @@ const ENEMY_TYPES = {
     healthPerLevel: 1.0,
     attackBase: 8,
     attackPerLevel: 0.4,
-    expValue: 4,
+    expValue: 5,
     scoreValue: 12,
     spawnWeight: 15,
     canShoot: true,      // 발사 가능 표시
@@ -1264,7 +1264,7 @@ const ENEMY_TYPES = {
     healthPerLevel: 10,
     attackBase: 20,
     attackPerLevel: 1.5,
-    expValue: 50,
+    expValue: 100,
     scoreValue: 100,
     spawnWeight: 0, // 특별 조건에서만 스폰
     isBoss: true
@@ -1464,11 +1464,12 @@ class Enemy {
     // 아이템 드롭
     // 일반 보석 드롭 확률 (보스는 BossEnemy 클래스에서 처리)
     if (!this.isBoss && Math.random() < 0.1) {
-      gameObjects.jewels.push(new Jewel(this.x, this.y));
+      const jewelType = getWeightedRandomJewelType();
+      gameObjects.jewels.push(new Jewel(this.x, this.y, jewelType));
     }
   
     // 보물 드롭 (보스가 아닌 경우 더 낮은 확률)
-    if (!this.isBoss && Math.random() < 0.05) {
+    if (!this.isBoss && Math.random() < 0.01) {
       gameObjects.terrain.push(new Treasure(this.x, this.y));
     }
     
@@ -1494,55 +1495,75 @@ class Enemy {
   }
 
   drawSpawning(drawX, drawY) {
-    const progress = (Date.now() - this.stateStartTime) / this.spawnDuration;
-    ctx.globalAlpha = Math.min(progress, 1);
-    
-    // 스폰 서클 효과
-    ctx.strokeStyle = 'white';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.arc(drawX, drawY, this.currentSize * 1.5, 0, Math.PI * 2 * progress);
-    ctx.stroke();
-    
-    if (assetManager.loaded.enemy) {
-      const displaySize = this.currentSize * 2.5;
-      const defaultDirection = player.x < this.x ? 'left' : 'right';
+      const progress = (Date.now() - this.stateStartTime) / this.spawnDuration;
+      ctx.globalAlpha = Math.min(progress, 1);
       
-      ctx.save();
+      // 스폰 서클 효과
+      ctx.strokeStyle = 'white';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(drawX, drawY, this.currentSize * 1.5, 0, Math.PI * 2 * progress);
+      ctx.stroke();
       
-      if (defaultDirection === 'right') {
-        ctx.translate(drawX + displaySize / 2, 0);
-        ctx.scale(-1, 1);
-        ctx.drawImage(
-          assetManager.images.enemy,
-          0, 0,
-          this.spriteWidth, this.spriteHeight,
-          0,
-          drawY - displaySize / 2,
-          displaySize,
-          displaySize
-        );
+      // 적 유형에 따른 이미지 선택
+      let enemyImage;
+      
+      if (this.type === "Boss" && assetManager.loaded.enemies) {
+          enemyImage = assetManager.images.enemies.boss;
+      } else if (this.type === "Fast" && assetManager.loaded.enemies) {
+          enemyImage = assetManager.images.enemies.fast;
+      } else if (this.type === "Tank" && assetManager.loaded.enemies) {
+          enemyImage = assetManager.images.enemies.tank;
+      } else if (this.type === "Shooter" && assetManager.loaded.enemies) {
+          enemyImage = assetManager.images.enemies.shooter;
+      } else if (this.type === "Normal" && assetManager.loaded.enemies) {
+          enemyImage = assetManager.images.enemies.normal;
       } else {
-        ctx.drawImage(
-          assetManager.images.enemy,
-          0, 0,
-          this.spriteWidth, this.spriteHeight,
-          drawX - displaySize / 2,
-          drawY - displaySize / 2,
-          displaySize,
-          displaySize
-        );
+          // 이미지가 로드되지 않았을 경우
+          ctx.globalAlpha = 1;
+          return;
       }
       
-      ctx.restore();
-    }    
-    ctx.globalAlpha = 1;
+      if (enemyImage) {
+          const displaySize = this.currentSize * 2.5;
+          const defaultDirection = player.x < this.x ? 'left' : 'right';
+          
+          ctx.save();
+          
+          if (defaultDirection === 'right') {
+              ctx.translate(drawX + displaySize / 2, 0);
+              ctx.scale(-1, 1);
+              ctx.drawImage(
+                  enemyImage,
+                  0, 0,
+                  this.spriteWidth, this.spriteHeight,
+                  0,
+                  drawY - displaySize / 2,
+                  displaySize,
+                  displaySize
+              );
+          } else {
+              ctx.drawImage(
+                  enemyImage,
+                  0, 0,
+                  this.spriteWidth, this.spriteHeight,
+                  drawX - displaySize / 2,
+                  drawY - displaySize / 2,
+                  displaySize,
+                  displaySize
+              );
+          }
+          
+          ctx.restore();
+      }
+      
+      ctx.globalAlpha = 1;
   }
 
   drawMoving(drawX, drawY) {
     const pulse = 1 + Math.sin(this.animationTime * 0.005) * 0.05;
     const currentSize = this.currentSize * pulse;
-    
+      
     // 그림자
     ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
     ctx.beginPath();
@@ -1883,6 +1904,7 @@ class BossEnemy extends Enemy {
   constructor(x, y) {
     // 보스는 더 크고, 느리고, 체력이 많음
     super(x, y, 40, 0.3, 100, 20);
+    this.type = "Boss";
     this.isBoss = true;
     this.expValue = 50;
     this.scoreValue = 100;
@@ -1926,14 +1948,6 @@ class BossEnemy extends Enemy {
     
     // 크기 복원
     this.size = originalSize;
-    
-    // 보스 특수 효과 (예: 오오라)
-    ctx.globalAlpha = 0.3;
-    ctx.fillStyle = 'rgba(255, 0, 0, 0.3)';
-    ctx.beginPath();
-    ctx.arc(drawX, drawY, this.size * 2, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.globalAlpha = 1.0;
   }
   
   // 죽었을 때 추가 보상
@@ -1944,17 +1958,19 @@ class BossEnemy extends Enemy {
     // 체력 회복 보석 100% 드롭
     gameObjects.jewels.push(new Jewel(this.x, this.y, 4));
     
-    // 아이템 더 많이 드롭
     for (let i = 0; i < 3; i++) {
       if (Math.random() < 0.7) {
-        gameObjects.jewels.push(new Jewel(this.x + (Math.random() * 30 - 15), 
-                                          this.y + (Math.random() * 30 - 15),
-                                          Math.floor(Math.random() * 3)));
+        const jewelType = getWeightedRandomJewelType();
+        gameObjects.jewels.push(new Jewel(
+          this.x + (Math.random() * 30 - 15), 
+          this.y + (Math.random() * 30 - 15),
+          jewelType
+        ));
       }
     }
     
     // 보물 상자 드롭 확률 증가
-    if (Math.random() < 0.5) {
+    if (Math.random() < 0.25) {
       gameObjects.terrain.push(new Treasure(this.x, this.y));
     }
   }
@@ -1964,7 +1980,7 @@ class BossEnemy extends Enemy {
 // 적이 발사하는 총알 클래스
 class EnemyBullet extends Bullet {
   constructor(x, y, size, speed, angle, damage) {
-    super(x, y, size, speed, angle, damage);
+    super(x, y, size * 2, speed, angle, damage);
     this.fromEnemy = true; // 적의 총알 표시
   }
   
@@ -1988,10 +2004,24 @@ class EnemyBullet extends Bullet {
   }
   
   draw(offsetX, offsetY) {
-    ctx.fillStyle = 'red'; // 적의 총알은 빨간색
-    ctx.beginPath();
-    ctx.arc(this.x + offsetX, this.y + offsetY, this.size, 0, Math.PI * 2);
-    ctx.fill();
+    if (assetManager.loaded.enemies && assetManager.images.enemies.bullet) {
+      const drawSize = this.size * 3; // 크기 조정
+      
+      ctx.save();
+      ctx.translate(this.x + offsetX, this.y + offsetY);
+      ctx.rotate(this.angle); // 탄환 이동 방향으로 회전
+      
+      // 탄환 이미지 그리기
+      ctx.drawImage(
+        assetManager.images.enemies.bullet,
+        -drawSize / 2,
+        -drawSize / 2,
+        drawSize,
+        drawSize
+      );
+      
+      ctx.restore();
+    }
   }
 }
 
@@ -1999,42 +2029,56 @@ class EnemyBullet extends Bullet {
 // 아이템 클래스들
 //----------------------
 
+// 보석 가중치
+const JEWEL_WEIGHTS = {
+  SMALL: 100,    // 작은 보석 (타입 0)
+  MEDIUM: 20,    // 중간 보석 (타입 1) 
+  LARGE: 5,     // 큰 보석 (타입 2)
+  MAGNET: 0.3,    // 자석 보석 (타입 3)
+  HEALTH: 1     // 체력 보석 (타입 4)
+};
+
+// 보석 타입과 인덱스 매핑
+const JEWEL_TYPES = {
+  SMALL: 0,
+  MEDIUM: 1,
+  LARGE: 2,
+  MAGNET: 3,
+  HEALTH: 4
+};
+
 class Jewel extends GameObject {
   constructor(x, y, type = 0) {
     super(x, y, 8);
     this.type = type; // 0: 소, 1: 중, 2: 대, 3: 자석, 4: 체력
     this.collected = false;
-    this.pulseTime = 0;
     
     // 타입별 속성 설정
     switch(this.type) {
       case 0: // 소 jewel
-        this.size = 6;
+        this.size = 10;
         this.expValue = 20;
         break;
       case 1: // 중 jewel
-        this.size = 9;
-        this.expValue = 100; // 5배
+        this.size = 14;
+        this.expValue = 50;
         break;
       case 2: // 대 jewel
-        this.size = 12;
+        this.size = 20;
         this.expValue = 250;
         break;
       case 3: // 자석 jewel
-        this.size = 10;
-        this.expValue = 50;
+        this.size = 20;
+        this.expValue = 0;
         break;
       case 4: // 체력 jewel
-        this.size = 10;
-        this.expValue = 30;
+        this.size = 20;
+        this.expValue = 0;
         break;
     }
   }
 
-  update() {
-    // 맥동 애니메이션 효과
-    this.pulseTime += 0.05;
-    
+  update() {    
     // 플레이어 주변 아이템 끌어당기기
     if (detectCollision(this, { x: player.x, y: player.y, size: player.pickupRadius })) {
       const angle = Math.atan2(player.y - this.y, player.x - this.x);
@@ -2056,10 +2100,7 @@ class Jewel extends GameObject {
 
   draw(offsetX, offsetY) {
     if (assetManager.loaded.jewels && assetManager.images.jewels[this.type]) {
-      // 맥동 효과 계산
-      const pulseFactor = 1 + Math.sin(this.pulseTime) * 0.2;
-      const drawSize = this.size * 3 * pulseFactor; // 이미지 크기 조정
-      
+      const drawSize = this.size * 3 // 이미지 크기 조정
       ctx.drawImage(
         assetManager.images.jewels[this.type],
         0, 0,
@@ -2069,13 +2110,6 @@ class Jewel extends GameObject {
         drawSize,
         drawSize
       );
-    } else {
-      // 이미지가 로드되지 않았을 경우 기본 원으로 표시 (폴백)
-      const colors = ['cyan', 'lightgreen', 'gold', 'magenta', 'red'];
-      ctx.fillStyle = colors[this.type];
-      ctx.beginPath();
-      ctx.arc(this.x + offsetX, this.y + offsetY, this.size, 0, Math.PI * 2);
-      ctx.fill();
     }
   }
 
@@ -2110,6 +2144,30 @@ class Jewel extends GameObject {
     
     checkLevelUp();
   }
+}
+
+// 가중치 기반으로 보석 타입을 결정하는 함수
+function getWeightedRandomJewelType() {
+  // 총 가중치 계산
+  const totalWeight = Object.values(JEWEL_WEIGHTS).reduce((sum, weight) => sum + weight, 0);
+  
+  // 0부터 총 가중치 사이의 랜덤 값 생성
+  let random = Math.random() * totalWeight;
+  
+  // 가중치에 따른 선택
+  if ((random -= JEWEL_WEIGHTS.SMALL) <= 0) {
+    return JEWEL_TYPES.SMALL;
+  }
+  if ((random -= JEWEL_WEIGHTS.MEDIUM) <= 0) {
+    return JEWEL_TYPES.MEDIUM;
+  }
+  if ((random -= JEWEL_WEIGHTS.LARGE) <= 0) {
+    return JEWEL_TYPES.LARGE;
+  }
+  if ((random -= JEWEL_WEIGHTS.HEALTH) <= 0) {
+    return JEWEL_TYPES.HEALTH;
+  }
+  return JEWEL_TYPES.MAGNET;
 }
 
 class Treasure extends GameObject {
@@ -3322,43 +3380,26 @@ function generateChunk(chunkX, chunkY) {
     items: [],
     terrain: [],
   };
-
   // 기본 보석 생성
   const itemCount = 3;
   for (let i = 0; i < itemCount; i++) {
     const x = chunkX * CHUNK_SIZE + Math.random() * CHUNK_SIZE;
     const y = chunkY * CHUNK_SIZE + Math.random() * CHUNK_SIZE;
     
-    // 적절한 가중치로 보석 타입 무작위화
-    let jewelType = 0; // 기본값: 소형 보석
-    const rand = Math.random();
-    
-    if (rand < 0.7) {
-      jewelType = 0; // 70% 확률로 소형 보석
-    } else if (rand < 0.85) {
-      jewelType = 1; // 15% 확률로 중형 보석
-    } else if (rand < 0.93) {
-      jewelType = 2; // 8% 확률로 대형 보석
-    } else if (rand < 0.97) {
-      jewelType = 4; // 4% 확률로 체력 회복 보석
-    } else {
-      jewelType = 3; // 3% 확률로 자석 보석
-    }
-    
+    const jewelType = getWeightedRandomJewelType();
     const jewel = new Jewel(x, y, jewelType);
     chunk.items.push(jewel);
     gameObjects.jewels.push(jewel);
-  }
-
-  // 보물 생성 (10% 확률)
-  if (Math.random() < 0.1) {
+  } // 닫는 중괄호 추가
+  
+  // 보물 생성 (5% 확률)
+  if (Math.random() < 0.05) {
     const x = chunkX * CHUNK_SIZE + Math.random() * CHUNK_SIZE;
     const y = chunkY * CHUNK_SIZE + Math.random() * CHUNK_SIZE;
     const treasure = new Treasure(x, y);
     chunk.terrain.push(treasure);
     gameObjects.terrain.push(treasure);
   }
-
   // 청크 저장
   const chunkKey = `${chunkX},${chunkY}`;
   gameObjects.chunks[chunkKey] = chunk;
@@ -3389,6 +3430,12 @@ function spawnEnemyAroundPlayer() {
   // 최대 적 수 체크
   if (gameObjects.enemies.length >= MAX_ENEMIES) {
     return;
+  }
+
+  // 경과 시간에 따른 스폰 간격 조정 (시간이 지날수록 빨라짐)
+  let currentSpawnInterval = ENEMY_SPAWN_INTERVAL;
+  if (elapsedTime > 60) {
+    currentSpawnInterval = Math.max(200, ENEMY_SPAWN_INTERVAL - (elapsedTime - 60) / 10);
   }
   
   // 스폰 간격 체크
@@ -3431,8 +3478,7 @@ function spawnEnemyAroundPlayer() {
     let selectedType;
     
     // 보스는 일정 시간/레벨 이후 5% 확률로 등장
-    //if (elapsedTime > 300 && player.level >= 10 && Math.random() < 0.05) {
-    if (elapsedTime > 10 && player.level >= 1 && Math.random() < 0.5) {
+    if (elapsedTime > 180 && player.level >= 10 && Math.random() < 0.05) {
       selectedType = ENEMY_TYPES.BOSS;
     } else {
       // 가중치 기반 선택
