@@ -711,12 +711,12 @@ class FlameWeapon extends Weapon {
   constructor() {
     super({
       type: 'flame',
-      baseCooldown: 3000, // 3초 쿨타임
-      damage: 15 // 데미지 증가
+      baseCooldown: 8000, // 쿨타임
+      damage: 15 // 데미지
     });
     this.flameAngle = Math.PI / 3; // 60도 부채꼴
     this.range = 200; // 범위
-    this.duration = 5000; // 지속시간 5초
+    this.duration = 3000; // 지속시간
     this.activeFlames = []; // 활성화된 화염 효과 저장
   }
   
@@ -761,7 +761,7 @@ class FlameEffect {
     this.frameWidth = 64;
     this.frameHeight = 64;
     this.frameTime = 0;
-    this.frameDuration = 125; // 4프레임 x 125ms = 500ms (전체 애니메이션 시간)
+    this.frameDuration = 100;
   }
   
   update() {
@@ -821,7 +821,7 @@ class FlameEffect {
       return;
     }
     
-    // 현재 마우스 방향으로 화염 방향 실시간 업데이트 - PLAYING 상태일 때만 적용
+    // 현재 마우스 방향으로 화염 방향 실시간 업데이트
     let currentDirection = this.lastDirection || 0; // 저장된 마지막 방향 사용
     
     if (currentGameState === GAME_STATE.PLAYING) {
@@ -838,9 +838,22 @@ class FlameEffect {
     ctx.translate(this.x + offsetX, this.y + offsetY);
     ctx.rotate(currentDirection);
     
-    // 투명도 설정 (시간 경과에 따라 페이드 아웃)
-    const elapsed = Date.now() - this.startTime;
-    const opacity = 1 - (elapsed / this.duration);
+    // 투명도 설정 - PAUSED가 아닐 때만 페이드아웃 계산
+    let opacity;
+    if (currentGameState === GAME_STATE.PLAYING) {
+      // 플레이 중일 때만 실제 경과 시간 계산
+      const elapsed = Date.now() - this.startTime;
+      const progress = elapsed / this.duration;
+      // 사인 함수를 사용한 부드러운 페이드아웃
+      opacity = Math.cos(progress * Math.PI / 2);
+      
+      // 현재 불투명도 저장 (일시정지 시 사용)
+      this.currentOpacity = opacity;
+    } else {
+      // 일시정지 상태에서는 저장된 불투명도 사용
+      opacity = this.currentOpacity || 1.0;
+    }
+    
     ctx.globalAlpha = opacity;
     
     // 화염 애니메이션 프레임 그리기
