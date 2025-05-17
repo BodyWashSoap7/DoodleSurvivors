@@ -315,6 +315,14 @@ class AssetManager {
       console.log('적 스프라이트 시트 로드 완료');
     };
 
+    // 적 총알 이미지
+    this.images.enemyBullet = new Image();
+    this.images.enemyBullet.src = './img/enemy_bullet.png';
+    this.images.enemyBullet.onload = () => {
+      this.loaded.enemyBullet = true;
+      console.log('적 총알 이미지 로드 완료');
+    };
+
     // 보스 적 이미지
     this.images.bossEnemy = new Image();
     this.images.bossEnemy.src = './img/boss_enemy_sprites.png';
@@ -3546,12 +3554,12 @@ function update() {
   
   // 거리에 따른 속도 계수 계산
   let speedFactor = 0;
-  if (distance > 15) {
-    if (distance >= 50) {
+  if (distance > 30) {
+    if (distance >= 80) {
       speedFactor = 1; // 최대 속도
     } else {
       // 15-50 범위에서 선형적으로 속도 증가
-      speedFactor = (distance - 15) / (50 - 15);
+      speedFactor = (distance - 30) / (80 - 30);
     }
     
     playerMoved = true;
