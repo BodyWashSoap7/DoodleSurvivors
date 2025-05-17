@@ -192,7 +192,7 @@ class AssetManager {
 
   loadWeaponImages() {
     const weaponTypes = [
-      'bullet', 'orbit', 'flame', 'lightningChain', 
+      'basic', 'orbit', 'flame', 'lightningChain', 
       'lightningImpact', 'boomerang', 'soul', 'axe', 'wave', 'bible'
     ];
     
@@ -244,7 +244,7 @@ class AssetManager {
   
   loadLevelUpIcons() {
     const iconTypes = [
-      'attackPower', 'maxHealth', 'fireRate', 'projectileSpeed',
+      'attackPower', 'maxHealth', 'cooldownReduction', 'projectileSpeed',
       'moveSpeed', 'pickupRadius', 'expMultiplier'
     ];
     
@@ -270,7 +270,7 @@ class AssetManager {
 
   loadArtifactIcons() {
     const artifactTypes = [
-      'reducePlayerSize', 'increaseAttackPower', 'increaseFireRate',
+      'reducePlayerSize', 'increaseAttackPower', 'increaseCooldownReduction',
       'increaseMoveSpeed', 'enableHealthRegen', 'reduceEnemySpeed',
       'reduceEnemyHealth', 'expGain'
     ];
@@ -403,7 +403,7 @@ const player = {
   size: 15,
   speed: 2,
   attackPower: 1,
-  fireRate: 1,
+  cooldownReduction: 0,
   projectileSpeed: 1,
   pickupRadius: 30,
   expMultiplier: 1,
@@ -477,11 +477,12 @@ class GameObject {
 //----------------------
 
 // 기본 무기 클래스
+// 기본 무기 클래스
 class Weapon {
   constructor(config = {}) {
     this.type = config.type || 'basic';
-    this.baseAttackSpeed = config.baseAttackSpeed || 1000;
-    this.attackSpeed = this.baseAttackSpeed;
+    this.baseCooldown = config.baseCooldown || 1000;
+    this.cooldown = this.baseCooldown;
     this.lastAttackTime = Date.now();
     this.damage = config.damage || 10;
     
@@ -489,13 +490,13 @@ class Weapon {
     Object.assign(this, config.properties || {});
   }
 
-  updateFireRate(fireRateMultiplier) {
-    this.attackSpeed = this.baseAttackSpeed / fireRateMultiplier;
+  updateCooldown(cooldownReduction) {
+    this.cooldown = this.baseCooldown * (1 - cooldownReduction);
   }
 
   update() {
     const now = Date.now();
-    if (now - this.lastAttackTime >= this.attackSpeed) {
+    if (now - this.lastAttackTime >= this.cooldown) {
       this.fire();
       this.lastAttackTime = now;
     }
@@ -511,7 +512,7 @@ class BasicWeapon extends Weapon {
   constructor() {
     super({
       type: 'basic',
-      baseAttackSpeed: 1000,
+      baseCooldown: 1000,
       damage: 10
     });
   }
@@ -590,7 +591,7 @@ class OrbitWeapon extends Weapon {
   constructor() {
     super({
       type: 'orbit',
-      baseAttackSpeed: 50,
+      baseCooldown: 50,
       damage: 8
     });
     this.orbitRadius = 50;
@@ -705,7 +706,7 @@ class OrbitBullet extends Bullet {
   }
 }
 
-// 화염방사기 무기 클래스
+// 화염방사기 무기 클래스 수정
 class FlameWeapon extends Weapon {
   constructor() {
     super({
@@ -838,7 +839,7 @@ class LightningWeapon extends Weapon {
   constructor() {
     super({
       type: 'lightning',
-      baseAttackSpeed: 2000,
+        baseCooldown: 2000,
       damage: 15
     });
     this.chainCount = 3;
@@ -1191,7 +1192,7 @@ const WeaponFactory = {
       weapon.maxBoomerangs += 1;
     }
     
-    weapon.updateFireRate(player.fireRate);
+    weapon.updateCooldown(player.cooldownReduction);
   }
 };
 
@@ -2226,7 +2227,7 @@ function generateLevelUpOptions() {
   const allUpgrades = [
     { type: 'attackPower', name: '공격력 증가', value: 0.2, description: '공격력 +20%' },
     { type: 'maxHealth', name: '최대 체력 증가', value: 20, description: '최대 체력 +20' },
-    { type: 'fireRate', name: '공격속도 증가', value: 0.15, description: '공격속도 +15%' },
+    { type: 'cooldownReduction', name: '쿨타임 감소', value: 0.1, description: '쿨타임 -10%' },
     { type: 'projectileSpeed', name: '투사체 속도', value: 0.2, description: '투사체 속도 +20%' },
     { type: 'moveSpeed', name: '이동속도 증가', value: 0.3, description: '이동속도 +0.3' },
     { type: 'pickupRadius', name: '획득 범위 증가', value: 20, description: '아이템 획득 범위 +20' },
@@ -2266,7 +2267,7 @@ function generateArtifactOptions() {
   const allArtifacts = [
     { id: 1, name: '작은 체구', description: '크기 25% 감소', effect: 'reducePlayerSize' },
     { id: 2, name: '강력한 공격', description: '공격력 50% 증가', effect: 'increaseAttackPower' },
-    { id: 3, name: '빠른 손놀림', description: '공격속도 50% 증가', effect: 'increaseFireRate' },
+    { id: 3, name: '빠른 손놀림', description: '쿨타임 50% 감소', effect: 'increaseCooldownReduction' },
     { id: 4, name: '신속한 발걸음', description: '이동속도 50% 증가', effect: 'increaseMoveSpeed' },
     { id: 5, name: '생명의 샘', description: '초당 체력 2% 회복', effect: 'enableHealthRegen' },
     { id: 6, name: '적 둔화', description: '적 이동속도 50% 감소', effect: 'reduceEnemySpeed' },
@@ -2351,10 +2352,11 @@ function applyLevelUpChoice(optionIndex) {
         case 'increaseAttackPower':
           player.attackPower *= 1.5;
           break;
-        case 'increaseFireRate':
-          player.fireRate *= 1.5;
+        case 'increaseCooldownReduction':
+          player.cooldownReduction += 0.3; // 쿨타임 30% 감소
+          player.cooldownReduction = Math.min(player.cooldownReduction, 0.8); // 최대 값 제한
           player.weapons.forEach(weapon => {
-            weapon.updateFireRate(player.fireRate);
+            weapon.updateCooldown(player.cooldownReduction);
           });
           break;
         case 'increaseMoveSpeed':
@@ -2396,10 +2398,12 @@ function applyLevelUpChoice(optionIndex) {
           player.maxHealth += option.value;
           player.health = player.maxHealth;
           break;
-        case 'fireRate':
-          player.fireRate += option.value;
+        case 'cooldownReduction':
+          player.cooldownReduction += option.value;
+          // 최대 값 제한 (80% 이상 감소 방지)
+          player.cooldownReduction = Math.min(player.cooldownReduction, 0.8);
           player.weapons.forEach(weapon => {
-            weapon.updateFireRate(player.fireRate);
+            weapon.updateCooldown(player.cooldownReduction);
           });
           break;
         case 'projectileSpeed':
@@ -2427,7 +2431,7 @@ function applyLevelUpChoice(optionIndex) {
 // 무기 추가
 function addWeapon(weaponType) {
   const weapon = WeaponFactory.createWeapon(weaponType);
-  weapon.updateFireRate(player.fireRate);
+  weapon.updateCooldown(player.cooldownReduction);
   player.weapons.push(weapon);
 }
 
@@ -2502,7 +2506,7 @@ function resetGame() {
 
   // 능력치 초기화
   player.attackPower = 1;
-  player.fireRate = 1;
+  player.cooldownReduction = 0;
   player.projectileSpeed = 1;
   player.pickupRadius = 100;
   player.expMultiplier = 1;
@@ -3803,7 +3807,7 @@ function update() {
         const dy = player.y - jewel.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
         
-        if (dist < 1000) { // 자석 효과의 범위
+        if (dist < 800) { // 자석 효과의 범위
           // 거리에 따라 끌어당김 강도 조절
           const strength = 0.1 + (1 - Math.min(dist, 500) / 500) * 0.3;
           
