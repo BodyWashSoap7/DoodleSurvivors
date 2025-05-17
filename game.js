@@ -96,6 +96,7 @@ class AssetManager {
       enemy: null,
       bossEnemy: null,
       fastEnemy: null,
+      shooterEnemy: null,
       enemyBullet: null
     };
     this.loaded = {
@@ -111,6 +112,7 @@ class AssetManager {
       enemy: false,
       bossEnemy: false,
       fastEnemy: false,
+      shooterEnemy: false,
       enemyBullet: false
     };
   }
@@ -337,6 +339,14 @@ class AssetManager {
     this.images.fastEnemy.onload = () => {
       this.loaded.fastEnemy = true;
       console.log('빠른 적 스프라이트 시트 로드 완료');
+    };
+
+    // 슈터 적 이미지
+    this.images.shooterEnemy = new Image();
+    this.images.shooterEnemy.src = './img/shooter_enemy_sprites.png';
+    this.images.shooterEnemy.onload = () => {
+      this.loaded.shooterEnemy = true;
+      console.log('슈터 적 스프라이트 시트 로드 완료');
     };
     
     // 피격 효과 이미지
@@ -1242,6 +1252,21 @@ const ENEMY_TYPES = {
     scoreValue: 15,
     spawnWeight: 10
   },
+  SHOOTER: {
+    name: "Shooter",
+    size: 18,
+    speedBase: 0.4,
+    speedVariance: 0.1,
+    healthBase: 4,       // 체력이 적음
+    healthPerLevel: 1.0,
+    attackBase: 8,
+    attackPerLevel: 0.4,
+    expValue: 4,
+    scoreValue: 12,
+    spawnWeight: 15,
+    canShoot: true,      // 발사 가능 표시
+    shootCooldown: 2000  // 발사 간격(ms)
+  },
   BOSS: {
     name: "Boss",
     size: 40,
@@ -1289,6 +1314,12 @@ class Enemy {
     this.attackStrength = attackStrength;
     this.lastAttackTime = 0;
     this.attackCooldown = 500;
+
+    // 발사 관련 속성
+    this.canShoot = false;  // 기본값은 발사 불가
+    this.shootRange = 300;
+    this.shootCooldown = 2000;
+    this.lastShotTime = 0;
     
     // 피격 효과 관련 속성
     this.isHit = false;
@@ -1301,6 +1332,20 @@ class Enemy {
     const currentTime = Date.now();
     const deltaTime = 16;
     this.animationTime += deltaTime;
+
+    // 발사 로직
+    if (this.canShoot && this.state === 'moving') {
+      // 플레이어와의 거리 계산
+      const dx = player.x - this.x;
+      const dy = player.y - this.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      
+      // 시야 내이고 쿨다운이 지났으면 발사
+      if (distance <= this.shootRange && currentTime - this.lastShotTime >= this.shootCooldown) {
+        this.shoot();
+        this.lastShotTime = currentTime;
+      }
+    }
     
     // 피격 효과 업데이트
     if (this.isHit) {
@@ -1326,6 +1371,31 @@ class Enemy {
         this.updateDying(currentTime);
         break;
     }
+  }
+
+  // 발사 메서드 추가
+  shoot() {
+    // 각도 계산 (플레이어 방향)
+    const angle = Math.atan2(player.y - this.y, player.x - this.x);
+    
+    // 약간의 랜덤성 추가
+    const randomAngle = angle + (Math.random() * 0.2 - 0.1);
+    
+    // 총알 생성
+    gameObjects.bullets.push(
+      new EnemyBullet(
+        this.x,
+        this.y,
+        4,                   // 크기
+        3,                   // 속도
+        randomAngle,         // 각도
+        this.attackStrength / 2  // 데미지
+      )
+    );
+    
+    // 발사 효과
+    this.isHit = true;
+    this.hitTime = Date.now();
   }
 
   updateSpawning(currentTime) {
@@ -1441,7 +1511,7 @@ class Enemy {
     
     // 스폰 서클 효과
     ctx.strokeStyle = 'white';
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 3;
     ctx.beginPath();
     ctx.arc(drawX, drawY, this.currentSize * 1.5, 0, Math.PI * 2 * progress);
     ctx.stroke();
@@ -1481,150 +1551,166 @@ class Enemy {
     ctx.globalAlpha = 1;
   }
 
-  drawMoving(drawX, drawY) {
-    const pulse = 1 + Math.sin(this.animationTime * 0.005) * 0.05;
-    const currentSize = this.currentSize * pulse;
-    
-    // 그림자
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
-    ctx.beginPath();
-    ctx.ellipse(drawX + 3, drawY + 5, currentSize * 0.8, currentSize * 0.4, 0, 0, Math.PI * 2);
-    ctx.fill();
-    
-    if (assetManager.loaded.enemy) {
-      const spriteX = this.currentFrame * this.spriteWidth;
-      const displaySize = this.size * 2.5;
-      
-      ctx.save();
-      
-      // 방향에 따라 다르게 처리
-      if (this.direction === 'right') {
-        ctx.translate(drawX + displaySize / 2 + this.wobbleAmount, 0);
-        ctx.scale(-1, 1);
-        
-        // 피격 효과를 위한 캔버스 생성
-        if (this.isHit && this.hitBrightness > 0) {
-          // 임시 캔버스 생성
-          const tempCanvas = document.createElement('canvas');
-          tempCanvas.width = displaySize;
-          tempCanvas.height = displaySize;
-          const tempCtx = tempCanvas.getContext('2d');
-          
-          // 1. 임시 캔버스에 원본 이미지 그리기
-          tempCtx.drawImage(
-            assetManager.images.enemy,
-            spriteX, 0,
-            this.spriteWidth, this.spriteHeight,
-            0,
-            0,
-            displaySize,
-            displaySize
-          );
-          
-          // 2. 이미지가 있는 부분에만 밝기 효과 적용
-          tempCtx.globalCompositeOperation = 'source-atop';
-          tempCtx.fillStyle = 'white';
-          tempCtx.globalAlpha = this.hitBrightness * 0.7;
-          tempCtx.fillRect(0, 0, displaySize, displaySize);
-          
-          // 3. 원본 이미지 그리기
-          ctx.drawImage(
-            assetManager.images.enemy,
-            spriteX, 0,
-            this.spriteWidth, this.spriteHeight,
-            0,
-            drawY - displaySize / 2,
-            displaySize,
-            displaySize
-          );
-          
-          // 4. 효과가 적용된 이미지 오버레이
-          ctx.globalCompositeOperation = 'lighter';
-          ctx.drawImage(
-            tempCanvas,
-            0,
-            drawY - displaySize / 2
-          );
-          ctx.globalCompositeOperation = 'source-over';
-        } else {
-          // 일반 상태: 그냥 이미지만 그리기
-          ctx.drawImage(
-            assetManager.images.enemy,
-            spriteX, 0,
-            this.spriteWidth, this.spriteHeight,
-            0,
-            drawY - displaySize / 2,
-            displaySize,
-            displaySize
-          );
-        }
-      } else {
-        // 왼쪽 방향일 때 처리
-        if (this.isHit && this.hitBrightness > 0) {
-          // 임시 캔버스 생성
-          const tempCanvas = document.createElement('canvas');
-          tempCanvas.width = displaySize;
-          tempCanvas.height = displaySize;
-          const tempCtx = tempCanvas.getContext('2d');
-          
-          // 1. 임시 캔버스에 원본 이미지 그리기
-          tempCtx.drawImage(
-            assetManager.images.enemy,
-            spriteX, 0,
-            this.spriteWidth, this.spriteHeight,
-            0,
-            0,
-            displaySize,
-            displaySize
-          );
-          
-          // 2. 이미지가 있는 부분에만 밝기 효과 적용
-          tempCtx.globalCompositeOperation = 'source-atop';
-          tempCtx.fillStyle = 'white';
-          tempCtx.globalAlpha = this.hitBrightness * 0.7;
-          tempCtx.fillRect(0, 0, displaySize, displaySize);
-          
-          // 3. 원본 이미지 그리기
-          ctx.drawImage(
-            assetManager.images.enemy,
-            spriteX, 0,
-            this.spriteWidth, this.spriteHeight,
-            drawX - displaySize / 2 + this.wobbleAmount,
-            drawY - displaySize / 2,
-            displaySize,
-            displaySize
-          );
-          
-          // 4. 효과가 적용된 이미지 오버레이
-          ctx.globalCompositeOperation = 'lighter';
-          ctx.drawImage(
-            tempCanvas,
-            drawX - displaySize / 2 + this.wobbleAmount,
-            drawY - displaySize / 2
-          );
-          ctx.globalCompositeOperation = 'source-over';
-        } else {
-          // 일반 상태: 그냥 이미지만 그리기
-          ctx.drawImage(
-            assetManager.images.enemy,
-            spriteX, 0,
-            this.spriteWidth, this.spriteHeight,
-            drawX - displaySize / 2 + this.wobbleAmount,
-            drawY - displaySize / 2,
-            displaySize,
-            displaySize
-          );
-        }
-      }
-      
-      ctx.restore();
-    }
-    
-    // 체력바
-    if (this.state === 'moving') {
-      this.drawHealthBar(drawX, drawY);
-    }
+drawMoving(drawX, drawY) {
+  const pulse = 1 + Math.sin(this.animationTime * 0.005) * 0.05;
+  const currentSize = this.currentSize * pulse;
+  
+  // 그림자
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+  ctx.beginPath();
+  ctx.ellipse(drawX + 3, drawY + 5, currentSize * 0.8, currentSize * 0.4, 0, 0, Math.PI * 2);
+  ctx.fill();
+  
+  // 적 유형에 따른 이미지 선택
+  let enemyImage;
+  
+  if (this.isBoss && assetManager.loaded.bossEnemy) {
+    enemyImage = assetManager.images.bossEnemy;
+  } else if (this.type === "Fast" && assetManager.loaded.fastEnemy) {
+    enemyImage = assetManager.images.fastEnemy;
+  } else if (this.type === "Shooter" && assetManager.loaded.shooterEnemy) {
+    enemyImage = assetManager.images.shooterEnemy;
+  } else if (assetManager.loaded.enemy) {
+    enemyImage = assetManager.images.enemy;
+  } else {
+    // 이미지가 로드되지 않았을 경우 대체 이미지 사용
+    enemyImage = assetManager.images.enemy;
   }
+  
+  if (enemyImage) {
+    const spriteX = this.currentFrame * this.spriteWidth;
+    const displaySize = this.size * 2.5;
+    
+    ctx.save();
+    
+    // 방향에 따라 다르게 처리
+    if (this.direction === 'right') {
+      ctx.translate(drawX + displaySize / 2 + this.wobbleAmount, 0);
+      ctx.scale(-1, 1);
+      
+      // 피격 효과를 위한 캔버스 생성
+      if (this.isHit && this.hitBrightness > 0) {
+        // 임시 캔버스 생성
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = displaySize;
+        tempCanvas.height = displaySize;
+        const tempCtx = tempCanvas.getContext('2d');
+        
+        // 1. 임시 캔버스에 원본 이미지 그리기
+        tempCtx.drawImage(
+          enemyImage,
+          spriteX, 0,
+          this.spriteWidth, this.spriteHeight,
+          0,
+          0,
+          displaySize,
+          displaySize
+        );
+        
+        // 2. 이미지가 있는 부분에만 밝기 효과 적용
+        tempCtx.globalCompositeOperation = 'source-atop';
+        tempCtx.fillStyle = 'white';
+        tempCtx.globalAlpha = this.hitBrightness * 0.7;
+        tempCtx.fillRect(0, 0, displaySize, displaySize);
+        
+        // 3. 원본 이미지 그리기
+        ctx.drawImage(
+          enemyImage,
+          spriteX, 0,
+          this.spriteWidth, this.spriteHeight,
+          0,
+          drawY - displaySize / 2,
+          displaySize,
+          displaySize
+        );
+        
+        // 4. 효과가 적용된 이미지 오버레이
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.drawImage(
+          tempCanvas,
+          0,
+          drawY - displaySize / 2
+        );
+        ctx.globalCompositeOperation = 'source-over';
+      } else {
+        // 일반 상태: 그냥 이미지만 그리기
+        ctx.drawImage(
+          enemyImage,
+          spriteX, 0,
+          this.spriteWidth, this.spriteHeight,
+          0,
+          drawY - displaySize / 2,
+          displaySize,
+          displaySize
+        );
+      }
+    } else {
+      // 왼쪽 방향일 때 처리
+      if (this.isHit && this.hitBrightness > 0) {
+        // 임시 캔버스 생성
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = displaySize;
+        tempCanvas.height = displaySize;
+        const tempCtx = tempCanvas.getContext('2d');
+        
+        // 1. 임시 캔버스에 원본 이미지 그리기
+        tempCtx.drawImage(
+          enemyImage,
+          spriteX, 0,
+          this.spriteWidth, this.spriteHeight,
+          0,
+          0,
+          displaySize,
+          displaySize
+        );
+        
+        // 2. 이미지가 있는 부분에만 밝기 효과 적용
+        tempCtx.globalCompositeOperation = 'source-atop';
+        tempCtx.fillStyle = 'white';
+        tempCtx.globalAlpha = this.hitBrightness * 0.7;
+        tempCtx.fillRect(0, 0, displaySize, displaySize);
+        
+        // 3. 원본 이미지 그리기
+        ctx.drawImage(
+          enemyImage,
+          spriteX, 0,
+          this.spriteWidth, this.spriteHeight,
+          drawX - displaySize / 2 + this.wobbleAmount,
+          drawY - displaySize / 2,
+          displaySize,
+          displaySize
+        );
+        
+        // 4. 효과가 적용된 이미지 오버레이
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.drawImage(
+          tempCanvas,
+          drawX - displaySize / 2 + this.wobbleAmount,
+          drawY - displaySize / 2
+        );
+        ctx.globalCompositeOperation = 'source-over';
+      } else {
+        // 일반 상태: 그냥 이미지만 그리기
+        ctx.drawImage(
+          enemyImage,
+          spriteX, 0,
+          this.spriteWidth, this.spriteHeight,
+          drawX - displaySize / 2 + this.wobbleAmount,
+          drawY - displaySize / 2,
+          displaySize,
+          displaySize
+        );
+      }
+    }
+    
+    ctx.restore();
+  }
+  
+  // 체력바
+  if (this.state === 'moving') {
+    this.drawHealthBar(drawX, drawY);
+  }
+}
 
   drawDying(drawX, drawY) {
     const progress = (Date.now() - this.stateStartTime) / this.deathDuration;
@@ -1803,7 +1889,6 @@ class Enemy {
 }
 
 // 보스급 적 클래스 
-// 보스급 적 클래스 
 class BossEnemy extends Enemy {
   constructor(x, y) {
     // 보스는 더 크고, 느리고, 체력이 많음
@@ -1816,7 +1901,6 @@ class BossEnemy extends Enemy {
     this.attackRange = 200;
     this.specialAttackCooldown = 5000;
     this.lastSpecialAttack = 0;
-    this.color = "darkred"; // 보스는 진한 빨간색
   }
   
   // 보스 전용 메서드 오버라이드
@@ -3357,7 +3441,8 @@ function spawnEnemyAroundPlayer() {
     let selectedType;
     
     // 보스는 일정 시간/레벨 이후 5% 확률로 등장
-    if (elapsedTime > 300 && player.level >= 10 && Math.random() < 0.05) {
+    //if (elapsedTime > 300 && player.level >= 10 && Math.random() < 0.05) {
+    if (elapsedTime > 10 && player.level >= 1 && Math.random() < 0.5) {
       selectedType = ENEMY_TYPES.BOSS;
     } else {
       // 가중치 기반 선택
@@ -3401,16 +3486,21 @@ function spawnEnemyAroundPlayer() {
       enemy.type = selectedType.name;
       enemy.expValue = selectedType.expValue;
       enemy.scoreValue = selectedType.scoreValue;
+
+      // SHOOTER 타입 속성 추가
+      if (selectedType.canShoot) {
+        enemy.canShoot = true;
+        enemy.shootCooldown = selectedType.shootCooldown;
+      }
       
-      // 적 타입별 색상이나 스프라이트 설정
+      // 적 타입별 스프라이트 설정
       if (selectedType.name === "Fast") {
-        enemy.color = "lightgreen"; // 빠른 적은 초록색 (스프라이트가 없는 경우)
         enemy.spriteIndex = 1;      // 스프라이트 시트에서의 인덱스
       } else if (selectedType.name === "Tank") {
-        enemy.color = "purple";     // 탱크 적은 보라색
         enemy.spriteIndex = 2;
+      } else if (selectedType.name === "Shooter") {
+        enemy.spriteIndex = 3;
       } else {
-        enemy.color = "red";        // 일반 적은 빨간색
         enemy.spriteIndex = 0;
       }
     }
