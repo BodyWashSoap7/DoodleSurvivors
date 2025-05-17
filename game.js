@@ -1724,42 +1724,15 @@ class Enemy {
   }
 
   drawDying(drawX, drawY) {
-    const progress = (Date.now() - this.stateStartTime) / this.deathDuration;
-    ctx.globalAlpha = 1 - progress;
-    
-    // 간단하게 적 크기만 축소
-    if (assetManager.loaded.enemy) {
-      const displaySize = this.currentSize * 2.5;
+      // 페이드 아웃 효과
+      const progress = (Date.now() - this.stateStartTime) / this.deathDuration;
+      ctx.globalAlpha = 1 - progress;
       
-      ctx.save();
+      // 현재 이동 상태 그리기 함수를 재활용 (코드 중복 제거)
+      this.drawMoving(drawX, drawY);
       
-      if (this.direction === 'right') {
-        ctx.translate(drawX + displaySize / 2, 0);
-        ctx.scale(-1, 1);
-        ctx.drawImage(
-          assetManager.images.enemy,
-          0, 0,
-          this.spriteWidth, this.spriteHeight,
-          0,
-          drawY - displaySize / 2,
-          displaySize,
-          displaySize
-        );
-      } else {
-        ctx.drawImage(
-          assetManager.images.enemy,
-          0, 0,
-          this.spriteWidth, this.spriteHeight,
-          drawX - displaySize / 2,
-          drawY - displaySize / 2,
-          displaySize,
-          displaySize
-        );
-      }
-      
-      ctx.restore();
-    }    
-    ctx.globalAlpha = 1;
+      // 투명도 복원
+      ctx.globalAlpha = 1;
   }
 
   drawHealthBar(drawX, drawY) {
