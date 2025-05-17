@@ -706,131 +706,156 @@ class OrbitBullet extends Bullet {
   }
 }
 
-// 화염방사기 무기 클래스 수정
+// 화염방사기 무기 클래스
 class FlameWeapon extends Weapon {
   constructor() {
     super({
       type: 'flame',
-      baseAttackSpeed: 100,
-      damage: 3
+      baseCooldown: 3000, // 3초 쿨타임
+      damage: 15 // 데미지 증가
     });
-    this.range = 150;
-    this.coneAngle = Math.PI / 4;
+    this.flameAngle = Math.PI / 3; // 60도 부채꼴
+    this.range = 200; // 범위
+    this.duration = 5000; // 지속시간 5초
+    this.activeFlames = []; // 활성화된 화염 효과 저장
   }
   
   fire() {
-    // 플레이어가 바라보는 방향을 기준으로 불꽃 발사
-    const baseAngle = player.aimAngle;
+    const flame = new FlameEffect(
+      player.x, 
+      player.y,
+      this.flameAngle,
+      this.range,
+      this.damage * player.attackPower,
+      this.duration
+    );
     
-    // 3개의 불꽃 입자 생성
-    for (let i = 0; i < 3; i++) {
-      // 원뿔 내의 랜덤 각도
-      const spreadAngle = baseAngle + (Math.random() * this.coneAngle * 2 - this.coneAngle);
-      
-      // 랜덤 거리와 크기로 불꽃 생성
-      const distance = 20 + Math.random() * 30;
-      const size = 4 + Math.random() * 4;
-      const speed = 4 + Math.random() * 2;
-      
-      gameObjects.bullets.push(
-        new FlameBullet(
-          player.x + Math.cos(baseAngle) * distance,
-          player.y + Math.sin(baseAngle) * distance,
-          size, speed, spreadAngle, 3 * player.attackPower, this.range
-        )
-      );
-    }
-  }
-}
-
-// 불꽃 총알 클래스
-class FlameBullet extends Bullet {
-  constructor(x, y, size, speed, angle, damage, maxRange) {
-    super(x, y, size, speed, angle, damage);
-    this.initialX = x;
-    this.initialY = y;
-    this.maxRange = maxRange;
-    this.traveled = 0;
-    this.fadeRate = 0.02 + Math.random() * 0.02;
-    this.alpha = 1.0;
-    this.currentFrame = 0;
-    this.frameTime = 0;
-    this.frameDuration = 100;
-    
-    // 불꽃 애니메이션용 속성
-    this.wobble = Math.random() * Math.PI * 2;
-    this.wobbleSpeed = 0.2 + Math.random() * 0.1;
-    this.wobbleAmount = 2 + Math.random() * 2;
+    this.activeFlames.push(flame);
+    gameObjects.bullets.push(flame);
   }
   
   update() {
-    // 기존 이동에 흔들림 추가
-    this.wobble += this.wobbleSpeed;
-    const wobbleX = Math.cos(this.wobble) * this.wobbleAmount;
-    const wobbleY = Math.sin(this.wobble) * this.wobbleAmount;
+    // 기존 업데이트 로직 실행
+    super.update();
     
-    this.x += Math.cos(this.angle) * this.speed + wobbleX;
-    this.y += Math.sin(this.angle) * this.speed + wobbleY;
-    
-    // 이동 거리 계산
-    const dx = this.x - this.initialX;
-    const dy = this.y - this.initialY;
-    this.traveled = Math.sqrt(dx * dx + dy * dy);
-    
-    // 최대 거리 도달 시 사라짐
-    if (this.traveled >= this.maxRange) {
-      this.used = true;
-      return;
-    }
-    
-    // 점차 페이드 아웃
-    this.alpha -= this.fadeRate;
-    if (this.alpha <= 0) {
-      this.used = true;
-      return;
-    }
-    
-    // 거리에 따라 크기 감소
-    this.size = Math.max(1, this.size - 0.1);
-    
-    // 적과 충돌 검사
-    for (let enemy of gameObjects.enemies) {
-      if (enemy.state === 'moving' && detectCollision(this, enemy)) {
-        enemy.takeDamage(this.damage);
-        // 불꽃은 관통함 (사라지지 않음)
-      }
-    }
+    // 활성화된 화염 중 사용 완료된 것 제거
+    this.activeFlames = this.activeFlames.filter(flame => !flame.used);
+  }
+}
 
-    // 프레임 애니메이션 업데이트
+// 화염 효과 클래스 (기존 FlameBullet 대체)
+class FlameEffect {
+  constructor(x, y, angle, range, damage, duration) {
+    this.x = x;
+    this.y = y;
+    this.angle = angle; // 부채꼴 각도
+    this.range = range; // 최대 범위
+    this.damage = damage; // 데미지
+    this.duration = duration; // 지속 시간
+    this.startTime = Date.now(); // 생성 시간
+    this.used = false; // 사용 여부
+    
+    // 애니메이션 관련 속성
+    this.currentFrame = 0;
+    this.frameCount = 4;
+    this.frameWidth = 64;
+    this.frameHeight = 64;
+    this.frameTime = 0;
+    this.frameDuration = 125; // 4프레임 x 125ms = 500ms (전체 애니메이션 시간)
+  }
+  
+  update() {
+    // 지속 시간 체크
+    if (Date.now() - this.startTime >= this.duration) {
+      this.used = true;
+      return;
+    }
+    
+    // 애니메이션 프레임 업데이트
     this.frameTime += 16;
     if (this.frameTime >= this.frameDuration) {
       this.frameTime = 0;
-      this.currentFrame = (this.currentFrame + 1) % 4; // flameFrames = 4로 가정
+      this.currentFrame = (this.currentFrame + 1) % this.frameCount;
+    }
+    
+    // 플레이어 위치에 고정 (플레이어 따라다님)
+    this.x = player.x;
+    this.y = player.y;
+    
+    // 현재 마우스 방향으로 화염 방향 실시간 업데이트
+    const dx = mouseWorldX - player.x;
+    const dy = mouseWorldY - player.y;
+    const currentDirection = Math.atan2(dy, dx);
+    
+    // 부채꼴 범위 내 적 데미지 처리
+    for (let enemy of gameObjects.enemies) {
+      if (enemy.state !== 'moving') continue;
+      
+      // 적과 플레이어 사이의 각도 계산
+      const dx = enemy.x - this.x;
+      const dy = enemy.y - this.y;
+      const distanceToEnemy = Math.sqrt(dx * dx + dy * dy);
+      
+      // 범위 내에 있는지 확인
+      if (distanceToEnemy <= this.range) {
+        // 각도 계산
+        const angleToEnemy = Math.atan2(dy, dx);
+        
+        // 각도 차이 계산 (-PI ~ PI 사이로 정규화)
+        let angleDiff = angleToEnemy - currentDirection;
+        while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+        while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+        angleDiff = Math.abs(angleDiff);
+        
+        // 부채꼴 내에 있는지 확인
+        if (angleDiff <= this.angle / 2) {
+          // 데미지 적용 (초당 3회 = 16ms마다 데미지/20)
+          enemy.takeDamage(this.damage / 20);
+        }
+      }
     }
   }
-  
+    
   draw(offsetX, offsetY) {
-    if (assetManager.loaded.weapons && assetManager.images.weapons.flame) {
-      const drawSize = this.size * 4;
-      
-      ctx.save();
-      ctx.translate(this.x + offsetX, this.y + offsetY);
-      ctx.rotate(this.angle);
-      ctx.globalAlpha = this.alpha;
-      
-      // 스프라이트 시트에서 현재 프레임 그리기
-      ctx.drawImage(
-        assetManager.images.weapons.flame,
-        this.currentFrame * 64, 0, // flameFrameWidth = 64로 가정
-        64, 64,
-        -drawSize / 2,
-        -drawSize / 2,
-        drawSize,
-        drawSize
-      );
-      
-      ctx.restore();
+    if (!assetManager.loaded.weapons || !assetManager.images.weapons.flame) {
+      return;
     }
+    
+    // 현재 마우스 방향으로 화염 방향 실시간 업데이트 - PLAYING 상태일 때만 적용
+    let currentDirection = this.lastDirection || 0; // 저장된 마지막 방향 사용
+    
+    if (currentGameState === GAME_STATE.PLAYING) {
+      const dx = mouseWorldX - player.x;
+      const dy = mouseWorldY - player.y;
+      currentDirection = Math.atan2(dy, dx);
+      this.lastDirection = currentDirection; // 현재 방향 저장
+    }
+    
+    // 화염 효과 그리기
+    ctx.save();
+    
+    // 플레이어 위치로 이동 후 방향에 맞게 회전
+    ctx.translate(this.x + offsetX, this.y + offsetY);
+    ctx.rotate(currentDirection);
+    
+    // 투명도 설정 (시간 경과에 따라 페이드 아웃)
+    const elapsed = Date.now() - this.startTime;
+    const opacity = 1 - (elapsed / this.duration);
+    ctx.globalAlpha = opacity;
+    
+    // 화염 애니메이션 프레임 그리기
+    const frameX = this.currentFrame * this.frameWidth;
+    const drawSize = this.range * 0.9; // 화면에 표시될 크기
+    
+    ctx.drawImage(
+      assetManager.images.weapons.flame,
+      frameX, 0,
+      this.frameWidth, this.frameHeight,
+      0, -drawSize/2, // 중앙 정렬
+      drawSize, drawSize
+    );
+    
+    ctx.restore();
   }
 }
 
