@@ -9,6 +9,49 @@ let CANVAS_WIDTH = BASE_WIDTH;
 let CANVAS_HEIGHT = BASE_HEIGHT;
 const CHUNK_SIZE = 500; // Size of each chunk in pixels
 
+// 게임 시간 시스템
+const gameTimeSystem = {
+  realStartTime: 0,          // 실제 게임 시작 시간
+  gameTime: 0,               // 현재 게임 시간
+  lastUpdateTime: 0,         // 마지막 업데이트 시간
+  paused: false,             // 일시정지 상태
+  
+  // 초기화
+  init() {
+    const now = Date.now(); // 실제 시간으로 초기화
+    this.realStartTime = now;
+    this.gameTime = now;    // 시작 시간을 실제 타임스탬프로 설정
+    this.lastUpdateTime = now;
+    this.paused = false;
+  },
+  
+  // 업데이트
+  update() {
+    if (!this.paused) {
+      const now = Date.now(); // 실제 시간으로 델타타임 계산
+      const deltaTime = now - this.lastUpdateTime;
+      this.gameTime += deltaTime;
+      this.lastUpdateTime = now;
+    }
+  },
+  
+  // 게임 시간 획득
+  getTime() {
+    return this.gameTime;
+  },
+  
+  // 일시정지
+  pause() {
+    this.paused = true;
+  },
+  
+  // 재개
+  resume() {
+    this.lastUpdateTime = Date.now(); // 실제 시간으로 업데이트
+    this.paused = false;
+  }
+};
+
 // Game objects
 const gameObjects = {
   chunks: {}, 
@@ -483,7 +526,7 @@ class Weapon {
     this.type = config.type || 'basic';
     this.baseCooldown = config.baseCooldown || 1000;
     this.cooldown = this.baseCooldown;
-    this.lastAttackTime = Date.now();
+    this.lastAttackTime = gameTimeSystem.getTime();
     this.damage = config.damage || 10;
     
     // 무기별 추가 속성들
@@ -495,7 +538,7 @@ class Weapon {
   }
 
   update() {
-    const now = Date.now();
+    const now = gameTimeSystem.getTime();
     if (now - this.lastAttackTime >= this.cooldown) {
       this.fire();
       this.lastAttackTime = now;
@@ -752,7 +795,7 @@ class FlameEffect {
     this.range = range; // 최대 범위
     this.damage = damage; // 데미지
     this.duration = duration; // 지속 시간
-    this.startTime = Date.now(); // 생성 시간
+    this.startTime = gameTimeSystem.getTime(); // 생성 시간
     this.used = false; // 사용 여부
     
     // 애니메이션 관련 속성
@@ -766,7 +809,7 @@ class FlameEffect {
   
   update() {
     // 지속 시간 체크
-    if (Date.now() - this.startTime >= this.duration) {
+    if (gameTimeSystem.getTime() - this.startTime >= this.duration) {
       this.used = true;
       return;
     }
@@ -842,7 +885,7 @@ class FlameEffect {
     let opacity;
     if (currentGameState === GAME_STATE.PLAYING) {
       // 플레이 중일 때만 실제 경과 시간 계산
-      const elapsed = Date.now() - this.startTime;
+      const elapsed = gameTimeSystem.getTime() - this.startTime;
       const progress = elapsed / this.duration;
       // 사인 함수를 사용한 부드러운 페이드아웃
       opacity = Math.cos(progress * Math.PI / 2);
@@ -1089,7 +1132,7 @@ class BoomerangWeapon extends Weapon {
   }
   
   update() {
-    const now = Date.now();
+    const now = gameTimeSystem.getTime();
     if (now - this.lastAttackTime >= this.attackSpeed && this.activeBoomerangs < this.maxBoomerangs) {
       this.fire();
       this.lastAttackTime = now;
@@ -1322,7 +1365,7 @@ class Enemy {
     
     // 애니메이션 관련 속성
     this.state = 'spawning';
-    this.stateStartTime = Date.now();
+    this.stateStartTime = gameTimeSystem.getTime();
     this.spawnDuration = 500;
     this.deathDuration = 500;
     this.currentFrame = 0;
@@ -1356,7 +1399,7 @@ class Enemy {
   }
   
   update() {
-    const currentTime = Date.now();
+    const currentTime = gameTimeSystem.getTime();
     const deltaTime = 16;
     this.animationTime += deltaTime;
 
@@ -1422,7 +1465,7 @@ class Enemy {
     
     // 발사 효과
     this.isHit = true;
-    this.hitTime = Date.now();
+    this.hitTime = gameTimeSystem.getTime();
   }
 
   updateSpawning(currentTime) {
@@ -1491,7 +1534,7 @@ class Enemy {
 
   startDying() {
     this.state = 'dying';
-    this.stateStartTime = Date.now();
+    this.stateStartTime = gameTimeSystem.getTime();
     
     // 경험치 및 점수 획득 (타입별로 다른 값 적용)
     const expValue = this.expValue || 3; // 기본값 3
@@ -1534,7 +1577,7 @@ class Enemy {
   }
 
   drawSpawning(drawX, drawY) {
-      const progress = (Date.now() - this.stateStartTime) / this.spawnDuration;
+      const progress = (gameTimeSystem.getTime() - this.stateStartTime) / this.spawnDuration;
       ctx.globalAlpha = Math.min(progress, 1);
       
       // 스폰 서클 효과
@@ -1764,7 +1807,7 @@ class Enemy {
 
   drawDying(drawX, drawY) {
       // 페이드 아웃 효과
-      const progress = (Date.now() - this.stateStartTime) / this.deathDuration;
+      const progress = (gameTimeSystem.getTime() - this.stateStartTime) / this.deathDuration;
       ctx.globalAlpha = 1 - progress;
       
       // 현재 이동 상태 그리기 함수를 재활용 (코드 중복 제거)
@@ -1805,7 +1848,7 @@ class Enemy {
       
       // 피격 효과 시작
       this.isHit = true;
-      this.hitTime = Date.now();
+      this.hitTime = gameTimeSystem.getTime();
       this.hitBrightness = 1;
       
       if (this.health <= 0) {
@@ -1886,7 +1929,7 @@ class Enemy {
   }
   
   attackPlayer(player) {
-    const currentTime = Date.now();
+    const currentTime = gameTimeSystem.getTime();
     
     // 공격 쿨다운 확인 + 플레이어가 무적 상태가 아닌 경우에만 데미지
     if (currentTime - this.lastAttackTime >= this.attackCooldown && !player.invincible) {
@@ -1932,7 +1975,7 @@ class BossEnemy extends Enemy {
     super.update(); // 기본 업데이트 실행
     
     // 특수 공격 로직
-    const currentTime = Date.now();
+    const currentTime = gameTimeSystem.getTime();
     if (this.state === 'moving' && 
         currentTime - this.lastSpecialAttack >= this.specialAttackCooldown) {
       this.specialAttack();
@@ -2007,11 +2050,11 @@ class EnemyBullet extends Bullet {
       
       // 플레이어 피격 효과
       player.isHit = true;
-      player.hitStartTime = Date.now();
+      player.hitStartTime = gameTimeSystem.getTime();
       
       // 무적 상태 활성화
       player.invincible = true;
-      player.invincibilityStartTime = Date.now();
+      player.invincibilityStartTime = gameTimeSystem.getTime();
     }
   }
   
@@ -2216,7 +2259,7 @@ class Treasure extends GameObject {
       this.collected = true;
       // 아티팩트 선택 화면
       currentGameState = GAME_STATE.LEVEL_UP;
-      pauseStartTime = Date.now();
+      pauseStartTime = gameTimeSystem.getTime();
       previousGameState = GAME_STATE.PLAYING;
       generateArtifactOptions();
     }
@@ -2253,7 +2296,7 @@ function checkLevelUp() {
   if (leveledUp) {
     isArtifactSelection = false;
     currentGameState = GAME_STATE.LEVEL_UP;
-    pauseStartTime = Date.now();
+    pauseStartTime = gameTimeSystem.getTime();
     generateLevelUpOptions();
   }
 }
@@ -2413,7 +2456,7 @@ function applyLevelUpChoice(optionIndex) {
           player.exp += option.value;
           
           currentGameState = GAME_STATE.PLAYING;
-          totalPausedTime += Date.now() - pauseStartTime;
+          totalPausedTime += gameTimeSystem.getTime() - pauseStartTime;
           
           // 경험치 획득 후 레벨업 체크
           checkLevelUp();
@@ -2463,7 +2506,7 @@ function applyLevelUpChoice(optionIndex) {
   // 게임 재개
   console.log("Resuming game after level up choice");
   currentGameState = GAME_STATE.PLAYING;
-  totalPausedTime += Date.now() - pauseStartTime;
+  totalPausedTime += gameTimeSystem.getTime() - pauseStartTime;
 }
 
 // 무기 추가
@@ -2479,12 +2522,15 @@ function addWeapon(weaponType) {
 
 function startGame() {
   currentGameState = GAME_STATE.LOADING;
-  loadingStartTime = Date.now();
+  loadingStartTime = gameTimeSystem.getTime();
   chunksLoaded = false;
   
   resetGame();
   
-  gameStartTime = Date.now();
+  // 게임 시계 초기화
+  gameTimeSystem.init();
+  
+  gameStartTime = gameTimeSystem.getTime();
   totalPausedTime = 0;
   elapsedTime = 0;
   
@@ -2500,14 +2546,20 @@ function pauseGame() {
     previousGameState = currentGameState;
     currentGameState = GAME_STATE.PAUSED;
     selectedPauseOption = 0;
-    pauseStartTime = Date.now();
+    pauseStartTime = gameTimeSystem.getTime();
+    
+    // 게임 시계 일시정지
+    gameTimeSystem.pause();
   }
 }
 
 function resumeGame() {
   if (currentGameState === GAME_STATE.PAUSED && previousGameState !== null) {
-    const pausedDuration = Date.now() - pauseStartTime;
+    const pausedDuration = gameTimeSystem.getTime() - pauseStartTime;
     totalPausedTime += pausedDuration;
+    
+    // 게임 시계 재개
+    gameTimeSystem.resume();
     
     currentGameState = previousGameState;
   }
@@ -2563,9 +2615,14 @@ function resetGame() {
   elapsedTime = 0;
   totalPausedTime = 0;
   
-  // 화면 효과 초기화
+  // 게임 효과 변수 초기화
+  lastEnemySpawnTime = gameTimeSystem.getTime(); // 게임 시간으로 초기화
   screenShakeTime = 0;
   screenShakeIntensity = 0;
+  
+  // 자석 효과 초기화
+  player.magnetActive = false;
+  player.magnetDuration = 0;
 }
 
 function restartGame() {
@@ -2828,7 +2885,7 @@ function drawLoadingScreen() {
   ctx.fillRect(canvas.width / 2 - 100, canvas.height / 2 + 20, 200, 20);
   
   // 로딩 진행 표시
-  const elapsedTime = Date.now() - loadingStartTime;
+  const elapsedTime = gameTimeSystem.getTime() - loadingStartTime;
   const progress = Math.min(elapsedTime / loadingMinDuration, 1);
   
   ctx.fillStyle = '#66fcf1';
@@ -3052,7 +3109,7 @@ function draw() {
   // 화면 흔들림 효과
   if (screenShakeTime > 0) {
     const vibrationSpeed = 0.08;
-    const time = Date.now() * vibrationSpeed;
+    const time = gameTimeSystem.getTime() * vibrationSpeed;
     
     screenOffsetX = Math.sin(time) * screenShakeIntensity;
     
@@ -3130,7 +3187,7 @@ function draw() {
       }
       
       // 피격 효과 (빨간색 오버레이)
-      const currentTime = Date.now();
+      const currentTime = gameTimeSystem.getTime();
       const hitProgress = (currentTime - player.hitStartTime) / player.hitDuration;
       const blinkSpeed = 10;
       const alpha = Math.abs(Math.sin(hitProgress * Math.PI * blinkSpeed)) * 0.8;
@@ -3454,7 +3511,7 @@ function spawnEnemyAroundPlayer() {
   }
   
   // 스폰 간격 체크
-  const currentTime = Date.now();
+  const currentTime = gameTimeSystem.getTime();
   if (currentTime - lastEnemySpawnTime < ENEMY_SPAWN_INTERVAL) {
     return;
   }
@@ -3642,7 +3699,7 @@ function autoFireAtNearestEnemy() {
   const nearestEnemy = findNearestEnemy();
   
   if (nearestEnemy) {
-    const now = Date.now();
+    const now = gameTimeSystem.getTime();
     if (!player.lastFireTime || now - player.lastFireTime >= 500) {
       fireWeapon();
       player.lastFireTime = now;
@@ -3669,7 +3726,7 @@ function fireWeapon() {
 function update() {
   // 경과 시간 계산
   if (currentGameState === GAME_STATE.PLAYING) {
-    const currentTime = Date.now();
+    const currentTime = gameTimeSystem.getTime();
     const totalElapsed = currentTime - gameStartTime - totalPausedTime;
     elapsedTime = Math.floor(totalElapsed / 1000);
   }
@@ -3723,7 +3780,7 @@ function update() {
   
   // 피격 효과 업데이트
   if (player.isHit) {
-    const currentTime = Date.now();
+    const currentTime = gameTimeSystem.getTime();
     
     // 프레임 업데이트
     player.hitFrameTime += 16;
@@ -3875,7 +3932,7 @@ function update() {
 
   // 플레이어 무적 상태 업데이트
   if (player.invincible) {
-    const currentTime = Date.now();
+    const currentTime = gameTimeSystem.getTime();
     const invincibilityElapsed = currentTime - player.invincibilityStartTime;
     
     // 무적 시간이 끝났는지 확인
@@ -3920,7 +3977,7 @@ document.addEventListener('keydown', (e) => {
     } else if (currentGameState === GAME_STATE.LEVEL_UP) {
       previousGameState = currentGameState;
       currentGameState = GAME_STATE.PAUSED;
-      pauseStartTime = Date.now();
+      pauseStartTime = gameTimeSystem.getTime();
     }
     e.preventDefault();
   }
@@ -4205,6 +4262,11 @@ function gameLoop(timestamp) {
   if (deltaTime >= FRAME_INTERVAL) {
     lastFrameTime = timestamp;
     
+    // 게임 시계 업데이트 (PLAYING 상태일 때만)
+    if (currentGameState === GAME_STATE.PLAYING) {
+      gameTimeSystem.update();
+    }
+    
     // 로딩 상태 처리
     if (currentGameState === GAME_STATE.LOADING) {
       drawLoadingScreen();
@@ -4213,25 +4275,51 @@ function gameLoop(timestamp) {
       const elapsedTime = Date.now() - loadingStartTime;
       if (chunksLoaded && elapsedTime >= loadingMinDuration) {
         currentGameState = GAME_STATE.PLAYING;
+        // 게임 시작시 시계 초기화
+        gameTimeSystem.init();
       }
     }
     // 게임 상태별 업데이트
     else if (currentGameState === GAME_STATE.PLAYING) {
+      // 경과 시간 계산 - 게임 시계 기반
+      const currentGameTime = gameTimeSystem.getTime();
+      elapsedTime = Math.floor(currentGameTime / 1000);
+      
       update();
       draw();
+      
       if (player.health <= 0) {
         currentGameState = GAME_STATE.GAME_OVER;
       }
-    } else if (currentGameState === GAME_STATE.LEVEL_UP) {
+    } 
+    else if (currentGameState === GAME_STATE.LEVEL_UP) {
       draw(); // 배경으로 게임 화면 그리기
       drawLevelUpScreen();
-    } else if (currentGameState === GAME_STATE.START_SCREEN) {
+    } 
+    else if (currentGameState === GAME_STATE.START_SCREEN) {
       drawStartScreen();
-    } else if (currentGameState === GAME_STATE.SETTINGS) {
+      
+      // 시작 화면에서 애니메이션 프레임 업데이트 - 게임 시계와 무관하게 처리
+      previewAnimation.frameTime += 16;
+      if (previewAnimation.frameTime >= previewAnimation.frameDuration) {
+        previewAnimation.frameTime = 0;
+        previewAnimation.currentFrame = (previewAnimation.currentFrame + 1) % player.frameCount;
+      }
+    } 
+    else if (currentGameState === GAME_STATE.SETTINGS) {
       drawSettingsScreen();
-    } else if (currentGameState === GAME_STATE.GAME_OVER) {
+      
+      // 설정 화면에서도 애니메이션 계속 - 게임 시계와 무관하게 처리
+      previewAnimation.frameTime += 16;
+      if (previewAnimation.frameTime >= previewAnimation.frameDuration) {
+        previewAnimation.frameTime = 0;
+        previewAnimation.currentFrame = (previewAnimation.currentFrame + 1) % player.frameCount;
+      }
+    } 
+    else if (currentGameState === GAME_STATE.GAME_OVER) {
       drawGameOverScreen();
-    } else if (currentGameState === GAME_STATE.PAUSED) {
+    } 
+    else if (currentGameState === GAME_STATE.PAUSED) {
       // 일시정지 전 화면에 따라 배경 다르게 그리기
       if (previousGameState === GAME_STATE.LEVEL_UP) {
         draw();
@@ -4241,7 +4329,8 @@ function gameLoop(timestamp) {
       }
       
       drawPauseScreen();
-    } else if (currentGameState === GAME_STATE.CONFIRM_DIALOG) {
+    } 
+    else if (currentGameState === GAME_STATE.CONFIRM_DIALOG) {
       if (previousGameState === GAME_STATE.LEVEL_UP) {
         draw();
         drawLevelUpScreen();
@@ -4252,8 +4341,14 @@ function gameLoop(timestamp) {
       drawPauseScreen();
       drawConfirmDialog();
     }
+    
+    // 화면 흔들림 효과 업데이트 - 오직 PLAYING 상태에서만
+    if (currentGameState === GAME_STATE.PLAYING && screenShakeTime > 0) {
+      screenShakeTime -= 16;
+    }
   }
   
+  // 다음 프레임 요청
   requestAnimationFrame(gameLoop);
 }
 
