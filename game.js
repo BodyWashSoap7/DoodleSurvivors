@@ -630,6 +630,7 @@ class Bullet {
 }
 
 // 오비트 무기 클래스
+// 오비트 무기 클래스 수정
 class OrbitWeapon extends Weapon {
   constructor() {
     super({
@@ -637,115 +638,89 @@ class OrbitWeapon extends Weapon {
       baseCooldown: 50,
       damage: 8
     });
-    this.orbitRadius = 50;
-    this.orbitSpeed = 0.05;
+    this.orbitRadius = 150; // 반경을 더 크게 설정 (기존 50에서 변경)
+    this.orbitSpeed = 0.03; // 회전 속도 약간 감소
     this.orbitAngle = 0;
-    this.bulletCount = 3;
-    this.bullets = [];
+    this.bulletCount = 1; // 구체 하나만 사용
+    this.permanentOrbs = []; // 영구적인 구체 배열
     
-    // 초기 총알 생성
-    for (let i = 0; i < this.bulletCount; i++) {
-      const angle = (Math.PI * 2 * i) / this.bulletCount;
-      this.bullets.push({
-        angle: angle,
-        active: true
-      });
-    }
+    // 초기 구체 생성
+    this.createPermanentOrb();
+  }
+
+  // 영구적인 구체 생성 함수
+  createPermanentOrb() {
+    // 기존 구체가 있으면 모두 제거
+    this.permanentOrbs = [];
+    
+    // 새 구체 생성
+    this.permanentOrbs.push({
+      angle: 0,
+      x: 0,
+      y: 0,
+      rotationAngle: 0
+    });
   }
 
   update() {
     // 회전 각도 업데이트
     this.orbitAngle += this.orbitSpeed;
     
-    // 총알이 비활성화되면 재생성
-    this.bullets = this.bullets.filter(b => b.active);
-    
-    // 총알 부족하면 추가
-    while (this.bullets.length < this.bulletCount) {
-      this.bullets.push({
-        angle: Math.random() * Math.PI * 2,
-        active: true
-      });
-    }
-    
-    // 총알 발사 처리
-    this.fire();
-  }
-
-  fire() {
-    // 회전하는 총알 위치 업데이트 및 충돌 검사
-    this.bullets.forEach((orbitBullet, index) => {
-      // 총알의 실제 위치 계산
-      const bulletAngle = this.orbitAngle + orbitBullet.angle;
-      const bulletX = player.x + Math.cos(bulletAngle) * this.orbitRadius;
-      const bulletY = player.y + Math.sin(bulletAngle) * this.orbitRadius;
+    // 구체 위치 업데이트
+    this.permanentOrbs.forEach(orb => {
+      // 구체의 실제 위치 계산
+      orb.angle = this.orbitAngle;
+      orb.x = player.x + Math.cos(orb.angle) * this.orbitRadius;
+      orb.y = player.y + Math.sin(orb.angle) * this.orbitRadius;
       
-      // 실제 총알 생성
-      const bullet = new OrbitBullet(
-        bulletX, bulletY, 8, 0, bulletAngle, 8 * player.attackPower
-      );
+      // 구체 자체 회전 업데이트
+      orb.rotationAngle = (orb.rotationAngle + 0.05) % (Math.PI * 2);
       
-      // 충돌 검사를 위해 배열에 추가
-      gameObjects.bullets.push(bullet);
-      
-      // 적과 충돌 검사
+      // 충돌 검사
       for (let enemy of gameObjects.enemies) {
-        if (enemy.state === 'moving' && detectCollision(bullet, enemy)) {
-          enemy.takeDamage(bullet.damage);
-          bullet.used = true;
+        if (enemy.state === 'moving' && 
+            detectCollision({x: orb.x, y: orb.y, size: 12}, enemy)) {
+          enemy.takeDamage(10 * player.attackPower);
         }
       }
     });
   }
-}
 
-// 오비트 총알 클래스
-class OrbitBullet extends Bullet {
-  constructor(x, y, size, speed, angle, damage) {
-    super(x, y, size, speed, angle, damage);
-    this.lifeTime = 1;
-    this.rotationAngle = Math.random() * Math.PI * 2;
-    this.rotationSpeed = 0.05;
-  }
-  
-  update() {
-    // 기존 코드 유지
-    this.lifeTime -= 0.1;
-    if (this.lifeTime <= 0) {
-      this.used = true;
-    }
-    
-    // 구체 자체가 회전하는 효과
-    this.rotationAngle += this.rotationSpeed;
-  }
-  
+  // 그리기 함수 추가
   draw(offsetX, offsetY) {
-    if (assetManager.loaded.weapons && assetManager.images.weapons.orbit) {
-      const drawSize = this.size * 3;
-      
-      ctx.save();
-      ctx.translate(this.x + offsetX, this.y + offsetY);
-      ctx.rotate(this.rotationAngle);
-      
-      // 광채 효과
-      ctx.globalAlpha = 0.4;
-      ctx.fillStyle = '#66fcf1';
-      ctx.beginPath();
-      ctx.arc(0, 0, drawSize * 0.7, 0, Math.PI * 2);
-      ctx.fill();
-      
-      // 이미지 그리기
-      ctx.globalAlpha = 1;
-      ctx.drawImage(
-        assetManager.images.weapons.orbit,
-        -drawSize / 2,
-        -drawSize / 2,
-        drawSize,
-        drawSize
-      );
-      
-      ctx.restore();
-    }
+    this.permanentOrbs.forEach(orb => {
+      if (assetManager.loaded.weapons && assetManager.images.weapons.orbit) {
+        const drawSize = 12 * 3;
+        
+        ctx.save();
+        ctx.translate(orb.x + offsetX, orb.y + offsetY);
+        ctx.rotate(orb.rotationAngle);
+        
+        // 광채 효과
+        ctx.globalAlpha = 0.4;
+        ctx.fillStyle = '#66fcf1';
+        ctx.beginPath();
+        ctx.arc(0, 0, drawSize * 0.7, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // 이미지 그리기
+        ctx.globalAlpha = 1;
+        ctx.drawImage(
+          assetManager.images.weapons.orbit,
+          -drawSize / 2,
+          -drawSize / 2,
+          drawSize,
+          drawSize
+        );
+        
+        ctx.restore();
+      }
+    });
+  }
+
+  // fire 메서드 재정의 (필요 없음)
+  fire() {
+    // 기존 fire 메서드는 사용하지 않음
   }
 }
 
