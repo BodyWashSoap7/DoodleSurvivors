@@ -499,7 +499,7 @@ const player = {
 const previewAnimation = {
   currentFrame: 0,
   frameTime: 0,
-  frameDuration: 150
+  frameDuration: 300
 };
 
 // 기본 게임 오브젝트 클래스 (공통 속성/메서드)
@@ -749,7 +749,6 @@ class OrbitBullet extends Bullet {
   }
 }
 
-// 화염방사기 무기 클래스
 class FlameWeapon extends Weapon {
   constructor() {
     super({
@@ -761,6 +760,23 @@ class FlameWeapon extends Weapon {
     this.range = 200; // 범위
     this.duration = 3000; // 지속시간
     this.activeFlames = []; // 활성화된 화염 효과 저장
+    this.isFiring = false; // 발사 중인지 여부
+  }
+  
+  update() {
+    const now = gameTimeSystem.getTime();
+    
+    // 활성화된 화염 중 사용 완료된 것 제거
+    this.activeFlames = this.activeFlames.filter(flame => !flame.used);
+    
+    // 발사 중인지 확인 (활성 화염이 있으면 발사 중)
+    this.isFiring = this.activeFlames.length > 0;
+    
+    // 발사 중이 아니고 쿨다운이 지났으면 발사
+    if (!this.isFiring && now - this.lastAttackTime >= this.cooldown) {
+      this.fire();
+      this.lastAttackTime = now;
+    }
   }
   
   fire() {
@@ -776,17 +792,9 @@ class FlameWeapon extends Weapon {
     this.activeFlames.push(flame);
     gameObjects.bullets.push(flame);
   }
-  
-  update() {
-    // 기존 업데이트 로직 실행
-    super.update();
-    
-    // 활성화된 화염 중 사용 완료된 것 제거
-    this.activeFlames = this.activeFlames.filter(flame => !flame.used);
-  }
 }
 
-// 화염 효과 클래스 (기존 FlameBullet 대체)
+// 화염 효과 클래스
 class FlameEffect {
   constructor(x, y, angle, range, damage, duration) {
     this.x = x;
@@ -797,6 +805,7 @@ class FlameEffect {
     this.duration = duration; // 지속 시간
     this.startTime = gameTimeSystem.getTime(); // 생성 시간
     this.used = false; // 사용 여부
+    this.fadeOutStart = 0.85; // 지속 시간의 85%에서 페이드 아웃 시작
     
     // 애니메이션 관련 속성
     this.currentFrame = 0;
@@ -808,8 +817,11 @@ class FlameEffect {
   }
   
   update() {
+    const currentTime = gameTimeSystem.getTime();
+    const elapsedTime = currentTime - this.startTime;
+    
     // 지속 시간 체크
-    if (gameTimeSystem.getTime() - this.startTime >= this.duration) {
+    if (elapsedTime >= this.duration) {
       this.used = true;
       return;
     }
@@ -887,8 +899,16 @@ class FlameEffect {
       // 플레이 중일 때만 실제 경과 시간 계산
       const elapsed = gameTimeSystem.getTime() - this.startTime;
       const progress = elapsed / this.duration;
-      // 사인 함수를 사용한 부드러운 페이드아웃
-      opacity = Math.cos(progress * Math.PI / 2);
+      
+      // 페이드아웃 계산 (지속 시간의 85% 이후부터 페이드아웃)
+      if (progress >= this.fadeOutStart) {
+        // 페이드아웃 구간 내 진행률 계산 (0~1)
+        const fadeProgress = (progress - this.fadeOutStart) / (1 - this.fadeOutStart);
+        // 부드러운 S 커브 페이드아웃 (급격하게 사라지는 느낌)
+        opacity = Math.pow(1 - fadeProgress, 2);
+      } else {
+        opacity = 1.0;
+      }
       
       // 현재 불투명도 저장 (일시정지 시 사용)
       this.currentOpacity = opacity;
@@ -981,6 +1001,7 @@ class ChainLightningEffect {
     this.targetEnemy = targetEnemy;
     this.age = 0;
     this.maxAge = 45;
+    this.fadeOutStart = 0.7; // 지속 시간의 70%에서 페이드 아웃 시작
     this.used = false;
     this.hasHit = false;
     
@@ -1021,6 +1042,7 @@ class ChainLightningEffect {
   }
   
   chainLightning(sourceEnemy) {
+    // 기존 체인 로직 유지
     // 범위 내 다른 적 찾기
     const nearbyEnemies = gameObjects.enemies.filter(enemy => {
       if (enemy === sourceEnemy || enemy === this.targetEnemy || enemy.state !== 'moving') return false;
@@ -1063,8 +1085,19 @@ class ChainLightningEffect {
       return;
     }
     
-    // 투명도는 수명에 따라 감소
-    const alpha = 1 - this.age / this.maxAge;
+    // 투명도 계산 - 급격한 페이드아웃 적용
+    let alpha;
+    const lifeProgress = this.age / this.maxAge;
+    
+    // 시간의 70% 이후부터 급격하게 페이드아웃
+    if (lifeProgress >= this.fadeOutStart) {
+      // 페이드아웃 구간 내 진행률 계산 (0~1)
+      const fadeProgress = (lifeProgress - this.fadeOutStart) / (1 - this.fadeOutStart);
+      // 급격한 페이드아웃을 위한 제곱함수
+      alpha = Math.pow(1 - fadeProgress, 2);
+    } else {
+      alpha = 1.0;
+    }
     
     ctx.save();
     ctx.globalAlpha = alpha;
@@ -1113,7 +1146,6 @@ class ChainLightningEffect {
       impactSize,
       impactSize
     );
-
     
     ctx.restore();
   }
@@ -3144,11 +3176,6 @@ function draw() {
     enemy.draw(offsetX, offsetY);
   });
 
-  // 총알 그리기
-  gameObjects.bullets.forEach(bullet => {
-    bullet.draw(offsetX, offsetY);
-  });
-
   // 플레이어 그리기
   if (player.image && player.image.complete) {
     const playerSize = player.size * 2;
@@ -3287,6 +3314,11 @@ function draw() {
   
   // HUD 그리기
   drawHUD();
+
+  // 총알 그리기(draw 함수 마지막에 그려서 가장 우선적으로 보이게 하기)
+  gameObjects.bullets.forEach(bullet => {
+    bullet.draw(offsetX, offsetY);
+  });
 }
 
 // 배경 그리기
