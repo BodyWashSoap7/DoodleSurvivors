@@ -52,6 +52,20 @@ const gameTimeSystem = {
   }
 };
 
+// 골드 저장 함수
+function saveGold() {
+  localStorage.setItem('vampireSurvivorGold', gold.toString());
+}
+
+// 골드 불러오기 함수
+function loadGold() {
+  const savedGold = localStorage.getItem('vampireSurvivorGold');
+  if (savedGold !== null) {
+    return parseInt(savedGold);
+  }
+  return 0; // 저장된 골드가 없으면 0 반환
+}
+
 // Game objects
 const gameObjects = {
   chunks: {}, 
@@ -62,7 +76,7 @@ const gameObjects = {
 };
 
 // Game state
-let score = 0;
+let gold = 0;
 let currentGameState = 0;
 let previousGameState = null;
 let loadingStartTime = 0;
@@ -1201,7 +1215,7 @@ const ENEMY_TYPES = {
     attackBase: 10,
     attackPerLevel: 0.5,
     expValue: 3,
-    scoreValue: 10,
+    goldValue: 10,
     spawnWeight: 70 // 스폰 가중치
   },
   FAST: {
@@ -1214,7 +1228,7 @@ const ENEMY_TYPES = {
     attackBase: 5,
     attackPerLevel: 0.3,
     expValue: 5,
-    scoreValue: 8,
+    goldValue: 8,
     spawnWeight: 20
   },
   TANK: {
@@ -1227,7 +1241,7 @@ const ENEMY_TYPES = {
     attackBase: 15,
     attackPerLevel: 0.7,
     expValue: 15,
-    scoreValue: 15,
+    goldValue: 15,
     spawnWeight: 10
   },
   SHOOTER: {
@@ -1240,7 +1254,7 @@ const ENEMY_TYPES = {
     attackBase: 8,
     attackPerLevel: 0.4,
     expValue: 5,
-    scoreValue: 12,
+    goldValue: 12,
     spawnWeight: 15,
     canShoot: true,      // 발사 가능 표시
     shootCooldown: 2000  // 발사 간격(ms)
@@ -1255,7 +1269,7 @@ const ENEMY_TYPES = {
     attackBase: 20,
     attackPerLevel: 1.5,
     expValue: 100,
-    scoreValue: 100,
+    goldValue: 100,
     spawnWeight: 0, // 특별 조건에서만 스폰
     isBoss: true
   }
@@ -1444,12 +1458,13 @@ class Enemy {
     this.state = 'dying';
     this.stateStartTime = gameTimeSystem.getTime();
     
-    // 경험치 및 점수 획득 (타입별로 다른 값 적용)
+    // 경험치 및 골드 획득 (타입별로 다른 값 적용)
     const expValue = this.expValue || 3; // 기본값 3
-    const scoreValue = this.scoreValue || 10; // 기본값 10
+    const goldValue = this.goldValue || 10; // 기본값 10
     
     player.exp += Math.floor(expValue * player.expMultiplier);
-    score += scoreValue;
+    gold += goldValue;
+    saveGold();
     
     // 아이템 드롭
     // 일반 보석 드롭 확률 (보스는 BossEnemy 클래스에서 처리)
@@ -1871,7 +1886,7 @@ class BossEnemy extends Enemy {
     this.type = "Boss";
     this.isBoss = true;
     this.expValue = 50;
-    this.scoreValue = 100;
+    this.goldValue = 100;
     
     // 보스 전용 속성 추가
     this.attackRange = 200;
@@ -2088,12 +2103,13 @@ class Jewel extends GameObject {
       case 2: // 대 jewel
         const expGained = Math.floor(this.expValue * player.expMultiplier);
         player.exp += expGained;
-        score += this.type + 5; // 큰 보석일수록 더 많은 점수
+        gold += this.type + 5; // 큰 보석일수록 더 많은 골드
+        saveGold();
         break;
         
       case 3: // 자석 jewel - 자석 효과 활성화
         player.exp += Math.floor(this.expValue * player.expMultiplier);
-        score += 10;
+        gold += 10;
         
         // 자석 효과 활성화
         player.magnetActive = true;
@@ -2102,7 +2118,7 @@ class Jewel extends GameObject {
       case 4: // 체력 jewel - 최대 체력의 30% 회복
         const healAmount = Math.floor(player.maxHealth * 0.3);
         player.health = Math.min(player.health + healAmount, player.maxHealth);
-        score += 15;
+        gold += 15;
         break;
     }
     
@@ -2496,7 +2512,7 @@ function resetGame() {
   gameObjects.jewels = [];
   gameObjects.terrain = [];
   gameObjects.chunks = {};
-  score = 0;
+  gold = loadGold(); // 저장된 골드 불러오기
 
   // 능력치 초기화
   player.attackPower = 1;
@@ -2950,7 +2966,7 @@ function drawGameOverScreen() {
   
   ctx.fillStyle = '#FFFFFF';
   ctx.font = '24px Arial';
-  ctx.fillText(`최종 점수: ${score}`, canvas.width / 2, canvas.height / 2);
+  ctx.fillText(`최종 골드: ${gold}`, canvas.width / 2, canvas.height / 2);
   ctx.fillText('클릭하여 다시 시작하세요', canvas.width / 2, canvas.height / 2 + 50);
 }
 
@@ -2972,10 +2988,10 @@ function drawHUD() {
   ctx.textAlign = 'center';
   drawTextWithStroke(formatTime(elapsedTime), canvas.width / 2, 30, '#66fcf1', '#000000');
   
-  // 점수 (화면 왼쪽 위)
+  // 골드 (화면 왼쪽 위)
   ctx.font = '18px Arial';
   ctx.textAlign = 'left';
-  drawTextWithStroke(`Score: ${score}`, 20, 30, '#66fcf1', '#000000');
+  drawTextWithStroke(`Gold: ${gold}`, 20, 30, '#66fcf1', '#000000');
   
   // 레벨 (화면 하단)
   ctx.font = '24px Arial';
@@ -3497,7 +3513,7 @@ function spawnEnemyAroundPlayer() {
       // 추가 속성 설정
       enemy.type = selectedType.name;
       enemy.expValue = selectedType.expValue;
-      enemy.scoreValue = selectedType.scoreValue;
+      enemy.goldValue = selectedType.goldValue;
 
       // SHOOTER 타입 속성 추가
       if (selectedType.canShoot) {
@@ -4193,6 +4209,7 @@ function gameLoop(timestamp) {
       draw();
       
       if (player.health <= 0) {
+        saveGold();
         currentGameState = GAME_STATE.GAME_OVER;
       }
     } 
