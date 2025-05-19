@@ -627,78 +627,113 @@ class Bullet {
   }
 }
 
-// 오비트 무기 클래스
 class OrbitWeapon extends Weapon {
   constructor() {
     super({
       type: 'orbit',
       baseCooldown: 50,
-      damage: 3
+      damage: 8
     });
-    this.orbitRadius = 300; // 구체가 회전하는 반경
-    this.orbitSpeed = 0.025; // 회전 속도
-    this.orbitAngle = 0; // 현재 각도
-    this.damageCooldown = 100; // 데미지 간격 (ms)
-    this.lastDamageTime = 0; // 마지막 데미지 시간
-    this.hitEnemies = new Set(); // 맞은 적 추적
+    this.orbitRadius = 150;        
+    this.orbitSpeed = 0.03;       
+    this.orbitAngle = 0;          
+    this.orbCount = 1;            
+    this.damageCooldown = 100;    
+    this.lastDamageTime = 0;
     
-    // 구체 생성
-    this.orb = {
-      angle: 0,
-      x: 0,
-      y: 0,
-      rotationAngle: 0,
-      size: 15
-    };
+    // 구체를 게임 객체로 생성
+    this.createOrbs();
   }
-
-  update() {
-    const currentTime = gameTimeSystem.getTime();
+  
+  createOrbs() {
+    // 기존 구체 제거
+    this.removeOldOrbs();
     
-    // 회전 각도 업데이트
-    this.orbitAngle += this.orbitSpeed;
-    
-    // 구체 위치 업데이트
-    this.orb.angle = this.orbitAngle;
-    this.orb.x = player.x + Math.cos(this.orb.angle) * this.orbitRadius;
-    this.orb.y = player.y + Math.sin(this.orb.angle) * this.orbitRadius;
-    
-    // 구체 자체 회전 업데이트 (시각 효과)
-    this.orb.rotationAngle = (this.orb.rotationAngle + 0.05) % (Math.PI * 2);
-    
-    // 데미지 간격 확인
-    if (currentTime - this.lastDamageTime >= this.damageCooldown) {
-      // 마지막 데미지 이후 충분한 시간이 지나면 맞은 적 목록 초기화
-      this.hitEnemies.clear();
-      this.lastDamageTime = currentTime;
+    // 새 구체 생성
+    for (let i = 0; i < this.orbCount; i++) {
+      const angle = (Math.PI * 2 * i) / this.orbCount;
+      const orb = new OrbitOrb(
+        player.x, 
+        player.y,
+        angle,
+        this.orbitRadius,
+        this.damage * player.attackPower,
+        this
+      );
+      gameObjects.bullets.push(orb);
     }
+  }
+  
+  removeOldOrbs() {
+    // 이전 구체들 제거
+    gameObjects.bullets = gameObjects.bullets.filter(b => !(b instanceof OrbitOrb && b.parent === this));
+  }
+  
+  update() {
+    this.orbitAngle += this.orbitSpeed;
+  }
+  
+  // 업그레이드 시 구체 재생성
+  upgrade() {
+    this.damage += 3;
+    this.orbCount += 1;
+    this.orbitRadius += 15;
+    this.createOrbs();
+  }
+  
+  fire() {
+    // 오비트 무기에서는 사용되지 않음
+  }
+}
+
+// OrbitOrb 클래스
+class OrbitOrb {
+  constructor(x, y, baseAngle, radius, damage, parent) {
+    this.x = x;
+    this.y = y;
+    this.baseAngle = baseAngle;
+    this.radius = radius;
+    this.damage = damage;
+    this.size = 8;
+    this.used = false;
+    this.parent = parent;
+    this.rotationAngle = Math.random() * Math.PI * 2;
+    this.rotationSpeed = 0.05;
+  }
+  
+  update() {
+    if (this.used) return;
     
-    // 충돌 검사
-    for (let enemy of gameObjects.enemies) {
-      if (enemy.state === 'moving' && 
-          detectCollision({x: this.orb.x, y: this.orb.y, size: this.orb.size}, enemy)) {
-        
-        // 이 적에게 이번 주기에 이미 데미지를 줬는지 확인
-        if (!this.hitEnemies.has(enemy)) {
-          // 데미지 적용
-          enemy.takeDamage(3 * player.attackPower);
-          
-          // 맞은 적 목록에 추가
-          this.hitEnemies.add(enemy);
+    // 플레이어 주변 회전
+    const totalAngle = this.parent.orbitAngle + this.baseAngle;
+    this.x = player.x + Math.cos(totalAngle) * this.radius;
+    this.y = player.y + Math.sin(totalAngle) * this.radius;
+    
+    // 구체 자체 회전
+    this.rotationAngle += this.rotationSpeed;
+    
+    // 적과 충돌 검사
+    const currentTime = gameTimeSystem.getTime();
+    if (currentTime - this.parent.lastDamageTime >= this.parent.damageCooldown) {
+      for (let enemy of gameObjects.enemies) {
+        if (enemy.state === 'moving' && detectCollision(this, enemy)) {
+          enemy.takeDamage(this.damage);
+          this.parent.lastDamageTime = currentTime;
+          break;
         }
       }
     }
   }
-
+  
   draw(offsetX, offsetY) {
+    const drawSize = this.size * 3;
+      
+    ctx.save();
+    ctx.translate(this.x + offsetX, this.y + offsetY);
+    ctx.rotate(this.rotationAngle);
+        
+    // 이미지 그리기
     if (assetManager.loaded.weapons && assetManager.images.weapons.orbit) {
-      const drawSize = this.orb.size * 3;
-      
-      ctx.save();
-      ctx.translate(this.orb.x + offsetX, this.orb.y + offsetY);
-      ctx.rotate(this.orb.rotationAngle);
-      
-      // 이미지 그리기
       ctx.globalAlpha = 1;
       ctx.drawImage(
         assetManager.images.weapons.orbit,
@@ -707,20 +742,12 @@ class OrbitWeapon extends Weapon {
         drawSize,
         drawSize
       );
-      
-      ctx.restore();
     }
+    ctx.restore();
   }
-
-  // 레벨 업 시 강화
-  upgrade() {
-    this.damage += 5;
-    // 레벨업에 따라 반경 증가 또는 데미지 간격 감소 가능
-    this.orbitRadius += 15;
-    this.damageCooldown = Math.max(300, this.damageCooldown - 50);
-  }
-
-  fire() {
+  
+  outOfBounds() {
+    return false; // 플레이어 주변에 고정됨
   }
 }
 
