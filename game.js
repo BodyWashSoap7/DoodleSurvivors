@@ -236,7 +236,7 @@ class AssetManager {
   loadWeaponImages() {
     const weaponTypes = [
       'basic', 'orbit', 'flame', 'lightningChain', 
-      'lightningImpact', 'boomerang', 'soul', 'axe', 'wave', 'bible'
+      'lightningImpact',
     ];
     
     let loadedCount = 0;
@@ -262,7 +262,6 @@ class AssetManager {
   loadWeaponIcons() {
     const weaponTypes = [
       'basic', 'orbit', 'flame', 'lightning', 
-      'boomerang', 'soul', 'axe', 'wave', 'bible'
     ];
     
     let loadedCount = 0;
@@ -520,7 +519,6 @@ class GameObject {
 //----------------------
 
 // 기본 무기 클래스
-// 기본 무기 클래스
 class Weapon {
   constructor(config = {}) {
     this.type = config.type || 'basic';
@@ -630,97 +628,99 @@ class Bullet {
 }
 
 // 오비트 무기 클래스
-// 오비트 무기 클래스 수정
 class OrbitWeapon extends Weapon {
   constructor() {
     super({
       type: 'orbit',
       baseCooldown: 50,
-      damage: 8
+      damage: 3
     });
-    this.orbitRadius = 150; // 반경을 더 크게 설정 (기존 50에서 변경)
-    this.orbitSpeed = 0.03; // 회전 속도 약간 감소
-    this.orbitAngle = 0;
-    this.bulletCount = 1; // 구체 하나만 사용
-    this.permanentOrbs = []; // 영구적인 구체 배열
+    this.orbitRadius = 300; // 구체가 회전하는 반경
+    this.orbitSpeed = 0.025; // 회전 속도
+    this.orbitAngle = 0; // 현재 각도
+    this.damageCooldown = 100; // 데미지 간격 (ms)
+    this.lastDamageTime = 0; // 마지막 데미지 시간
+    this.hitEnemies = new Set(); // 맞은 적 추적
     
-    // 초기 구체 생성
-    this.createPermanentOrb();
-  }
-
-  // 영구적인 구체 생성 함수
-  createPermanentOrb() {
-    // 기존 구체가 있으면 모두 제거
-    this.permanentOrbs = [];
-    
-    // 새 구체 생성
-    this.permanentOrbs.push({
+    // 구체 생성
+    this.orb = {
       angle: 0,
       x: 0,
       y: 0,
-      rotationAngle: 0
-    });
+      rotationAngle: 0,
+      size: 15
+    };
   }
 
   update() {
+    const currentTime = gameTimeSystem.getTime();
+    
     // 회전 각도 업데이트
     this.orbitAngle += this.orbitSpeed;
     
     // 구체 위치 업데이트
-    this.permanentOrbs.forEach(orb => {
-      // 구체의 실제 위치 계산
-      orb.angle = this.orbitAngle;
-      orb.x = player.x + Math.cos(orb.angle) * this.orbitRadius;
-      orb.y = player.y + Math.sin(orb.angle) * this.orbitRadius;
-      
-      // 구체 자체 회전 업데이트
-      orb.rotationAngle = (orb.rotationAngle + 0.05) % (Math.PI * 2);
-      
-      // 충돌 검사
-      for (let enemy of gameObjects.enemies) {
-        if (enemy.state === 'moving' && 
-            detectCollision({x: orb.x, y: orb.y, size: 12}, enemy)) {
-          enemy.takeDamage(10 * player.attackPower);
+    this.orb.angle = this.orbitAngle;
+    this.orb.x = player.x + Math.cos(this.orb.angle) * this.orbitRadius;
+    this.orb.y = player.y + Math.sin(this.orb.angle) * this.orbitRadius;
+    
+    // 구체 자체 회전 업데이트 (시각 효과)
+    this.orb.rotationAngle = (this.orb.rotationAngle + 0.05) % (Math.PI * 2);
+    
+    // 데미지 간격 확인
+    if (currentTime - this.lastDamageTime >= this.damageCooldown) {
+      // 마지막 데미지 이후 충분한 시간이 지나면 맞은 적 목록 초기화
+      this.hitEnemies.clear();
+      this.lastDamageTime = currentTime;
+    }
+    
+    // 충돌 검사
+    for (let enemy of gameObjects.enemies) {
+      if (enemy.state === 'moving' && 
+          detectCollision({x: this.orb.x, y: this.orb.y, size: this.orb.size}, enemy)) {
+        
+        // 이 적에게 이번 주기에 이미 데미지를 줬는지 확인
+        if (!this.hitEnemies.has(enemy)) {
+          // 데미지 적용
+          enemy.takeDamage(3 * player.attackPower);
+          
+          // 맞은 적 목록에 추가
+          this.hitEnemies.add(enemy);
         }
       }
-    });
+    }
   }
 
-  // 그리기 함수 추가
   draw(offsetX, offsetY) {
-    this.permanentOrbs.forEach(orb => {
-      if (assetManager.loaded.weapons && assetManager.images.weapons.orbit) {
-        const drawSize = 12 * 3;
-        
-        ctx.save();
-        ctx.translate(orb.x + offsetX, orb.y + offsetY);
-        ctx.rotate(orb.rotationAngle);
-        
-        // 광채 효과
-        ctx.globalAlpha = 0.4;
-        ctx.fillStyle = '#66fcf1';
-        ctx.beginPath();
-        ctx.arc(0, 0, drawSize * 0.7, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // 이미지 그리기
-        ctx.globalAlpha = 1;
-        ctx.drawImage(
-          assetManager.images.weapons.orbit,
-          -drawSize / 2,
-          -drawSize / 2,
-          drawSize,
-          drawSize
-        );
-        
-        ctx.restore();
-      }
-    });
+    if (assetManager.loaded.weapons && assetManager.images.weapons.orbit) {
+      const drawSize = this.orb.size * 3;
+      
+      ctx.save();
+      ctx.translate(this.orb.x + offsetX, this.orb.y + offsetY);
+      ctx.rotate(this.orb.rotationAngle);
+      
+      // 이미지 그리기
+      ctx.globalAlpha = 1;
+      ctx.drawImage(
+        assetManager.images.weapons.orbit,
+        -drawSize / 2,
+        -drawSize / 2,
+        drawSize,
+        drawSize
+      );
+      
+      ctx.restore();
+    }
   }
 
-  // fire 메서드 재정의 (필요 없음)
+  // 레벨 업 시 강화
+  upgrade() {
+    this.damage += 5;
+    // 레벨업에 따라 반경 증가 또는 데미지 간격 감소 가능
+    this.orbitRadius += 15;
+    this.damageCooldown = Math.max(300, this.damageCooldown - 50);
+  }
+
   fire() {
-    // 기존 fire 메서드는 사용하지 않음
   }
 }
 
@@ -728,7 +728,7 @@ class FlameWeapon extends Weapon {
   constructor() {
     super({
       type: 'flame',
-      baseCooldown: 8000, // 쿨타임
+      baseCooldown: 5000, // 쿨타임
       damage: 15 // 데미지
     });
     this.flameAngle = Math.PI / 3; // 60도 부채꼴
@@ -747,8 +747,8 @@ class FlameWeapon extends Weapon {
     // 발사 중인지 확인 (활성 화염이 있으면 발사 중)
     this.isFiring = this.activeFlames.length > 0;
     
-    // 발사 중이 아니고 쿨다운이 지났으면 발사
-    if (!this.isFiring && now - this.lastAttackTime >= this.cooldown) {
+    // 발사 중이 아니고 쿨다운이 지났으면 발사(발사 중엔 쿨타임 돌지 않음)
+    if (!this.isFiring && now - this.lastAttackTime - this.duration >= this.cooldown) {
       this.fire();
       this.lastAttackTime = now;
     }
@@ -1126,119 +1126,6 @@ class ChainLightningEffect {
   }
 }
 
-// 나머지 무기 클래스들 추가 (아래는 기본 구현)
-class BoomerangWeapon extends Weapon {
-  constructor() {
-    super({
-      type: 'boomerang',
-      baseAttackSpeed: 3000,
-      damage: 20
-    });
-    this.maxBoomerangs = 2;
-    this.activeBoomerangs = 0;
-  }
-  
-  update() {
-    const now = gameTimeSystem.getTime();
-    if (now - this.lastAttackTime >= this.attackSpeed && this.activeBoomerangs < this.maxBoomerangs) {
-      this.fire();
-      this.lastAttackTime = now;
-    }
-  }
-  
-  fire() {
-    // 간단한 기본 구현
-    const angle = player.aimAngle || Math.random() * Math.PI * 2;
-    gameObjects.bullets.push(new Bullet(
-      player.x, player.y, 10, 7, angle, this.damage * player.attackPower
-    ));
-    this.activeBoomerangs++;
-  }
-  
-  boomerangReturned() {
-    this.activeBoomerangs--;
-  }
-}
-
-class SoulExplosionWeapon extends Weapon {
-  constructor() {
-    super({
-      type: 'soul',
-      baseAttackSpeed: 5000,
-      damage: 30
-    });
-  }
-  
-  fire() {
-    // 간단한 기본 구현
-    for (let i = 0; i < 8; i++) {
-      const angle = (Math.PI * 2 * i) / 8;
-      gameObjects.bullets.push(new Bullet(
-        player.x, player.y, 8, 6, angle, this.damage * player.attackPower
-      ));
-    }
-  }
-}
-
-class AxeWeapon extends Weapon {
-  constructor() {
-    super({
-      type: 'axe',
-      baseAttackSpeed: 1200,
-      damage: 25
-    });
-  }
-  
-  fire() {
-    // 간단한 기본 구현
-    const angle = Math.random() * Math.PI * 2;
-    gameObjects.bullets.push(new Bullet(
-      player.x, player.y, 12, 8, angle, this.damage * player.attackPower
-    ));
-  }
-}
-
-class WaveWeapon extends Weapon {
-  constructor() {
-    super({
-      type: 'wave',
-      baseAttackSpeed: 4000,
-      damage: 15
-    });
-  }
-  
-  fire() {
-    // 간단한 기본 구현
-    for (let i = 0; i < 12; i++) {
-      const angle = (Math.PI * 2 * i) / 12;
-      gameObjects.bullets.push(new Bullet(
-        player.x, player.y, 8, 4, angle, this.damage * player.attackPower
-      ));
-    }
-  }
-}
-
-class BibleWeapon extends Weapon {
-  constructor() {
-    super({
-      type: 'bible',
-      baseAttackSpeed: 5000,
-      damage: 15
-    });
-    this.maxBibles = 3;
-  }
-  
-  fire() {
-    // 간단한 기본 구현
-    for (let i = 0; i < this.maxBibles; i++) {
-      const angle = (Math.PI * 2 * i) / this.maxBibles;
-      gameObjects.bullets.push(new Bullet(
-        player.x, player.y, 8, 4, angle, this.damage * player.attackPower
-      ));
-    }
-  }
-}
-
 // 무기 팩토리 - 무기 생성과 업그레이드 관리
 const WeaponFactory = {
   createWeapon(type) {
@@ -1251,16 +1138,6 @@ const WeaponFactory = {
         return new FlameWeapon();
       case 'lightning':
         return new LightningWeapon();
-      case 'boomerang':
-        return new BoomerangWeapon();
-      case 'soul':
-        return new SoulExplosionWeapon();
-      case 'axe':
-        return new AxeWeapon();
-      case 'wave':
-        return new WaveWeapon();
-      case 'bible':
-        return new BibleWeapon();
       default:
         return new BasicWeapon();
     }
@@ -1276,10 +1153,7 @@ const WeaponFactory = {
     } else if (weapon instanceof LightningWeapon) {
       weapon.chainCount += 1;
       weapon.chainRange += 25;
-    } else if (weapon instanceof BoomerangWeapon) {
-      weapon.maxBoomerangs += 1;
-    }
-    
+    }     
     weapon.updateCooldown(player.cooldownReduction);
   }
 };
@@ -1651,8 +1525,9 @@ class Enemy {
 
   drawMoving(drawX, drawY) {
     const pulse = 1 + Math.sin(this.animationTime * 0.005) * 0.05;
-    const currentSize = this.currentSize * pulse;
-      
+    let currentSize = this.currentSize * pulse;
+    currentSize = Math.max(0.1, currentSize);
+    
     // 그림자
     ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
     ctx.beginPath();
@@ -2146,10 +2021,10 @@ class Jewel extends GameObject {
       const angle = Math.atan2(player.y - this.y, player.x - this.x);
       
       // 기본 속도 계수 (자석 보석은 더 빠름)
-      const speedFactor = this.type === 3 ? 3 : 2;
+      const speedFactor = 4;
       
       // 최대 이동 속도 설정 (픽셀/프레임)
-      const maxSpeed = 5;
+      const maxSpeed = 6;
       
       // 이동 거리 계산 및 상한 적용
       const moveDistance = Math.min(speedFactor, maxSpeed);
@@ -2325,11 +2200,6 @@ function generateLevelUpOptions() {
     { type: 'weapon', weaponType: 'orbit', name: '회전 구체', description: '플레이어 주변을 회전하며 공격' },
     { type: 'weapon', weaponType: 'flame', name: '화염방사기', description: '넓은 범위의 지속 데미지' },
     { type: 'weapon', weaponType: 'lightning', name: '번개 사슬', description: '적들 사이를 튀는 번개' },
-    { type: 'weapon', weaponType: 'boomerang', name: '부메랑', description: '던졌다가 돌아오는 무기' },
-    { type: 'weapon', weaponType: 'soul', name: '영혼 폭발', description: '주변의 모든 적에게 데미지' },
-    { type: 'weapon', weaponType: 'axe', name: '도끼 던지기', description: '회전하며 날아가는 도끼' },
-    { type: 'weapon', weaponType: 'wave', name: '파동', description: '주변으로 퍼지는 충격파' },
-    { type: 'weapon', weaponType: 'bible', name: '바이블', description: '주변을 회전하는 책' }
   ];
   
   // 플레이어가 이미 가지고 있는 무기 필터링
