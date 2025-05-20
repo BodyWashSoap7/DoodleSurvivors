@@ -54,16 +54,20 @@ const gameTimeSystem = {
 
 // 골드 저장 함수
 function saveGold() {
-  localStorage.setItem('vampireSurvivorGold', gold.toString());
+  if (userProfileSystem.currentUser) {
+    localStorage.setItem(`vampireSurvivorGold_${userProfileSystem.currentUser}`, gold.toString());
+  }
 }
 
 // 골드 불러오기 함수
 function loadGold() {
-  const savedGold = localStorage.getItem('vampireSurvivorGold');
-  if (savedGold !== null) {
-    return parseInt(savedGold);
+  if (userProfileSystem.currentUser) {
+    const savedGold = localStorage.getItem(`vampireSurvivorGold_${userProfileSystem.currentUser}`);
+    if (savedGold !== null) {
+      return parseInt(savedGold);
+    }
   }
-  return 0; // 저장된 골드가 없으면 0 반환
+  return 0; // 저장된 골드가 없거나 사용자가 없으면 0 반환
 }
 
 // Game objects
@@ -77,7 +81,7 @@ const gameObjects = {
 
 // Game state
 let gold = 0;
-let currentGameState = 0;
+let currentGameState = -1;
 let previousGameState = null;
 let loadingStartTime = 0;
 let loadingMinDuration = 500;
@@ -115,6 +119,7 @@ let lastFrameTime = 0;
 
 // 게임 상태 상수
 const GAME_STATE = {
+  PROFILE_SELECT: -1,
   START_SCREEN: 0,
   SETTINGS: 1,
   PLAYING: 2,
@@ -123,6 +128,88 @@ const GAME_STATE = {
   LOADING: 5,
   CONFIRM_DIALOG: 6,
   LEVEL_UP: 7
+};
+
+// 사용자 프로필 관리 시스템
+const userProfileSystem = {
+  currentUser: '',
+  users: [],
+  
+  // 초기화
+  init() {
+    // 저장된 사용자 목록 불러오기
+    const savedUsers = localStorage.getItem('vampireSurvivor_users');
+    if (savedUsers) {
+      this.users = JSON.parse(savedUsers);
+    }
+    
+    // 마지막 사용자 불러오기
+    const lastUser = localStorage.getItem('vampireSurvivor_lastUser');
+    if (lastUser && this.users.includes(lastUser)) {
+      this.currentUser = lastUser;
+    }
+  },
+  
+  // 사용자 추가
+  addUser(username) {
+    if (!username || username.trim() === '') return false;
+    
+    const cleanUsername = username.trim();
+    if (!this.users.includes(cleanUsername)) {
+      this.users.push(cleanUsername);
+      this.saveUserList();
+    }
+    
+    this.currentUser = cleanUsername;
+    this.saveCurrentUser();
+    return true;
+  },
+  
+  // 사용자 선택
+  selectUser(username) {
+    if (this.users.includes(username)) {
+      this.currentUser = username;
+      this.saveCurrentUser();
+      return true;
+    }
+    return false;
+  },
+  
+  // 사용자 삭제
+  deleteUser(username) {
+    const index = this.users.indexOf(username);
+    if (index !== -1) {
+      this.users.splice(index, 1);
+      this.saveUserList();
+      
+      // 삭제한 사용자 데이터도 제거
+      localStorage.removeItem(`vampireSurvivorGold_${username}`);
+      
+      // 현재 사용자가 삭제된 경우, 다른 사용자 선택 또는 빈 상태로
+      if (this.currentUser === username) {
+        this.currentUser = this.users.length > 0 ? this.users[0] : '';
+        this.saveCurrentUser();
+      }
+      
+      return true;
+    }
+    return false;
+  },
+  
+  // 사용자 목록 저장
+  saveUserList() {
+    localStorage.setItem('vampireSurvivor_users', JSON.stringify(this.users));
+  },
+  
+  // 현재 사용자 저장
+  saveCurrentUser() {
+    localStorage.setItem('vampireSurvivor_lastUser', this.currentUser);
+  },
+  
+  // 현재 사용자 확인
+  hasCurrentUser() {
+    return this.currentUser !== '';
+  }
 };
 
 // 적 관련 상수
@@ -2545,9 +2632,23 @@ function resetGame() {
   player.magnetDuration = 0;
 }
 
+// 사용자 생성 프롬프트 보완 (게임 내 UI)
+function showCreateUserPrompt() {
+  // 프롬프트 대신 게임 내 대화상자 표시
+  // 간단한 구현을 위해 기본 프롬프트 사용
+  const username = prompt('새 사용자 이름을 입력하세요:');
+  if (username && username.trim()) {
+    if (userProfileSystem.addUser(username.trim())) {
+      // 사용자 추가 성공
+    } else {
+      alert('이미 존재하는 사용자 이름입니다.');
+    }
+  }
+}
+
 function restartGame() {
   resetGame();
-  currentGameState = GAME_STATE.START_SCREEN;
+  currentGameState = GAME_STATE.PROFILE_SELECT;
 }
 
 //----------------------
@@ -2790,6 +2891,92 @@ function drawConfirmDialog() {
   ctx.fillText('취소', canvas.width / 2 + buttonSpacing / 2, buttonY);
 }
 
+function drawProfileSelectScreen() {
+  ctx.fillStyle = 'black';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  
+  // 제목
+  ctx.fillStyle = '#55AAFF';
+  ctx.font = '48px Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText('뱀파이어 서바이벌', canvas.width / 2, 80);
+  
+  // 안내 메시지
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = '24px Arial';
+  ctx.fillText('계속하려면 사용자 프로필을 선택하세요', canvas.width / 2, 130);
+  
+  // 현재 사용자 표시
+  if (userProfileSystem.hasCurrentUser()) {
+    ctx.fillStyle = '#FFFF00';
+    ctx.fillText(`현재 사용자: ${userProfileSystem.currentUser}`, canvas.width / 2, 170);
+    
+    // 골드 표시
+    ctx.fillStyle = '#66fcf1';
+    ctx.fillText(`보유 골드: ${loadGold()}`, canvas.width / 2, 200);
+    
+    // 시작하기 버튼 - 현재 사용자가 선택된 경우에만 활성화
+    const continueButtonY = canvas.height - 50;
+    drawButton(canvas.width / 2 - 190, continueButtonY, 380, 40, '시작하기', true);
+  }
+  
+  // 사용자 목록
+  const listX = canvas.width / 2 - 200;
+  const listY = 230;
+  const listWidth = 400;
+  const listHeight = 250;
+  const itemHeight = 40;
+  
+  // 배경
+  ctx.fillStyle = 'rgba(30, 30, 40, 0.8)';
+  ctx.fillRect(listX, listY, listWidth, listHeight);
+  
+  // 테두리
+  ctx.strokeStyle = '#45a29e';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(listX, listY, listWidth, listHeight);
+  
+  // 사용자 목록
+  ctx.fillStyle = '#FFFFFF';
+  ctx.textAlign = 'left';
+  ctx.font = '20px Arial';
+  
+  if (userProfileSystem.users.length === 0) {
+    ctx.textAlign = 'center';
+    ctx.fillText('사용자가 없습니다. 새 사용자를 만드세요.', canvas.width / 2, listY + listHeight/2);
+    ctx.textAlign = 'left';
+  } else {
+    for (let i = 0; i < userProfileSystem.users.length; i++) {
+      const username = userProfileSystem.users[i];
+      const isSelected = username === userProfileSystem.currentUser;
+      
+      // 선택된 사용자 강조
+      if (isSelected) {
+        ctx.fillStyle = 'rgba(102, 252, 241, 0.3)';
+        ctx.fillRect(listX, listY + i * itemHeight, listWidth, itemHeight);
+        ctx.fillStyle = '#66fcf1';
+      } else {
+        ctx.fillStyle = '#FFFFFF';
+      }
+      
+      ctx.fillText(username, listX + 20, listY + i * itemHeight + 25);
+    }
+  }
+  
+  // 프로필 관리 버튼
+  const buttonY = listY + listHeight + 20;
+  const buttonWidth = 180;
+  const buttonHeight = 40;
+  const spacing = 20;
+  
+  // 새 사용자 버튼
+  drawButton(canvas.width / 2 - buttonWidth - spacing/2, buttonY, buttonWidth, buttonHeight, '새 사용자', true);
+  
+  // 사용자 삭제 버튼 (선택된 사용자가 있을 때만 활성화)
+  drawButton(canvas.width / 2 + spacing/2, buttonY, buttonWidth, buttonHeight, '사용자 삭제', 
+             userProfileSystem.hasCurrentUser());
+}
+
 function drawLoadingScreen() {
   ctx.fillStyle = 'black';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -2812,6 +2999,70 @@ function drawLoadingScreen() {
   ctx.fillRect(canvas.width / 2 - 100, canvas.height / 2 + 20, 200 * progress, 20);
 }
 
+function handleProfileSelectClick() {
+  // 사용자 목록 영역 클릭 처리
+  const listX = canvas.width / 2 - 200;
+  const listY = 230;
+  const listWidth = 400;
+  const listHeight = 250;
+  const itemHeight = 40;
+  
+  // 사용자 목록에서 선택
+  if (mouseX >= listX && mouseX <= listX + listWidth && 
+      mouseY >= listY && mouseY <= listY + listHeight) {
+    const clickedIndex = Math.floor((mouseY - listY) / itemHeight);
+    if (clickedIndex >= 0 && clickedIndex < userProfileSystem.users.length) {
+      userProfileSystem.selectUser(userProfileSystem.users[clickedIndex]);
+      return;
+    }
+  }
+  
+  // 프로필 관리 버튼 클릭 처리
+  const buttonY = listY + listHeight + 20;
+  const buttonWidth = 180;
+  const buttonHeight = 40;
+  const spacing = 20;
+  
+  // 새 사용자 버튼
+  if (mouseX >= canvas.width / 2 - buttonWidth - spacing/2 && 
+      mouseX <= canvas.width / 2 - spacing/2 &&
+      mouseY >= buttonY && mouseY <= buttonY + buttonHeight) {
+    showCreateUserPrompt();
+    return;
+  }
+  
+  // 사용자 삭제 버튼
+  if (mouseX >= canvas.width / 2 + spacing/2 && 
+      mouseX <= canvas.width / 2 + spacing/2 + buttonWidth &&
+      mouseY >= buttonY && mouseY <= buttonY + buttonHeight &&
+      userProfileSystem.hasCurrentUser()) {
+    confirmDeleteUser();
+    return;
+  }
+  
+  // 계속하기 버튼 - 사용자가 선택된 경우에만
+  if (userProfileSystem.hasCurrentUser()) {
+    const continueButtonY = canvas.height - 50;
+    if (mouseX >= canvas.width / 2 - 190 && 
+        mouseX <= canvas.width / 2 + 190 &&
+        mouseY >= continueButtonY && 
+        mouseY <= continueButtonY + 40) {
+      // 사용자가 선택되면 시작 화면으로 전환
+      currentGameState = GAME_STATE.START_SCREEN;
+      return;
+    }
+  }
+}
+
+// 사용자 삭제 확인
+function confirmDeleteUser() {
+  if (userProfileSystem.currentUser) {
+    if (confirm(`${userProfileSystem.currentUser} 사용자를 삭제하시겠습니까?`)) {
+      userProfileSystem.deleteUser(userProfileSystem.currentUser);
+    }
+  }
+}
+
 function drawStartScreen() {
   ctx.fillStyle = 'black';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -2820,12 +3071,19 @@ function drawStartScreen() {
   ctx.fillStyle = '#55AAFF';
   ctx.font = '48px Arial';
   ctx.textAlign = 'center';
-  ctx.fillText('뱀파이어 서바이벌', canvas.width / 2, canvas.height / 3 + 50);
+  ctx.fillText('뱀파이어 서바이벌', canvas.width / 2, canvas.height / 4);
+  
+  // 현재 사용자 및 골드 정보 표시
+  ctx.fillStyle = '#FFFF00';
+  ctx.font = '20px Arial';
+  ctx.fillText(`사용자: ${userProfileSystem.currentUser}`, canvas.width / 2, canvas.height / 4 + 40);
+  ctx.fillStyle = '#66fcf1';
+  ctx.fillText(`보유 골드: ${loadGold()}`, canvas.width / 2, canvas.height / 4 + 70);
   
   // 캐릭터 미리보기
   const previewSize = player.size * 3;
   const previewX = canvas.width / 2;
-  const previewY = canvas.height / 3 + 70;
+  const previewY = canvas.height / 2 + 20;
   
   // 애니메이션 프레임 업데이트
   previewAnimation.frameTime += 16;
@@ -2841,46 +3099,27 @@ function drawStartScreen() {
       player.image,
       spriteX, 0,
       player.spriteWidth, player.spriteHeight,
-      previewX - previewSize * 2,
-      previewY - previewSize * 2 - 150,
-      previewSize * 4,
-      previewSize * 4
+      previewX - previewSize,
+      previewY - previewSize,
+      previewSize * 2,
+      previewSize * 2
     );
   }
   
-  // 메뉴 옵션
-  ctx.font = '24px Arial';
-  
-  // 마우스에 기반한 hover 효과
-  const startButtonX = canvas.width / 2 - 75;
-  const startButtonY = canvas.height / 2 + 30;
+  // 게임 버튼
+  const buttonY = canvas.height - 100;
   const buttonWidth = 150;
   const buttonHeight = 40;
-  const settingsButtonY = canvas.height / 2 + 80;
+  const spacing = 40;
   
-  // 마우스가 시작 버튼 위에 있는지 확인
-  const isStartHovered = mouseX >= startButtonX && mouseX <= startButtonX + buttonWidth &&
-                         mouseY >= startButtonY && mouseY <= startButtonY + buttonHeight;
+  // 시작 버튼
+  drawButton(canvas.width / 2 - buttonWidth - spacing/2, buttonY, buttonWidth, buttonHeight, '게임 시작', true);
   
-  // 마우스가 설정 버튼 위에 있는지 확인
-  const isSettingsHovered = mouseX >= startButtonX && mouseX <= startButtonX + buttonWidth &&
-                           mouseY >= settingsButtonY && mouseY <= settingsButtonY + buttonHeight;
+  // 설정 버튼
+  drawButton(canvas.width / 2 + spacing/2, buttonY, buttonWidth, buttonHeight, '설정', true);
   
-  // 시작 버튼 그리기
-  ctx.fillStyle = isStartHovered ? '#66fcf1' : '#45a29e';
-  ctx.fillRect(startButtonX, startButtonY, buttonWidth, buttonHeight);
-  ctx.strokeStyle = '#ffffff';
-  ctx.strokeRect(startButtonX, startButtonY, buttonWidth, buttonHeight);
-  ctx.fillStyle = isStartHovered ? '#0b0c10' : '#ffffff';
-  ctx.fillText('시작', canvas.width / 2, startButtonY + buttonHeight/2 + 5);
-  
-  // 설정 버튼 그리기
-  ctx.fillStyle = isSettingsHovered ? '#66fcf1' : '#45a29e';
-  ctx.fillRect(startButtonX, settingsButtonY, buttonWidth, buttonHeight);
-  ctx.strokeStyle = '#ffffff';
-  ctx.strokeRect(startButtonX, settingsButtonY, buttonWidth, buttonHeight);
-  ctx.fillStyle = isSettingsHovered ? '#0b0c10' : '#ffffff';
-  ctx.fillText('설정', canvas.width / 2, settingsButtonY + buttonHeight/2 + 5);
+  // 프로필 변경 버튼
+  drawButton(canvas.width / 2 - buttonWidth/2, buttonY - 60, buttonWidth, buttonHeight, '프로필 변경', true);
 }
 
 // 버튼 그리기 함수
@@ -3961,6 +4200,9 @@ function handleMouseClick() {
   console.log("Mouse clicked, game state:", currentGameState); // 디버깅용
 
   switch(currentGameState) {
+    case GAME_STATE.PROFILE_SELECT:
+      handleProfileSelectClick();
+      break;
     case GAME_STATE.START_SCREEN:
       handleStartScreenClick();
       break;
@@ -3983,23 +4225,35 @@ function handleMouseClick() {
 }
 
 function handleStartScreenClick() {
-  const centerX = canvas.width / 2;
-  const startY = canvas.height / 2 + 50;
-  const settingsY = canvas.height / 2 + 100;
+  const buttonY = canvas.height - 100;
   const buttonWidth = 150;
   const buttonHeight = 40;
+  const spacing = 40;
   
-  // '시작' 버튼 클릭 감지
-  if (mouseX > centerX - buttonWidth/2 && mouseX < centerX + buttonWidth/2 &&
-      mouseY > startY - buttonHeight/2 && mouseY < startY + buttonHeight/2) {
+  // 시작 버튼
+  if (mouseX >= canvas.width / 2 - buttonWidth - spacing/2 && 
+      mouseX <= canvas.width / 2 - spacing/2 &&
+      mouseY >= buttonY && mouseY <= buttonY + buttonHeight) {
     startGame();
+    return;
   }
-  // '설정' 버튼 클릭 감지
-  else if (mouseX > centerX - buttonWidth/2 && mouseX < centerX + buttonWidth/2 &&
-           mouseY > settingsY - buttonHeight/2 && mouseY < settingsY + buttonHeight/2) {
+  
+  // 설정 버튼
+  if (mouseX >= canvas.width / 2 + spacing/2 && 
+      mouseX <= canvas.width / 2 + spacing/2 + buttonWidth &&
+      mouseY >= buttonY && mouseY <= buttonY + buttonHeight) {
     previousCharacterIndex = player.characterType - 1;
     currentCharacterIndex = previousCharacterIndex;
     currentGameState = GAME_STATE.SETTINGS;
+    return;
+  }
+  
+  // 프로필 변경 버튼
+  if (mouseX >= canvas.width / 2 - buttonWidth/2 && 
+      mouseX <= canvas.width / 2 + buttonWidth/2 &&
+      mouseY >= buttonY - 60 && mouseY <= buttonY - 60 + buttonHeight) {
+    currentGameState = GAME_STATE.PROFILE_SELECT;
+    return;
   }
 }
 
@@ -4186,9 +4440,13 @@ function gameLoop(timestamp) {
     if (currentGameState === GAME_STATE.PLAYING) {
       gameTimeSystem.update();
     }
+
+    if (currentGameState === GAME_STATE.PROFILE_SELECT) {
+        drawProfileSelectScreen();
+      }
     
     // 로딩 상태 처리
-    if (currentGameState === GAME_STATE.LOADING) {
+    else if (currentGameState === GAME_STATE.LOADING) {
       drawLoadingScreen();
       
       // 청크 로딩 완료 및 최소 로딩 시간 경과 확인
@@ -4275,6 +4533,12 @@ function gameLoop(timestamp) {
 
 // 게임 초기화 및 시작
 window.onload = function() {
+  // 사용자 프로필 시스템 초기화
+  userProfileSystem.init();
+  
+  // 초기 상태를 프로필 선택으로 설정
+  currentGameState = GAME_STATE.PROFILE_SELECT;
+  
   assetManager.loadAll(() => {
     // 플레이어 첫 번째 캐릭터로 초기화
     player.init(0); 
