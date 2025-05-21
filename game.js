@@ -81,7 +81,7 @@ const gameObjects = {
 
 // Game state
 let gold = 0;
-let currentGameState = -1;
+let currentGameState = 8;
 let previousGameState = null;
 let loadingStartTime = 0;
 let loadingMinDuration = 500;
@@ -119,7 +119,6 @@ let lastFrameTime = 0;
 
 // 게임 상태 상수
 const GAME_STATE = {
-  PROFILE_SELECT: -1,
   START_SCREEN: 0,
   SETTINGS: 1,
   PLAYING: 2,
@@ -127,13 +126,96 @@ const GAME_STATE = {
   PAUSED: 4,
   LOADING: 5,
   CONFIRM_DIALOG: 6,
-  LEVEL_UP: 7
+  LEVEL_UP: 7,
+  PROFILE_SELECT: 8,
+  CREATE_USER: 9
 };
+
+// 사용자 이름 입력 관련 변수
+let newUsername = '';
+let inputCursorBlink = 0;
+
+let showCreateUserError = false;
+let errorTimeout = 0;
+
+let createUserErrorMessage = '';
+
+// 한글 입력 관련 변수
+let hiddenInput;
+let isFocusedOnInput = false;
+
+function drawCreateUserScreen() {
+  // 배경
+  ctx.fillStyle = 'black';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  
+  // 제목
+  ctx.fillStyle = '#55AAFF';
+  ctx.font = '32px Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText('새 사용자 생성', canvas.width / 2, 80);
+  
+  // 입력 상자
+  const inputBoxWidth = 400;
+  const inputBoxHeight = 50;
+  const inputBoxX = (canvas.width - inputBoxWidth) / 2;
+  const inputBoxY = canvas.height / 2 - 40;
+  
+  // 입력 상자 배경
+  ctx.fillStyle = '#1f2833';
+  ctx.fillRect(inputBoxX, inputBoxY, inputBoxWidth, inputBoxHeight);
+  
+  // 입력 상자 테두리 (입력 필드가 포커스 되었을 때 테두리 색상 변경)
+  ctx.strokeStyle = isFocusedOnInput ? '#66fcf1' : '#45a29e';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(inputBoxX, inputBoxY, inputBoxWidth, inputBoxHeight);
+  
+  // 입력된 텍스트
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = '24px Arial';
+  ctx.textAlign = 'left';
+  ctx.fillText(newUsername, inputBoxX + 15, inputBoxY + 33);
+  
+  // 입력 커서 깜빡임 (입력 필드가 포커스 되었을 때만)
+  if (isFocusedOnInput) {
+    inputCursorBlink += 0.05;
+    if (Math.sin(inputCursorBlink) > 0) {
+      const textWidth = ctx.measureText(newUsername).width;
+      ctx.fillRect(inputBoxX + 15 + textWidth, inputBoxY + 10, 2, 30);
+    }
+  }
+  
+  // 안내 텍스트
+  ctx.fillStyle = '#c5c6c7';
+  ctx.textAlign = 'center';
+  ctx.font = '18px Arial';
+  ctx.fillText('사용자 이름을 입력한 후 Enter를 누르세요', canvas.width / 2, inputBoxY + 80);
+  ctx.fillText('취소하려면 ESC를 누르세요', canvas.width / 2, inputBoxY + 110);
+  
+  // 입력 제한 표시
+  if (newUsername.length >= 12) {
+    ctx.fillStyle = '#ff6b6b';
+    ctx.fillText('최대 12자까지 입력 가능합니다', canvas.width / 2, inputBoxY + 140);
+  }
+  
+  // 에러 메시지 표시
+  if (showCreateUserError) {
+    ctx.fillStyle = '#ff6b6b';
+    ctx.fillText(createUserErrorMessage, canvas.width / 2, inputBoxY + 170);
+    
+    // 타임아웃 처리
+    errorTimeout--;
+    if (errorTimeout <= 0) {
+      showCreateUserError = false;
+    }
+  }
+}
 
 // 사용자 프로필 관리 시스템
 const userProfileSystem = {
   currentUser: '',
   users: [],
+  MAX_PROFILES: 12, // 최대 프로필 수
   
   // 초기화
   init() {
@@ -155,14 +237,18 @@ const userProfileSystem = {
     if (!username || username.trim() === '') return false;
     
     const cleanUsername = username.trim();
-    if (!this.users.includes(cleanUsername)) {
-      this.users.push(cleanUsername);
-      this.saveUserList();
-    }
+    
+    this.users.push(cleanUsername);
+    this.saveUserList();
     
     this.currentUser = cleanUsername;
     this.saveCurrentUser();
     return true;
+  },
+  
+  // 최대 프로필 수 도달 여부 확인 메서드
+  isProfileLimitReached() {
+    return this.users.length >= this.MAX_PROFILES;
   },
   
   // 사용자 선택
@@ -2632,23 +2718,20 @@ function resetGame() {
   player.magnetDuration = 0;
 }
 
-// 사용자 생성 프롬프트 보완 (게임 내 UI)
+// 사용자 생성 프롬프트
 function showCreateUserPrompt() {
-  // 프롬프트 대신 게임 내 대화상자 표시
-  // 간단한 구현을 위해 기본 프롬프트 사용
-  const username = prompt('새 사용자 이름을 입력하세요:');
-  if (username && username.trim()) {
-    if (userProfileSystem.addUser(username.trim())) {
-      // 사용자 추가 성공
-    } else {
-      alert('이미 존재하는 사용자 이름입니다.');
-    }
-  }
-}
-
-function restartGame() {
-  resetGame();
-  currentGameState = GAME_STATE.PROFILE_SELECT;
+  // 게임 내 입력 화면으로 전환
+  newUsername = '';
+  currentGameState = GAME_STATE.CREATE_USER;
+  showCreateUserError = false;
+  inputCursorBlink = 0;
+  
+  // 히든 입력 필드 초기화 및 포커스
+  hiddenInput.value = '';
+  setTimeout(() => {
+    hiddenInput.focus();
+    isFocusedOnInput = true;
+  }, 100);
 }
 
 //----------------------
@@ -4124,8 +4207,6 @@ function update() {
 //----------------------
 
 document.addEventListener('keydown', (e) => {
-  
-  // 키보드 조작
   if (e.key === 'Escape') {
     if (currentGameState === GAME_STATE.PLAYING) {
       pauseGame();
@@ -4137,6 +4218,12 @@ document.addEventListener('keydown', (e) => {
       previousGameState = currentGameState;
       currentGameState = GAME_STATE.PAUSED;
       pauseStartTime = gameTimeSystem.getTime();
+    } else if (currentGameState === GAME_STATE.CREATE_USER) {
+      // 입력 취소
+      newUsername = '';
+      hiddenInput.value = '';
+      hiddenInput.blur();
+      currentGameState = GAME_STATE.PROFILE_SELECT;
     }
     e.preventDefault();
   }
@@ -4145,6 +4232,71 @@ document.addEventListener('keydown', (e) => {
 document.removeEventListener('keyup', (e) => {
   keys[e.key] = false;
 });
+
+// 입력 핸들러 설정 함수
+function setupInputHandlers() {
+  // 입력 이벤트
+  hiddenInput.addEventListener('input', function(e) {
+    if (currentGameState === GAME_STATE.CREATE_USER) {
+      // 최대 길이 제한 (12자)
+      if (e.target.value.length <= 12) {
+        newUsername = e.target.value;
+      } else {
+        // 제한 초과 시 잘라내기
+        newUsername = e.target.value.substring(0, 12);
+        e.target.value = newUsername;
+      }
+    }
+  });
+  
+  // 포커스 이벤트
+  hiddenInput.addEventListener('focus', function() {
+    isFocusedOnInput = true;
+  });
+  
+  hiddenInput.addEventListener('blur', function() {
+    isFocusedOnInput = false;
+  });
+  
+  // 키 이벤트 (Enter와 Escape 처리)
+  hiddenInput.addEventListener('keydown', function(e) {
+    if (currentGameState === GAME_STATE.CREATE_USER) {
+      if (e.key === 'Enter') {
+        // 입력 완료
+        if (newUsername.trim()) {
+          // 최대 프로필 수 체크
+          if (userProfileSystem.users.length >= userProfileSystem.MAX_PROFILES) {
+            showCreateUserError = true;
+            createUserErrorMessage = "최대 프로필 수(12개)에 도달했습니다";
+            errorTimeout = 120; // 약 2초
+          }
+          // 사용자 이름 중복 체크
+          else if (userProfileSystem.users.includes(newUsername.trim())) {
+            showCreateUserError = true;
+            createUserErrorMessage = "이미 존재하는 사용자 이름입니다";
+            errorTimeout = 120; // 약 2초
+          }
+          // 성공 케이스
+          else if (userProfileSystem.addUser(newUsername.trim())) {
+            // 사용자 추가 성공
+            newUsername = '';
+            hiddenInput.value = '';
+            hiddenInput.blur();
+            currentGameState = GAME_STATE.PROFILE_SELECT;
+          }
+        }
+        e.preventDefault();
+      } else if (e.key === 'Escape') {
+        // 입력 취소
+        newUsername = '';
+        hiddenInput.value = '';
+        hiddenInput.blur();
+        currentGameState = GAME_STATE.PROFILE_SELECT;
+        e.preventDefault();
+      }
+    }
+  });
+}
 
 // 마우스 조작
 
@@ -4444,6 +4596,10 @@ function gameLoop(timestamp) {
     if (currentGameState === GAME_STATE.PROFILE_SELECT) {
         drawProfileSelectScreen();
       }
+
+    else if (currentGameState === GAME_STATE.CREATE_USER) {
+      drawCreateUserScreen();
+    }
     
     // 로딩 상태 처리
     else if (currentGameState === GAME_STATE.LOADING) {
@@ -4539,6 +4695,12 @@ window.onload = function() {
   // 초기 상태를 프로필 선택으로 설정
   currentGameState = GAME_STATE.PROFILE_SELECT;
   
+  // 히든 입력 필드 초기화
+  hiddenInput = document.getElementById('hiddenInput');
+  
+  // 입력 핸들러 설정
+  setupInputHandlers();
+  
   assetManager.loadAll(() => {
     // 플레이어 첫 번째 캐릭터로 초기화
     player.init(0); 
@@ -4554,3 +4716,5 @@ window.onload = function() {
   resizeCanvas();
   window.addEventListener('resize', resizeCanvas);
 };
+
+
