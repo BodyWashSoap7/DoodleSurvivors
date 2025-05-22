@@ -340,6 +340,166 @@ class AssetManager {
     };
   }
 
+  // 통합된 이미지 로딩 메서드
+  loadImageSet(category, items, pathTemplate, options = {}) {
+    let loadedCount = 0;
+    const totalCount = items.length;
+    const timeout = options.timeout || 5000;
+    
+    // 타임아웃 설정
+    const timeoutId = setTimeout(() => {
+      if (!this.loaded[category] && loadedCount > 0) {
+        this.loaded[category] = true;
+        console.log(`시간 초과로 인한 ${category} 이미지 로드 중단`);
+      }
+    }, timeout);
+    
+    items.forEach((item, index) => {
+      const img = new Image();
+      const path = pathTemplate.replace('{item}', item).replace('{index}', index);
+      img.src = path;
+      
+      img.onload = () => {
+        loadedCount++;
+        if (loadedCount === totalCount) {
+          clearTimeout(timeoutId);
+          this.loaded[category] = true;
+          console.log(`${category} 이미지 로드 완료`);
+        }
+      };
+      
+      img.onerror = () => {
+        console.error(`${category} 이미지 로드 실패: ${item}`);
+        loadedCount++;
+        if (loadedCount === totalCount) {
+          clearTimeout(timeoutId);
+          this.loaded[category] = true;
+        }
+      };
+      
+      // 카테고리별 저장 방식
+      this.storeImage(category, item, index, img, options);
+    });
+  }
+
+  storeImage(category, item, index, img, options) {
+    switch(category) {
+      case 'players':
+        this.images.players[index] = {
+          name: `캐릭터 ${index + 1}`,
+          image: img,
+          spriteWidth: options.spriteWidth || 64,
+          spriteHeight: options.spriteHeight || 64,
+          frameCount: options.frameCount || 4
+        };
+        break;
+      case 'mapTiles':
+      case 'jewels':
+        this.images[category][index] = img;
+        break;
+      default:
+        this.images[category][item] = img;
+        break;
+    }
+  }
+
+  loadPlayerImages() {
+    const playerCount = 3;
+    this.images.players = [];
+    
+    for (let i = 0; i < playerCount; i++) {
+      const img = new Image();
+      img.src = `./img/player${i+1}_sprites.png`;
+      img.onload = () => {
+        console.log(`캐릭터 ${i+1} 스프라이트 시트 로드 완료`);
+        if (this.images.players.filter(p => p).length === playerCount) {
+          this.loaded.players = true;
+        }
+      };
+      this.images.players[i] = {
+        name: `캐릭터 ${i+1}`,
+        image: img,
+        spriteWidth: 64,
+        spriteHeight: 64,
+        frameCount: 4
+      };
+    }
+  }
+
+  loadMapTiles() {
+    this.loadImageSet('mapTiles', 
+      Array.from({length: 4}, (_, i) => i + 1), 
+      './img/maps/map_tile_{item}.png',
+      { timeout: 5000 }
+    );
+  }
+
+  loadWeaponImages() {
+    this.loadImageSet('weapons', 
+      ['basic', 'orbit', 'flame', 'lightningChain', 'lightningImpact'], 
+      './img/weapons/{item}.png'
+    );
+  }
+
+  loadWeaponIcons() {
+    this.loadImageSet('weaponIcons', 
+      ['basic', 'orbit', 'flame', 'lightning', 'fist', 'sword', 'spear'], 
+      './img/weapon_icons/{item}_icon.png'
+    );
+  }
+  
+  loadLevelUpIcons() {
+    this.loadImageSet('levelUpIcons', 
+      ['attackPower', 'maxHealth', 'cooldownReduction', 'projectileSpeed', 'moveSpeed', 'pickupRadius', 'expMultiplier'], 
+      './img/levelup/{item}_icon.png'
+    );
+  }
+
+  loadArtifactIcons() {
+    this.loadImageSet('artifactIcons', 
+      ['reducePlayerSize', 'increaseAttackPower', 'increaseCooldownReduction', 'increaseMoveSpeed', 'enableHealthRegen', 'reduceEnemySpeed', 'reduceEnemyHealth', 'expGain'], 
+      './img/artifacts/{item}_icon.png'
+    );
+  }
+
+  loadEnemyImages() {
+    this.loadImageSet('enemies', 
+      ['normal', 'fast', 'tank', 'shooter', 'boss'], 
+      './img/enemies/{item}_enemy_sprites.png'
+    );
+    
+    // 적 총알 이미지 별도 로드
+    const bulletImg = new Image();
+    bulletImg.src = './img/enemies/enemy_bullet.png';
+    bulletImg.onload = () => console.log('적 총알 이미지 로드 완료');
+    this.images.enemies.bullet = bulletImg;
+  }
+  
+  loadMiscImages() {
+    // 보물 이미지
+    this.images.treasure = new Image();
+    this.images.treasure.src = './img/miscs/treasure.png';
+    this.images.treasure.onload = () => {
+      this.loaded.treasure = true;
+      console.log('보물 이미지 로드 완료');
+    };
+    
+    // 피격 효과 이미지
+    this.images.hitEffect = new Image();
+    this.images.hitEffect.src = './img/miscs/hit_effect.png';
+    this.images.hitEffect.onload = () => {
+      this.loaded.hitEffect = true;
+      console.log('피격 효과 이미지 로드 완료');
+    };
+  }
+
+  loadJewelImages() {
+    this.loadImageSet('jewels', 
+      Array.from({length: 5}, (_, i) => i), 
+      './img/jewels/jewel_{item}.png',
+      { timeout: 5000 }
+    );
+  }
 
   loadAll(callback) {
     this.loadPlayerImages();
@@ -364,248 +524,6 @@ class AssetManager {
     };
     
     setTimeout(checkAllLoaded, 100);
-  }
-
-  loadPlayerImages() {
-    const playerTypes = 3;
-    this.images.players = [];
-    
-    for (let i = 0; i < playerTypes; i++) {
-      const img = new Image();
-      img.src = `./img/player${i+1}_sprites.png`;
-      img.onload = () => {
-        console.log(`캐릭터 ${i+1} 스프라이트 시트 로드 완료`);
-        if (this.images.players.length === playerTypes) {
-          this.loaded.players = true;
-        }
-      };
-      this.images.players.push({
-        name: `캐릭터 ${i+1}`,
-        image: img,
-        spriteWidth: 64,
-        spriteHeight: 64,
-        frameCount: 4
-      });
-    }
-  }
-
-  loadMapTiles() {
-    const tileCount = 4;
-    this.images.mapTiles = [];
-    let loadedCount = 0;
-    
-    for (let i = 1; i <= tileCount; i++) {
-      const img = new Image();
-      img.src = `./img/maps/map_tile_${i}.png`;
-      img.onload = () => {
-        loadedCount++;
-        if (loadedCount === tileCount) {
-          this.loaded.mapTiles = true;
-          console.log('맵 타일 이미지 로드 완료');
-        }
-      };
-      img.onerror = () => {
-        console.error(`맵 타일 이미지 로드 실패: map_tile_${i}.png`);
-        loadedCount++;
-      };
-      this.images.mapTiles.push(img);
-    }
-    
-    // 5초 후에도 로드가 안 되면 진행
-    setTimeout(() => {
-      if (!this.loaded.mapTiles && loadedCount > 0) {
-        this.loaded.mapTiles = true;
-        console.log('시간 초과로 인한 맵 타일 이미지 로드 중단');
-      }
-    }, 5000);
-  }
-
-  loadWeaponImages() {
-    const weaponTypes = [
-      'basic', 'orbit', 'flame', 'lightningChain', 
-      'lightningImpact',
-    ];
-    
-    let loadedCount = 0;
-    
-    for (const type of weaponTypes) {
-      const img = new Image();
-      img.src = `./img/weapons/${type}.png`;
-      img.onload = () => {
-        loadedCount++;
-        if (loadedCount === weaponTypes.length) {
-          this.loaded.weapons = true;
-          console.log('무기 이미지 로드 완료');
-        }
-      };
-      img.onerror = () => {
-        console.error(`무기 이미지 로드 실패: ${type}`);
-        loadedCount++;
-      };
-      this.images.weapons[type] = img;
-    }
-  }
-
-  loadWeaponIcons() {
-    const weaponTypes = [
-      'basic', 'orbit', 'flame', 'lightning', 
-      'fist', 'sword', 'spear'
-    ];
-    
-    let loadedCount = 0;
-    
-    for (const type of weaponTypes) {
-      const img = new Image();
-      img.src = `./img/weapon_icons/${type}_icon.png`;
-      img.onload = () => {
-        loadedCount++;
-        if (loadedCount === weaponTypes.length) {
-          this.loaded.weaponIcons = true;
-          console.log('무기 아이콘 로드 완료');
-        }
-      };
-      img.onerror = () => {
-        console.error(`무기 아이콘 로드 실패: ${type}`);
-        loadedCount++;
-      };
-      this.images.weaponIcons[type] = img;
-    }
-  }
-  
-  loadLevelUpIcons() {
-    const iconTypes = [
-      'attackPower', 'maxHealth', 'cooldownReduction', 'projectileSpeed',
-      'moveSpeed', 'pickupRadius', 'expMultiplier'
-    ];
-    
-    let loadedCount = 0;
-    
-    for (const type of iconTypes) {
-      const img = new Image();
-      img.src = `./img/levelup/${type}_icon.png`;
-      img.onload = () => {
-        loadedCount++;
-        if (loadedCount === iconTypes.length) {
-          this.loaded.levelUpIcons = true;
-          console.log('레벨업 아이콘 로드 완료');
-        }
-      };
-      img.onerror = () => {
-        console.error(`레벨업 아이콘 로드 실패: ${type}`);
-        loadedCount++;
-      };
-      this.images.levelUpIcons[type] = img;
-    }
-  }
-
-  loadArtifactIcons() {
-    const artifactTypes = [
-      'reducePlayerSize', 'increaseAttackPower', 'increaseCooldownReduction',
-      'increaseMoveSpeed', 'enableHealthRegen', 'reduceEnemySpeed',
-      'reduceEnemyHealth', 'expGain'
-    ];
-    
-    let loadedCount = 0;
-    
-    for (const type of artifactTypes) {
-      const img = new Image();
-      img.src = `./img/artifacts/${type}_icon.png`;
-      img.onload = () => {
-        loadedCount++;
-        if (loadedCount === artifactTypes.length) {
-          this.loaded.artifactIcons = true;
-          console.log('아티팩트 아이콘 로드 완료');
-        }
-      };
-      img.onerror = () => {
-        console.error(`아티팩트 아이콘 로드 실패: ${type}`);
-        loadedCount++;
-      };
-      this.images.artifactIcons[type] = img;
-    }
-  }
-
-  loadEnemyImages() {
-    const enemyTypes = [
-      'normal', 'fast', 'tank', 'shooter', 'boss'
-    ];
-    
-    let loadedCount = 0;
-    this.images.enemies = {}; // 초기화
-    
-    for (const type of enemyTypes) {
-      const img = new Image();
-      img.src = `./img/enemies/${type}_enemy_sprites.png`;
-      img.onload = () => {
-        loadedCount++;
-        if (loadedCount === enemyTypes.length) {
-          this.loaded.enemies = true;
-          console.log('적 이미지 로드 완료');
-        }
-      };
-      img.onerror = () => {
-        console.error(`적 이미지 로드 실패: ${type}`);
-        loadedCount++;
-      };
-      this.images.enemies[type] = img;
-    }
-    // 적 총알 이미지
-    const bulletImg = new Image();
-    bulletImg.src = './img/enemies/enemy_bullet.png';
-    bulletImg.onload = () => {
-      console.log('적 총알 이미지 로드 완료');
-    };
-    this.images.enemies.bullet = bulletImg;
-  }
-  
-  loadMiscImages() {
-    // 보물 이미지
-    this.images.treasure = new Image();
-    this.images.treasure.src = './img/miscs/treasure.png';
-    this.images.treasure.onload = () => {
-      this.loaded.treasure = true;
-      console.log('보물 이미지 로드 완료');
-    };
-    
-    // 피격 효과 이미지
-    this.images.hitEffect = new Image();
-    this.images.hitEffect.src = './img/miscs/hit_effect.png';
-    this.images.hitEffect.onload = () => {
-      this.loaded.hitEffect = true;
-      console.log('피격 효과 이미지 로드 완료');
-    };
-  }
-
-  // jewel 이미지 로드 함수
-  loadJewelImages() {
-    const jewelTypes = 5; // 총 5가지 타입의 jewel
-    this.images.jewels = [];
-    let loadedCount = 0;
-    
-    for (let i = 0; i < jewelTypes; i++) {
-      const img = new Image();
-      img.src = `./img/jewels/jewel_${i}.png`; // 이미지 파일 경로: ./img/jewel_0.png, jewel_1.png, ...
-      img.onload = () => {
-        loadedCount++;
-        if (loadedCount === jewelTypes) {
-          this.loaded.jewels = true;
-          console.log('보석 이미지 로드 완료');
-        }
-      };
-      img.onerror = () => {
-        console.error(`보석 이미지 로드 실패: jewel_${i}.png`);
-        loadedCount++;
-      };
-      this.images.jewels.push(img);
-    }
-    
-    // 5초 후에도 로드가 안 되면 진행
-    setTimeout(() => {
-      if (!this.loaded.jewels && loadedCount > 0) {
-        this.loaded.jewels = true;
-        console.log('시간 초과로 인한 보석 이미지 로드 중단');
-      }
-    }, 5000);
   }
 
   isAllLoaded() {
@@ -1943,7 +1861,7 @@ class Enemy {
     this.attackCooldown = 500;
 
     // 발사 관련 속성
-    this.canShoot = false;  // 기본값은 발사 불가
+    this.canShoot = false;
     this.shootRange = 300;
     this.shootCooldown = 2000;
     this.lastShotTime = 0;
@@ -1951,8 +1869,8 @@ class Enemy {
     // 피격 효과 관련 속성
     this.isHit = false;
     this.hitTime = 0;
-    this.hitDuration = 200; // 피격 효과 지속 시간(ms)
-    this.hitBrightness = 0; // 현재 밝기 효과 (0-1)
+    this.hitDuration = 200;
+    this.hitBrightness = 0;
   }
   
   update() {
@@ -1962,12 +1880,10 @@ class Enemy {
 
     // 발사 로직
     if (this.canShoot && this.state === 'moving') {
-      // 플레이어와의 거리 계산
       const dx = player.x - this.x;
       const dy = player.y - this.y;
       const distance = Math.sqrt(dx * dx + dy * dy);
       
-      // 시야 내이고 쿨다운이 지났으면 발사
       if (distance <= this.shootRange && currentTime - this.lastShotTime >= this.shootCooldown) {
         this.shoot();
         this.lastShotTime = currentTime;
@@ -1975,18 +1891,25 @@ class Enemy {
     }
     
     // 피격 효과 업데이트
+    this.updateHitEffect(currentTime);
+    
+    // 상태별 업데이트
+    this.updateByState(currentTime);
+  }
+
+  updateHitEffect(currentTime) {
     if (this.isHit) {
       const elapsedHitTime = currentTime - this.hitTime;
       if (elapsedHitTime >= this.hitDuration) {
         this.isHit = false;
         this.hitBrightness = 0;
       } else {
-        // 시간에 따라 밝기 감소 (1에서 0으로)
         this.hitBrightness = 1 - (elapsedHitTime / this.hitDuration);
       }
     }
-    
-    // 상태별 업데이트
+  }
+
+  updateByState(currentTime) {
     switch(this.state) {
       case 'spawning':
         this.updateSpawning(currentTime);
@@ -2000,36 +1923,10 @@ class Enemy {
     }
   }
 
-  // 발사 메서드 추가
-  shoot() {
-    // 각도 계산 (플레이어 방향)
-    const angle = Math.atan2(player.y - this.y, player.x - this.x);
-    
-    // 약간의 랜덤성 추가
-    const randomAngle = angle + (Math.random() * 0.2 - 0.1);
-    
-    // 총알 생성
-    gameObjects.bullets.push(
-      new EnemyBullet(
-        this.x,
-        this.y,
-        4,                   // 크기
-        3,                   // 속도
-        randomAngle,         // 각도
-        this.attackStrength / 2  // 데미지
-      )
-    );
-    
-    // 발사 효과
-    this.isHit = true;
-    this.hitTime = gameTimeSystem.getTime();
-  }
-
   updateSpawning(currentTime) {
     const elapsedTime = currentTime - this.stateStartTime;
     const progress = Math.min(elapsedTime / this.spawnDuration, 1);
     
-    // 크기 애니메이션
     this.currentSize = Math.max(0, this.size * this.easeOutBack(progress));
     
     if (progress >= 1) {
@@ -2080,7 +1977,6 @@ class Enemy {
     const elapsedTime = currentTime - this.stateStartTime;
     const progress = Math.min(elapsedTime / this.deathDuration, 1);
     
-    // 크기 감소 애니메이션
     this.currentSize = this.size * (1 - this.easeInQuad(progress));
     
     if (progress >= 1) {
@@ -2089,291 +1985,214 @@ class Enemy {
     }
   }
 
-  startDying() {
-    this.state = 'dying';
-    this.stateStartTime = gameTimeSystem.getTime();
+  shoot() {
+    const angle = Math.atan2(player.y - this.y, player.x - this.x);
+    const randomAngle = angle + (Math.random() * 0.2 - 0.1);
     
-    // 경험치 및 골드 획득 (타입별로 다른 값 적용)
-    const expValue = this.expValue || 3; // 기본값 3
-    const goldValue = this.goldValue || 10; // 기본값 10
+    gameObjects.bullets.push(
+      new EnemyBullet(
+        this.x,
+        this.y,
+        4,
+        3,
+        randomAngle,
+        this.attackStrength / 2
+      )
+    );
     
-    player.exp += Math.floor(expValue * player.expMultiplier);
-    gold += goldValue;
-    saveGold();
-    
-    // 아이템 드롭
-    // 일반 보석 드롭 확률 (보스는 BossEnemy 클래스에서 처리)
-    if (!this.isBoss && Math.random() < 0.1) {
-      const jewelType = getWeightedRandomJewelType();
-      gameObjects.jewels.push(new Jewel(this.x, this.y, jewelType));
-    }
-  
-    // 보물 드롭 (보스가 아닌 경우 더 낮은 확률)
-    if (!this.isBoss && Math.random() < 0.01) {
-      gameObjects.terrain.push(new Treasure(this.x, this.y));
-    }
-    
-    // 레벨업 체크
-    checkLevelUp();
+    this.isHit = true;
+    this.hitTime = gameTimeSystem.getTime();
   }
 
+  // 통합된 그리기 메서드
   draw(offsetX, offsetY) {
     const drawX = this.x + offsetX;
     const drawY = this.y + offsetY;
     
-    switch(this.state) {
-      case 'spawning':
-        this.drawSpawning(drawX, drawY);
-        break;
-      case 'moving':
-        this.drawMoving(drawX, drawY);
-        break;
-      case 'dying':
-        this.drawDying(drawX, drawY);
-        break;
-    }
-  }
-
-  drawSpawning(drawX, drawY) {
-      const progress = (gameTimeSystem.getTime() - this.stateStartTime) / this.spawnDuration;
-      ctx.globalAlpha = Math.min(progress, 1);
-      
-      // 스폰 서클 효과
-      ctx.strokeStyle = 'white';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.arc(drawX, drawY, this.currentSize * 1.5, 0, Math.PI * 2 * progress);
-      ctx.stroke();
-      
-      // 적 유형에 따른 이미지 선택
-      let enemyImage;
-      
-      if (this.type === "Boss" && assetManager.loaded.enemies) {
-          enemyImage = assetManager.images.enemies.boss;
-      } else if (this.type === "Fast" && assetManager.loaded.enemies) {
-          enemyImage = assetManager.images.enemies.fast;
-      } else if (this.type === "Tank" && assetManager.loaded.enemies) {
-          enemyImage = assetManager.images.enemies.tank;
-      } else if (this.type === "Shooter" && assetManager.loaded.enemies) {
-          enemyImage = assetManager.images.enemies.shooter;
-      } else if (this.type === "Normal" && assetManager.loaded.enemies) {
-          enemyImage = assetManager.images.enemies.normal;
-      } else {
-          // 이미지가 로드되지 않았을 경우
-          ctx.globalAlpha = 1;
-          return;
-      }
-      
-      if (enemyImage) {
-          const displaySize = this.currentSize * 2.5;
-          const defaultDirection = player.x < this.x ? 'left' : 'right';
-          
-          ctx.save();
-          
-          if (defaultDirection === 'right') {
-              ctx.translate(drawX + displaySize / 2, 0);
-              ctx.scale(-1, 1);
-              ctx.drawImage(
-                  enemyImage,
-                  0, 0,
-                  this.spriteWidth, this.spriteHeight,
-                  0,
-                  drawY - displaySize / 2,
-                  displaySize,
-                  displaySize
-              );
-          } else {
-              ctx.drawImage(
-                  enemyImage,
-                  0, 0,
-                  this.spriteWidth, this.spriteHeight,
-                  drawX - displaySize / 2,
-                  drawY - displaySize / 2,
-                  displaySize,
-                  displaySize
-              );
-          }
-          
-          ctx.restore();
-      }
-      
-      ctx.globalAlpha = 1;
-  }
-
-  drawMoving(drawX, drawY) {
-    const pulse = 1 + Math.sin(this.animationTime * 0.005) * 0.05;
-    let currentSize = this.currentSize * pulse;
-    currentSize = Math.max(0.1, currentSize);
+    // 상태별 설정
+    const stateConfig = this.getStateConfig();
+    if (!stateConfig) return;
     
-    // 그림자
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
-    ctx.beginPath();
-    ctx.ellipse(drawX + 3, drawY + 5, currentSize * 0.8, currentSize * 0.4, 0, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.globalAlpha = stateConfig.alpha;
     
-    // 적 유형에 따른 이미지 선택
-    let enemyImage;
-    
-    if (this.type === "Boss" && assetManager.loaded.enemies) {
-      enemyImage = assetManager.images.enemies.boss;
-    } else if (this.type === "Fast" && assetManager.loaded.enemies) {
-      enemyImage = assetManager.images.enemies.fast;
-    } else if (this.type === "Tank" && assetManager.loaded.enemies) {
-      enemyImage = assetManager.images.enemies.tank;
-    } else if (this.type === "Shooter" && assetManager.loaded.enemies) {
-      enemyImage = assetManager.images.enemies.shooter;
-    } else if (this.type === "Normal" && assetManager.loaded.enemies) {
-      enemyImage = assetManager.images.enemies.normal;
-    } else {
-      // 이미지가 로드되지 않았을 경우
-      return;
+    // 그림자 그리기
+    if (stateConfig.showShadow) {
+      this.drawShadow(drawX, drawY, stateConfig.size);
     }
     
-    if (enemyImage) {
-      const spriteX = this.currentFrame * this.spriteWidth;
-      const displaySize = this.size * 2.5;
-      
-      ctx.save();
-      
-      // 방향에 따라 다르게 처리
-      if (this.direction === 'right') {
-        ctx.translate(drawX + displaySize / 2 + this.wobbleAmount, 0);
-        ctx.scale(-1, 1);
-        
-        // 피격 효과를 위한 캔버스 생성
-        if (this.isHit && this.hitBrightness > 0) {
-          // 임시 캔버스 생성
-          const tempCanvas = document.createElement('canvas');
-          tempCanvas.width = displaySize;
-          tempCanvas.height = displaySize;
-          const tempCtx = tempCanvas.getContext('2d');
-          
-          // 1. 임시 캔버스에 원본 이미지 그리기
-          tempCtx.drawImage(
-            enemyImage,
-            spriteX, 0,
-            this.spriteWidth, this.spriteHeight,
-            0,
-            0,
-            displaySize,
-            displaySize
-          );
-          
-          // 2. 이미지가 있는 부분에만 밝기 효과 적용
-          tempCtx.globalCompositeOperation = 'source-atop';
-          tempCtx.fillStyle = 'white';
-          tempCtx.globalAlpha = this.hitBrightness * 0.7;
-          tempCtx.fillRect(0, 0, displaySize, displaySize);
-          
-          // 3. 원본 이미지 그리기
-          ctx.drawImage(
-            enemyImage,
-            spriteX, 0,
-            this.spriteWidth, this.spriteHeight,
-            0,
-            drawY - displaySize / 2,
-            displaySize,
-            displaySize
-          );
-          
-          // 4. 효과가 적용된 이미지 오버레이
-          ctx.globalCompositeOperation = 'lighter';
-          ctx.drawImage(
-            tempCanvas,
-            0,
-            drawY - displaySize / 2
-          );
-          ctx.globalCompositeOperation = 'source-over';
-        } else {
-          // 일반 상태: 그냥 이미지만 그리기
-          ctx.drawImage(
-            enemyImage,
-            spriteX, 0,
-            this.spriteWidth, this.spriteHeight,
-            0,
-            drawY - displaySize / 2,
-            displaySize,
-            displaySize
-          );
-        }
-      } else {
-        // 왼쪽 방향일 때 처리
-        if (this.isHit && this.hitBrightness > 0) {
-          // 임시 캔버스 생성
-          const tempCanvas = document.createElement('canvas');
-          tempCanvas.width = displaySize;
-          tempCanvas.height = displaySize;
-          const tempCtx = tempCanvas.getContext('2d');
-          
-          // 1. 임시 캔버스에 원본 이미지 그리기
-          tempCtx.drawImage(
-            enemyImage,
-            spriteX, 0,
-            this.spriteWidth, this.spriteHeight,
-            0,
-            0,
-            displaySize,
-            displaySize
-          );
-          
-          // 2. 이미지가 있는 부분에만 밝기 효과 적용
-          tempCtx.globalCompositeOperation = 'source-atop';
-          tempCtx.fillStyle = 'white';
-          tempCtx.globalAlpha = this.hitBrightness * 0.7;
-          tempCtx.fillRect(0, 0, displaySize, displaySize);
-          
-          // 3. 원본 이미지 그리기
-          ctx.drawImage(
-            enemyImage,
-            spriteX, 0,
-            this.spriteWidth, this.spriteHeight,
-            drawX - displaySize / 2 + this.wobbleAmount,
-            drawY - displaySize / 2,
-            displaySize,
-            displaySize
-          );
-          
-          // 4. 효과가 적용된 이미지 오버레이
-          ctx.globalCompositeOperation = 'lighter';
-          ctx.drawImage(
-            tempCanvas,
-            drawX - displaySize / 2 + this.wobbleAmount,
-            drawY - displaySize / 2
-          );
-          ctx.globalCompositeOperation = 'source-over';
-        } else {
-          // 일반 상태: 그냥 이미지만 그리기
-          ctx.drawImage(
-            enemyImage,
-            spriteX, 0,
-            this.spriteWidth, this.spriteHeight,
-            drawX - displaySize / 2 + this.wobbleAmount,
-            drawY - displaySize / 2,
-            displaySize,
-            displaySize
-          );
-        }
-      }
-      
-      ctx.restore();
+    // 스폰 서클 효과
+    if (stateConfig.showCircle) {
+      this.drawSpawnCircle(drawX, drawY);
     }
     
-    // 체력바
+    // 적 스프라이트 그리기
+    this.drawSprite(drawX, drawY, stateConfig.size);
+    
+    // 체력바 그리기
     if (this.state === 'moving') {
       this.drawHealthBar(drawX, drawY);
     }
+    
+    ctx.globalAlpha = 1;
   }
 
-  drawDying(drawX, drawY) {
-      // 페이드 아웃 효과
-      const progress = (gameTimeSystem.getTime() - this.stateStartTime) / this.deathDuration;
-      ctx.globalAlpha = 1 - progress;
-      
-      // 현재 이동 상태 그리기 함수를 재활용 (코드 중복 제거)
-      this.drawMoving(drawX, drawY);
-      
-      // 투명도 복원
-      ctx.globalAlpha = 1;
+  getStateConfig() {
+    const currentTime = gameTimeSystem.getTime();
+    
+    switch(this.state) {
+      case 'spawning':
+        return {
+          alpha: Math.min((currentTime - this.stateStartTime) / this.spawnDuration, 1),
+          size: this.currentSize,
+          showCircle: true,
+          showShadow: false
+        };
+      case 'moving':
+        const pulse = 1 + Math.sin(this.animationTime * 0.005) * 0.05;
+        return {
+          alpha: 1,
+          size: Math.max(0.1, this.currentSize * pulse),
+          showCircle: false,
+          showShadow: true
+        };
+      case 'dying':
+        return {
+          alpha: 1 - Math.min((currentTime - this.stateStartTime) / this.deathDuration, 1),
+          size: this.currentSize,
+          showCircle: false,
+          showShadow: false
+        };
+      default:
+        return null;
+    }
+  }
+
+  drawShadow(drawX, drawY, size) {
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+    ctx.beginPath();
+    ctx.ellipse(drawX + 3, drawY + 5, size * 0.8, size * 0.4, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  
+  drawSpawnCircle(drawX, drawY) {
+    const progress = (gameTimeSystem.getTime() - this.stateStartTime) / this.spawnDuration;
+    ctx.strokeStyle = 'white';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(drawX, drawY, this.currentSize * 1.5, 0, Math.PI * 2 * progress);
+    ctx.stroke();
+  }
+
+  drawSprite(drawX, drawY, size) {
+    const enemyImage = this.getEnemyImage();
+    if (!enemyImage) return;
+    
+    const spriteX = this.currentFrame * this.spriteWidth;
+    const displaySize = this.size * 2.5;
+    
+    ctx.save();
+    
+    // 방향에 따른 변환 처리
+    if (this.direction === 'right') {
+      ctx.translate(drawX + displaySize / 2 + this.wobbleAmount, 0);
+      ctx.scale(-1, 1);
+    }
+    
+    // 피격 효과 처리
+    if (this.isHit && this.hitBrightness > 0) {
+      this.drawSpriteWithHitEffect(enemyImage, spriteX, drawX, drawY, displaySize);
+    } else {
+      this.drawNormalSprite(enemyImage, spriteX, drawX, drawY, displaySize);
+    }
+    
+    ctx.restore();
+  }
+
+  getEnemyImage() {
+    if (!assetManager.loaded.enemies) return null;
+    
+    const imageMap = {
+      "Boss": assetManager.images.enemies.boss,
+      "Fast": assetManager.images.enemies.fast,
+      "Tank": assetManager.images.enemies.tank,
+      "Shooter": assetManager.images.enemies.shooter,
+      "Normal": assetManager.images.enemies.normal
+    };
+    
+    return imageMap[this.type] || assetManager.images.enemies.normal;
+  }
+
+  drawSpriteWithHitEffect(enemyImage, spriteX, drawX, drawY, displaySize) {
+    // 임시 캔버스 생성으로 피격 효과 적용
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = displaySize;
+    tempCanvas.height = displaySize;
+    const tempCtx = tempCanvas.getContext('2d');
+    
+    // 원본 이미지 그리기
+    tempCtx.drawImage(
+      enemyImage,
+      spriteX, 0,
+      this.spriteWidth, this.spriteHeight,
+      0, 0,
+      displaySize, displaySize
+    );
+    
+    // 피격 효과 적용
+    tempCtx.globalCompositeOperation = 'source-atop';
+    tempCtx.fillStyle = 'white';
+    tempCtx.globalAlpha = this.hitBrightness * 0.7;
+    tempCtx.fillRect(0, 0, displaySize, displaySize);
+    
+    // 원본 이미지 그리기
+    if (this.direction === 'right') {
+      ctx.drawImage(
+        enemyImage,
+        spriteX, 0,
+        this.spriteWidth, this.spriteHeight,
+        0, drawY - displaySize / 2,
+        displaySize, displaySize
+      );
+    } else {
+      ctx.drawImage(
+        enemyImage,
+        spriteX, 0,
+        this.spriteWidth, this.spriteHeight,
+        drawX - displaySize / 2 + this.wobbleAmount,
+        drawY - displaySize / 2,
+        displaySize, displaySize
+      );
+    }
+    
+    // 효과 오버레이
+    ctx.globalCompositeOperation = 'lighter';
+    if (this.direction === 'right') {
+      ctx.drawImage(tempCanvas, 0, drawY - displaySize / 2);
+    } else {
+      ctx.drawImage(tempCanvas, drawX - displaySize / 2 + this.wobbleAmount, drawY - displaySize / 2);
+    }
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  drawNormalSprite(enemyImage, spriteX, drawX, drawY, displaySize) {
+    if (this.direction === 'right') {
+      ctx.drawImage(
+        enemyImage,
+        spriteX, 0,
+        this.spriteWidth, this.spriteHeight,
+        0, drawY - displaySize / 2,
+        displaySize, displaySize
+      );
+    } else {
+      ctx.drawImage(
+        enemyImage,
+        spriteX, 0,
+        this.spriteWidth, this.spriteHeight,
+        drawX - displaySize / 2 + this.wobbleAmount,
+        drawY - displaySize / 2,
+        displaySize, displaySize
+      );
+    }
   }
 
   drawHealthBar(drawX, drawY) {
@@ -2383,29 +2202,18 @@ class Enemy {
     
     // 배경
     ctx.fillStyle = 'black';
-    ctx.fillRect(
-      drawX - barWidth/2,
-      barY,
-      barWidth,
-      barHeight
-    );
+    ctx.fillRect(drawX - barWidth/2, barY, barWidth, barHeight);
     
     // 체력바
     const healthPercent = this.health / this.maxHealth;
     ctx.fillStyle = healthPercent > 0.5 ? 'green' : healthPercent > 0.25 ? 'yellow' : 'red';
-    ctx.fillRect(
-      drawX - barWidth/2,
-      barY,
-      barWidth * healthPercent,
-      barHeight
-    );
+    ctx.fillRect(drawX - barWidth/2, barY, barWidth * healthPercent, barHeight);
   }
 
   takeDamage(damage) {
     if (this.state === 'moving') {
       this.health -= damage;
       
-      // 피격 효과 시작
       this.isHit = true;
       this.hitTime = gameTimeSystem.getTime();
       this.hitBrightness = 1;
@@ -2414,6 +2222,31 @@ class Enemy {
         this.startDying();
       }
     }
+  }
+
+  startDying() {
+    this.state = 'dying';
+    this.stateStartTime = gameTimeSystem.getTime();
+    
+    // 경험치 및 골드 획득
+    const expValue = this.expValue || 3;
+    const goldValue = this.goldValue || 10;
+    
+    player.exp += Math.floor(expValue * player.expMultiplier);
+    gold += goldValue;
+    saveGold();
+    
+    // 아이템 드롭
+    if (!this.isBoss && Math.random() < 0.1) {
+      const jewelType = getWeightedRandomJewelType();
+      gameObjects.jewels.push(new Jewel(this.x, this.y, jewelType));
+    }
+
+    if (!this.isBoss && Math.random() < 0.01) {
+      gameObjects.terrain.push(new Treasure(this.x, this.y));
+    }
+    
+    checkLevelUp();
   }
 
   die() {
@@ -2432,7 +2265,6 @@ class Enemy {
     return t * t;
   }
 
-  // 적 분리 계산
   calculateSeparation() {
     let separationX = 0;
     let separationY = 0;
@@ -2472,7 +2304,6 @@ class Enemy {
     return { x: separationX, y: separationY };
   }
 
-  // 플레이어 상호작용
   pushPlayer(player) {
     const dx = player.x - this.x;
     const dy = player.y - this.y;
@@ -2490,22 +2321,18 @@ class Enemy {
   attackPlayer(player) {
     const currentTime = gameTimeSystem.getTime();
     
-    // 공격 쿨다운 확인 + 플레이어가 무적 상태가 아닌 경우에만 데미지
     if (currentTime - this.lastAttackTime >= this.attackCooldown && !player.invincible) {
       player.health -= this.attackStrength;
       this.lastAttackTime = currentTime;
       
-      // 피격 효과
       player.isHit = true;
       player.hitStartTime = currentTime;
       player.hitFrame = 0;
       player.hitFrameTime = 0;
       
-      // 무적 상태 활성화
       player.invincible = true;
       player.invincibilityStartTime = currentTime;
       
-      // 화면 흔들림
       const damageRatio = this.attackStrength / player.maxHealth;
       screenShakeTime = 400 + damageRatio * 2000;
       screenShakeIntensity = 5 + damageRatio * 10;
