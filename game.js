@@ -910,6 +910,12 @@ class OrbitOrb {
   }
   
   draw(offsetX, offsetY) {
+    // 첫 번째 구체(baseAngle이 0인 구체)만 궤도 링을 그리기
+    if (this.baseAngle === 0 || Math.abs(this.baseAngle) < 0.1) {
+      this.drawOrbitRing();
+    }
+    
+    // 구체 그리기
     const drawSize = this.size * 3;
       
     ctx.save();
@@ -927,6 +933,28 @@ class OrbitOrb {
         drawSize
       );
     }
+    ctx.restore();
+  }
+  
+  // 궤도 링 그리기 메서드
+  drawOrbitRing() {
+    ctx.save();
+    
+    // 더 선명하게 만들어서 테스트
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)'; // 투명도 높임
+    ctx.lineWidth = 3; // 두께 증가
+    // ctx.setLineDash 제거 (일단 실선으로)
+    
+    ctx.beginPath();
+    ctx.arc(
+      canvas.width / 2,  // 플레이어 화면 중앙 X
+      canvas.height / 2, // 플레이어 화면 중앙 Y
+      this.radius,       // 궤도 반지름
+      0, 
+      Math.PI * 2
+    );
+    ctx.stroke();
+    
     ctx.restore();
   }
   
@@ -1136,7 +1164,7 @@ class LightningWeapon extends Weapon {
   
   fire() {
     // 가장 가까운 적 찾기
-    const nearestEnemy = this.findNearestEnemy();
+    const nearestEnemy = findNearestEnemy();
     
     if (nearestEnemy) {
       // 적을 찾으면 체인 라이트닝 효과 생성
@@ -1151,26 +1179,6 @@ class LightningWeapon extends Weapon {
         )
       );
     }
-  }
-  
-  findNearestEnemy() {
-    let closestEnemy = null;
-    let minDistance = this.maxTargetDistance;
-    
-    for (let enemy of gameObjects.enemies) {
-      if (enemy.state === 'moving') {
-        const dx = enemy.x - player.x;
-        const dy = enemy.y - player.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        
-        if (distance < minDistance) {
-          minDistance = distance;
-          closestEnemy = enemy;
-        }
-      }
-    }
-    
-    return closestEnemy;
   }
 }
 
