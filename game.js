@@ -2997,18 +2997,14 @@ function drawProfileSelectScreen() {
     // 골드 표시
     ctx.fillStyle = '#66fcf1';
     ctx.fillText(`보유 골드: ${loadGold()}`, canvas.width / 2, 200);
-    
-    // 시작하기 버튼 - 현재 사용자가 선택된 경우에만 활성화
-    const continueButtonY = canvas.height - 50;
-    drawButton(canvas.width / 2 - 190, continueButtonY, 380, 40, '시작하기', true);
   }
   
-  // 사용자 목록
-  const listX = canvas.width / 2 - 200;
+  // 왼쪽: 사용자 목록 박스
+  const listX = 100; // 왼쪽으로 이동
   const listY = 230;
-  const listWidth = 400;
-  const listHeight = 250;
-  const itemHeight = 40;
+  const listWidth = 350; // 약간 줄임
+  const listHeight = 300; // 높이 조정
+  const itemHeight = 25; // 더 작게
   
   // 배경
   ctx.fillStyle = 'rgba(30, 30, 40, 0.8)';
@@ -3022,11 +3018,12 @@ function drawProfileSelectScreen() {
   // 사용자 목록
   ctx.fillStyle = '#FFFFFF';
   ctx.textAlign = 'left';
-  ctx.font = '20px Arial';
+  ctx.font = '16px Arial'; // 더 작은 폰트
   
   if (userProfileSystem.users.length === 0) {
     ctx.textAlign = 'center';
-    ctx.fillText('사용자가 없습니다. 새 사용자를 만드세요.', canvas.width / 2, listY + listHeight/2);
+    ctx.fillText('사용자가 없습니다.', listX + listWidth/2, listY + listHeight/2 - 10);
+    ctx.fillText('새 사용자를 만드세요.', listX + listWidth/2, listY + listHeight/2 + 10);
     ctx.textAlign = 'left';
   } else {
     for (let i = 0; i < userProfileSystem.users.length; i++) {
@@ -3042,22 +3039,31 @@ function drawProfileSelectScreen() {
         ctx.fillStyle = '#FFFFFF';
       }
       
-      ctx.fillText(username, listX + 20, listY + i * itemHeight + 25);
+      ctx.fillText(username, listX + 15, listY + i * itemHeight + 17);
     }
   }
   
-  // 프로필 관리 버튼
-  const buttonY = listY + listHeight + 20;
-  const buttonWidth = 180;
-  const buttonHeight = 40;
-  const spacing = 20;
+  // 오른쪽: 버튼들
+  const buttonAreaX = listX + listWidth + 50; // 프로필 박스 오른쪽
+  const buttonWidth = 200;
+  const buttonHeight = 50;
+  const buttonSpacing = 20;
+  
+  let currentButtonY = listY; // 프로필 박스와 같은 높이에서 시작
   
   // 새 사용자 버튼
-  drawButton(canvas.width / 2 - buttonWidth - spacing/2, buttonY, buttonWidth, buttonHeight, '새 사용자', true);
+  drawButton(buttonAreaX, currentButtonY, buttonWidth, buttonHeight, '새 사용자', true);
+  currentButtonY += buttonHeight + buttonSpacing;
   
   // 사용자 삭제 버튼 (선택된 사용자가 있을 때만 활성화)
-  drawButton(canvas.width / 2 + spacing/2, buttonY, buttonWidth, buttonHeight, '사용자 삭제', 
+  drawButton(buttonAreaX, currentButtonY, buttonWidth, buttonHeight, '사용자 삭제', 
              userProfileSystem.hasCurrentUser());
+  currentButtonY += buttonHeight + buttonSpacing;
+  
+  // 시작하기 버튼 - 현재 사용자가 선택된 경우에만 활성화
+  if (userProfileSystem.hasCurrentUser()) {
+    drawButton(buttonAreaX, currentButtonY, buttonWidth, buttonHeight, '게임 시작', true);
+  }
 }
 
 function drawLoadingScreen() {
@@ -3083,12 +3089,12 @@ function drawLoadingScreen() {
 }
 
 function handleProfileSelectClick() {
-  // 사용자 목록 영역 클릭 처리
-  const listX = canvas.width / 2 - 200;
+  // 왼쪽: 사용자 목록 영역 클릭 처리
+  const listX = 100;
   const listY = 230;
-  const listWidth = 400;
-  const listHeight = 250;
-  const itemHeight = 40;
+  const listWidth = 350;
+  const listHeight = 300;
+  const itemHeight = 25;
   
   // 사용자 목록에서 선택
   if (mouseX >= listX && mouseX <= listX + listWidth && 
@@ -3100,36 +3106,35 @@ function handleProfileSelectClick() {
     }
   }
   
-  // 프로필 관리 버튼 클릭 처리
-  const buttonY = listY + listHeight + 20;
-  const buttonWidth = 180;
-  const buttonHeight = 40;
-  const spacing = 20;
+  // 오른쪽: 버튼 클릭 처리
+  const buttonAreaX = listX + listWidth + 50;
+  const buttonWidth = 200;
+  const buttonHeight = 50;
+  const buttonSpacing = 20;
+  
+  let currentButtonY = listY;
   
   // 새 사용자 버튼
-  if (mouseX >= canvas.width / 2 - buttonWidth - spacing/2 && 
-      mouseX <= canvas.width / 2 - spacing/2 &&
-      mouseY >= buttonY && mouseY <= buttonY + buttonHeight) {
+  if (mouseX >= buttonAreaX && mouseX <= buttonAreaX + buttonWidth &&
+      mouseY >= currentButtonY && mouseY <= currentButtonY + buttonHeight) {
     showCreateUserPrompt();
     return;
   }
+  currentButtonY += buttonHeight + buttonSpacing;
   
   // 사용자 삭제 버튼
-  if (mouseX >= canvas.width / 2 + spacing/2 && 
-      mouseX <= canvas.width / 2 + spacing/2 + buttonWidth &&
-      mouseY >= buttonY && mouseY <= buttonY + buttonHeight &&
+  if (mouseX >= buttonAreaX && mouseX <= buttonAreaX + buttonWidth &&
+      mouseY >= currentButtonY && mouseY <= currentButtonY + buttonHeight &&
       userProfileSystem.hasCurrentUser()) {
     confirmDeleteUser();
     return;
   }
+  currentButtonY += buttonHeight + buttonSpacing;
   
-  // 계속하기 버튼 - 사용자가 선택된 경우에만
+  // 게임 시작 버튼 - 사용자가 선택된 경우에만
   if (userProfileSystem.hasCurrentUser()) {
-    const continueButtonY = canvas.height - 50;
-    if (mouseX >= canvas.width / 2 - 190 && 
-        mouseX <= canvas.width / 2 + 190 &&
-        mouseY >= continueButtonY && 
-        mouseY <= continueButtonY + 40) {
+    if (mouseX >= buttonAreaX && mouseX <= buttonAreaX + buttonWidth &&
+        mouseY >= currentButtonY && mouseY <= currentButtonY + buttonHeight) {
       // 사용자가 선택되면 시작 화면으로 전환
       currentGameState = GAME_STATE.START_SCREEN;
       return;
