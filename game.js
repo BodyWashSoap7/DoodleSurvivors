@@ -865,7 +865,6 @@ class BasicWeapon extends Weapon {
   }
 }
 
-// OrbitOrb 클래스
 class OrbitWeapon extends Weapon {
   constructor() {
     super({
@@ -912,26 +911,109 @@ class OrbitWeapon extends Weapon {
     this.orbitAngle += this.orbitSpeed;
   }
   
-  applyLevelBonus() {
-    super.applyLevelBonus();
-    
-    // 레벨에 따른 개선
-    if (this.level % 2 === 0) {
-      this.orbCount++; // 짝수 레벨마다 구체 개수 증가
-    }
-    if (this.level % 3 === 0) {
-      this.orbitRadius += 20; // 3레벨마다 반지름 증가
-    }
-    if (this.level >= 4) {
-      this.orbitSpeed += 0.005; // 4레벨부터 회전 속도 증가
-    }
-    
-    // 구체 재생성
+  // 업그레이드 시 구체 재생성
+  upgrade() {
+    this.damage += 3;
+    this.orbCount += 1;
+    this.orbitRadius += 15;
     this.createOrbs();
   }
   
   fire() {
     // 오비트 무기에서는 사용되지 않음
+  }
+}
+
+// OrbitOrb 클래스
+class OrbitOrb {
+  constructor(x, y, baseAngle, radius, damage, parent) {
+    this.x = x;
+    this.y = y;
+    this.baseAngle = baseAngle;
+    this.radius = radius;
+    this.damage = damage;
+    this.size = 8;
+    this.used = false;
+    this.parent = parent;
+    this.rotationAngle = Math.random() * Math.PI * 2;
+    this.rotationSpeed = 0.05;
+  }
+  
+  update() {
+    if (this.used) return;
+    
+    // 플레이어 주변 회전
+    const totalAngle = this.parent.orbitAngle + this.baseAngle;
+    this.x = player.x + Math.cos(totalAngle) * this.radius;
+    this.y = player.y + Math.sin(totalAngle) * this.radius;
+    
+    // 구체 자체 회전
+    this.rotationAngle += this.rotationSpeed;
+    
+    // 적과 충돌 검사
+    const currentTime = gameTimeSystem.getTime();
+    if (currentTime - this.parent.lastDamageTime >= this.parent.damageCooldown) {
+      for (let enemy of gameObjects.enemies) {
+        if (enemy.state === 'moving' && detectCollision(this, enemy)) {
+          enemy.takeDamage(this.damage);
+          this.parent.lastDamageTime = currentTime;
+          break;
+        }
+      }
+    }
+  }
+  
+  draw(offsetX, offsetY) {
+    // 첫 번째 구체(baseAngle이 0인 구체)만 궤도 링을 그리기
+    if (this.baseAngle === 0 || Math.abs(this.baseAngle) < 0.1) {
+      this.drawOrbitRing();
+    }
+    
+    // 구체 그리기
+    const drawSize = this.size * 3;
+      
+    ctx.save();
+    ctx.translate(this.x + offsetX, this.y + offsetY);
+    ctx.rotate(this.rotationAngle);
+        
+    // 이미지 그리기
+    if (assetManager.loaded.weapons && assetManager.images.weapons.orbit) {
+      ctx.globalAlpha = 1;
+      ctx.drawImage(
+        assetManager.images.weapons.orbit,
+        -drawSize / 2,
+        -drawSize / 2,
+        drawSize,
+        drawSize
+      );
+    }
+    ctx.restore();
+  }
+  
+  // 궤도 링 그리기 메서드
+  drawOrbitRing() {
+    ctx.save();
+    
+    // 더 선명하게 만들어서 테스트
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)'; // 투명도 높임
+    ctx.lineWidth = 3; // 두께 증가
+    // ctx.setLineDash 제거 (일단 실선으로)
+    
+    ctx.beginPath();
+    ctx.arc(
+      canvas.width / 2,  // 플레이어 화면 중앙 X
+      canvas.height / 2, // 플레이어 화면 중앙 Y
+      this.radius,       // 궤도 반지름
+      0, 
+      Math.PI * 2
+    );
+    ctx.stroke();
+    
+    ctx.restore();
+  }
+  
+  outOfBounds() {
+    return false; // 플레이어 주변에 고정됨
   }
 }
 
