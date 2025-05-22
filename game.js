@@ -449,13 +449,14 @@ class AssetManager {
   loadWeaponIcons() {
     const weaponTypes = [
       'basic', 'orbit', 'flame', 'lightning', 
+      'fist', 'sword', 'spear'
     ];
     
     let loadedCount = 0;
     
     for (const type of weaponTypes) {
       const img = new Image();
-      img.src = `./img/weapon_icons/${type}_icon.png`; // 무기 아이콘 경로
+      img.src = `./img/weapon_icons/${type}_icon.png`;
       img.onload = () => {
         loadedCount++;
         if (loadedCount === weaponTypes.length) {
@@ -1449,11 +1450,389 @@ const WeaponFactory = {
         return new FlameWeapon();
       case 'lightning':
         return new LightningWeapon();
+      case 'fist':
+        return new FistWeapon();
+      case 'sword':
+        return new SwordWeapon();
+      case 'spear':
+        return new SpearWeapon();
       default:
         return new BasicWeapon();
     }
   }
 };
+
+//----------------------
+// 근접 무기 시스템
+//----------------------
+
+// 기본 근접 무기 클래스
+class MeleeWeapon extends Weapon {
+  constructor(config = {}) {
+    super(config);
+    this.range = config.range || 50;
+    this.effectDuration = config.effectDuration || 300;
+    this.attackAngle = config.attackAngle || Math.PI; // 공격 각도 (라디안)
+  }
+
+  fire() {
+    // 마우스 방향으로 공격
+    const dx = mouseWorldX - player.x;
+    const dy = mouseWorldY - player.y;
+    const attackDirection = Math.atan2(dy, dx);
+    
+    // 공격 범위 내 적들 찾기
+    const targets = this.findTargetsInRange(attackDirection);
+    
+    // 적들에게 데미지 적용
+    targets.forEach(enemy => {
+      enemy.takeDamage(this.damage * player.attackPower);
+    });
+    
+    // 시각적 효과 생성
+    this.createEffect(attackDirection);
+  }
+
+  findTargetsInRange(attackDirection) {
+    // 하위 클래스에서 오버라이드
+    return [];
+  }
+
+  createEffect(attackDirection) {
+    // 하위 클래스에서 오버라이드
+  }
+}
+
+// 주먹 무기 클래스
+class FistWeapon extends MeleeWeapon {
+  constructor() {
+    super({
+      type: 'fist',
+      baseCooldown: 400, // 빠른 공격속도
+      damage: 15,
+      range: 40, // 짧은 사거리
+      effectDuration: 200
+    });
+  }
+
+  findTargetsInRange(attackDirection) {
+    const targets = [];
+    
+    // 가장 가까운 적 1명만 공격
+    let nearestEnemy = null;
+    let minDistance = this.range;
+    
+    for (let enemy of gameObjects.enemies) {
+      if (enemy.state !== 'moving') continue;
+      
+      const dx = enemy.x - player.x;
+      const dy = enemy.y - player.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      
+      if (distance <= this.range && distance < minDistance) {
+        minDistance = distance;
+        nearestEnemy = enemy;
+      }
+    }
+    
+    if (nearestEnemy) {
+      targets.push(nearestEnemy);
+    }
+    
+    return targets;
+  }
+
+  createEffect(attackDirection) {
+    const effect = new FistEffect(
+      player.x + Math.cos(attackDirection) * 25,
+      player.y + Math.sin(attackDirection) * 25,
+      attackDirection,
+      this.effectDuration
+    );
+    gameObjects.bullets.push(effect);
+  }
+
+  applyLevelBonus() {
+    super.applyLevelBonus();
+    // 레벨업 시 공격속도 증가
+    if (this.level % 2 === 0) {
+      this.baseCooldown *= 0.9;
+      this.updateCooldown(player.cooldownReduction);
+    }
+    // 3레벨마다 범위 증가
+    if (this.level % 3 === 0) {
+      this.range += 10;
+    }
+  }
+}
+
+// 검 무기 클래스
+class SwordWeapon extends MeleeWeapon {
+  constructor() {
+    super({
+      type: 'sword',
+      baseCooldown: 800, // 중간 공격속도
+      damage: 25,
+      range: 70, // 중간 사거리
+      attackAngle: Math.PI / 3, // 60도 부채꼴
+      effectDuration: 400
+    });
+  }
+
+  findTargetsInRange(attackDirection) {
+    const targets = [];
+    
+    for (let enemy of gameObjects.enemies) {
+      if (enemy.state !== 'moving') continue;
+      
+      const dx = enemy.x - player.x;
+      const dy = enemy.y - player.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      
+      if (distance <= this.range) {
+        // 적과 플레이어 사이의 각도
+        const angleToEnemy = Math.atan2(dy, dx);
+        
+        // 각도 차이 계산
+        let angleDiff = angleToEnemy - attackDirection;
+        while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+        while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+        angleDiff = Math.abs(angleDiff);
+        
+        // 부채꼴 범위 내에 있는지 확인
+        if (angleDiff <= this.attackAngle / 2) {
+          targets.push(enemy);
+        }
+      }
+    }
+    
+    return targets;
+  }
+
+  createEffect(attackDirection) {
+    const effect = new SwordEffect(
+      player.x,
+      player.y,
+      attackDirection,
+      this.range,
+      this.attackAngle,
+      this.effectDuration
+    );
+    gameObjects.bullets.push(effect);
+  }
+
+  applyLevelBonus() {
+    super.applyLevelBonus();
+    // 레벨업 시 범위 증가
+    if (this.level % 2 === 0) {
+      this.range += 15;
+    }
+    // 3레벨마다 각도 증가
+    if (this.level % 3 === 0) {
+      this.attackAngle += Math.PI / 12; // 15도씩 증가
+    }
+  }
+}
+
+// 창 무기 클래스
+class SpearWeapon extends MeleeWeapon {
+  constructor() {
+    super({
+      type: 'spear',
+      baseCooldown: 1200, // 느린 공격속도
+      damage: 35,
+      range: 100, // 긴 사거리
+      width: 30, // 창의 폭
+      effectDuration: 500
+    });
+    this.width = 30;
+  }
+
+  findTargetsInRange(attackDirection) {
+    const targets = [];
+    
+    for (let enemy of gameObjects.enemies) {
+      if (enemy.state !== 'moving') continue;
+      
+      const dx = enemy.x - player.x;
+      const dy = enemy.y - player.y;
+      
+      // 플레이어를 중심으로 한 좌표계로 변환
+      const cos = Math.cos(-attackDirection);
+      const sin = Math.sin(-attackDirection);
+      const rotatedX = dx * cos - dy * sin;
+      const rotatedY = dx * sin + dy * cos;
+      
+      // 직사각형 범위 내에 있는지 확인
+      if (rotatedX >= 0 && rotatedX <= this.range && 
+          Math.abs(rotatedY) <= this.width / 2) {
+        targets.push(enemy);
+      }
+    }
+    
+    return targets;
+  }
+
+  createEffect(attackDirection) {
+    const effect = new SpearEffect(
+      player.x,
+      player.y,
+      attackDirection,
+      this.range,
+      this.width,
+      this.effectDuration
+    );
+    gameObjects.bullets.push(effect);
+  }
+
+  applyLevelBonus() {
+    super.applyLevelBonus();
+    // 레벨업 시 사거리 증가
+    if (this.level % 2 === 0) {
+      this.range += 20;
+    }
+    // 3레벨마다 폭 증가
+    if (this.level % 3 === 0) {
+      this.width += 10;
+    }
+  }
+}
+
+//----------------------
+// 근접 무기 이펙트 클래스들
+//----------------------
+
+// 기본 근접 무기 이펙트 클래스
+class MeleeEffect {
+  constructor(x, y, direction, duration) {
+    this.x = x;
+    this.y = y;
+    this.direction = direction;
+    this.duration = duration;
+    this.startTime = gameTimeSystem.getTime();
+    this.used = false;
+  }
+
+  update() {
+    const elapsed = gameTimeSystem.getTime() - this.startTime;
+    if (elapsed >= this.duration) {
+      this.used = true;
+    }
+  }
+
+  getProgress() {
+    const elapsed = gameTimeSystem.getTime() - this.startTime;
+    return Math.min(elapsed / this.duration, 1);
+  }
+
+  outOfBounds() {
+    return false; // 근접 공격은 화면 밖으로 나가지 않음
+  }
+}
+
+// 주먹 공격 이펙트
+class FistEffect extends MeleeEffect {
+  constructor(x, y, direction, duration) {
+    super(x, y, direction, duration);
+    this.maxSize = 30;
+  }
+
+  draw(offsetX, offsetY) {
+    const progress = this.getProgress();
+    const size = this.maxSize * Math.sin(progress * Math.PI); // 0에서 시작해서 커졌다가 다시 작아짐
+    const alpha = 1 - progress;
+    
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    
+    // 주먹 효과 - 원형 충격파
+    ctx.strokeStyle = '#FFD700';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(this.x + offsetX, this.y + offsetY, size, 0, Math.PI * 2);
+    ctx.stroke();
+    
+    // 내부 원
+    ctx.strokeStyle = '#FFA500';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(this.x + offsetX, this.y + offsetY, size * 0.6, 0, Math.PI * 2);
+    ctx.stroke();
+    
+    ctx.restore();
+  }
+}
+
+// 검 공격 이펙트
+class SwordEffect extends MeleeEffect {
+  constructor(x, y, direction, range, angle, duration) {
+    super(x, y, direction, duration);
+    this.range = range;
+    this.angle = angle;
+  }
+
+  draw(offsetX, offsetY) {
+    const progress = this.getProgress();
+    const alpha = 1 - progress;
+    const currentRange = this.range * progress;
+    
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = '#87CEEB';
+    ctx.strokeStyle = '#4169E1';
+    ctx.lineWidth = 2;
+    
+    // 부채꼴 그리기
+    ctx.translate(this.x + offsetX, this.y + offsetY);
+    ctx.rotate(this.direction);
+    
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.arc(0, 0, currentRange, -this.angle / 2, this.angle / 2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    
+    ctx.restore();
+  }
+}
+
+// 창 공격 이펙트
+class SpearEffect extends MeleeEffect {
+  constructor(x, y, direction, range, width, duration) {
+    super(x, y, direction, duration);
+    this.range = range;
+    this.width = width;
+  }
+
+  draw(offsetX, offsetY) {
+    const progress = this.getProgress();
+    const alpha = 1 - progress;
+    const currentRange = this.range * progress;
+    
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = '#CD853F';
+    ctx.strokeStyle = '#8B4513';
+    ctx.lineWidth = 2;
+    
+    // 직사각형 그리기
+    ctx.translate(this.x + offsetX, this.y + offsetY);
+    ctx.rotate(this.direction);
+    
+    ctx.fillRect(0, -this.width / 2, currentRange, this.width);
+    ctx.strokeRect(0, -this.width / 2, currentRange, this.width);
+    
+    // 창끝 부분 강조
+    if (progress > 0.3) {
+      ctx.fillStyle = '#FFD700';
+      const tipSize = this.width * 0.3;
+      ctx.fillRect(currentRange - tipSize, -tipSize / 2, tipSize, tipSize);
+    }
+    
+    ctx.restore();
+  }
+}
 
 //----------------------
 // Enemy 클래스
@@ -2502,6 +2881,9 @@ function generateLevelUpOptions() {
     { type: 'weapon', weaponType: 'orbit', name: '회전 구체', description: '플레이어 주변을 회전하며 공격' },
     { type: 'weapon', weaponType: 'flame', name: '화염방사기', description: '넓은 범위의 지속 데미지' },
     { type: 'weapon', weaponType: 'lightning', name: '번개 사슬', description: '적들 사이를 튀는 번개' },
+    { type: 'weapon', weaponType: 'fist', name: '주먹', description: '빠른 단일 대상 근접 공격' },
+    { type: 'weapon', weaponType: 'sword', name: '검', description: '부채꼴 범위 근접 공격' },
+    { type: 'weapon', weaponType: 'spear', name: '창', description: '긴 사거리 관통 공격' },
   ];
   
   // 기존 무기 업그레이드 옵션 추가
@@ -2541,7 +2923,10 @@ function getWeaponDisplayName(weaponType) {
     'basic': '기본 무기',
     'orbit': '회전 구체',
     'flame': '화염방사기',
-    'lightning': '번개 사슬'
+    'lightning': '번개 사슬',
+    'fist': '주먹',
+    'sword': '검',
+    'spear': '창'
   };
   return names[weaponType] || weaponType;
 }
