@@ -737,25 +737,22 @@ class Weapon {
 
 // 기본 총알 클래스
 class BasicWeapon extends Weapon {
-  constructor() {
-    super({
-      type: 'basic',
-      baseCooldown: 1000,
-      damage: 10
-    });
-  }
-
   fire() {
-    gameObjects.bullets.push(
-      new Bullet(
-        player.x,
-        player.y,
-        5,
-        7,
-        Math.random() * Math.PI * 2,
-        10 * player.attackPower
-      )
-    );
+    // 가장 가까운 적을 향해 발사
+    const nearestEnemy = findNearestEnemy();
+    if (nearestEnemy) {
+      const dx = nearestEnemy.x - player.x;
+      const dy = nearestEnemy.y - player.y;
+      const angle = Math.atan2(dy, dx);
+      
+      gameObjects.bullets.push(
+        new Bullet(
+          player.x, player.y, 5, 7,
+          angle,
+          10 * player.attackPower
+        )
+      );
+    }
   }
 }
 
@@ -809,7 +806,7 @@ class Bullet {
   }
 
   outOfBounds() {
-    const maxDistance = 1000;
+    const maxDistance = 500;
     return !isWithinDistance(this, player, maxDistance);
   }
 }
@@ -3941,34 +3938,6 @@ function updatePlayerAim() {
   }
 }
 
-// 자동 발사
-function autoFireAtNearestEnemy() {
-  const nearestEnemy = findNearestEnemy();
-  
-  if (nearestEnemy) {
-    const now = gameTimeSystem.getTime();
-    if (!player.lastFireTime || now - player.lastFireTime >= 500) {
-      fireWeapon();
-      player.lastFireTime = now;
-    }
-  }
-}
-
-function fireWeapon() {
-  if (player.aimAngle !== undefined) {
-    gameObjects.bullets.push(
-      new Bullet(
-        player.x,
-        player.y,
-        5,
-        7,
-        player.aimAngle,
-        10 // 기본 데미지
-      )
-    );
-  }
-}
-
 // 게임 메인 업데이트
 function update() {
   // 경과 시간 계산
@@ -4073,9 +4042,6 @@ function update() {
   
   // 플레이어 조준
   updatePlayerAim();
-  
-  // 자동 발사
-  autoFireAtNearestEnemy();
 
   // 무기 업데이트
   player.weapons.forEach(weapon => weapon.update());
