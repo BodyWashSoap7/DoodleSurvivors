@@ -705,7 +705,7 @@ class GameObject {
 // 무기 시스템
 //----------------------
 
-// 기본 무기 클래스
+// 무기 클래스
 class Weapon {
   constructor(config = {}) {
     this.type = config.type || 'basic';
@@ -713,6 +713,10 @@ class Weapon {
     this.cooldown = this.baseCooldown;
     this.lastAttackTime = gameTimeSystem.getTime();
     this.damage = config.damage || 10;
+    
+    // 레벨 시스템 추가
+    this.level = 1;
+    this.maxLevel = 8; // 최대 레벨
     
     // 무기별 추가 속성들
     Object.assign(this, config.properties || {});
@@ -733,26 +737,26 @@ class Weapon {
   fire() {
     // 하위 클래스에서 구현
   }
-}
-
-// 기본 총알 클래스
-class BasicWeapon extends Weapon {
-  fire() {
-    // 가장 가까운 적을 향해 발사
-    const nearestEnemy = findNearestEnemy();
-    if (nearestEnemy) {
-      const dx = nearestEnemy.x - player.x;
-      const dy = nearestEnemy.y - player.y;
-      const angle = Math.atan2(dy, dx);
-      
-      gameObjects.bullets.push(
-        new Bullet(
-          player.x, player.y, 5, 7,
-          angle,
-          10 * player.attackPower
-        )
-      );
+  
+  // 업그레이드 메서드
+  upgrade() {
+    if (this.level < this.maxLevel) {
+      this.level++;
+      this.applyLevelBonus();
+      return true;
     }
+    return false;
+  }
+  
+  // 레벨별 보너스 적용 (하위 클래스에서 오버라이드)
+  applyLevelBonus() {
+    // 기본: 데미지 10% 증가
+    this.damage *= 1.1;
+  }
+  
+  // 무기가 최대 레벨인지 확인
+  isMaxLevel() {
+    return this.level >= this.maxLevel;
   }
 }
 
@@ -811,6 +815,57 @@ class Bullet {
   }
 }
 
+// 기본 무기 클래스
+class BasicWeapon extends Weapon {
+  constructor() {
+    super({
+      type: 'basic',
+      baseCooldown: 1000,
+      damage: 10
+    });
+    this.projectileCount = 1;
+  }
+  
+  fire() {
+    // 가장 가까운 적을 향해 발사
+    const nearestEnemy = findNearestEnemy();
+    if (nearestEnemy) {
+      // 레벨에 따라 여러 발 발사
+      const angleSpread = Math.PI / 6; // 30도 확산
+      const baseAngle = Math.atan2(nearestEnemy.y - player.y, nearestEnemy.x - player.x);
+      
+      for (let i = 0; i < this.projectileCount; i++) {
+        let angle = baseAngle;
+        if (this.projectileCount > 1) {
+          angle += (i - (this.projectileCount - 1) / 2) * (angleSpread / Math.max(1, this.projectileCount - 1));
+        }
+        
+        gameObjects.bullets.push(
+          new Bullet(
+            player.x, player.y, 5, 7,
+            angle,
+            this.damage * player.attackPower
+          )
+        );
+      }
+    }
+  }
+  
+  applyLevelBonus() {
+    super.applyLevelBonus();
+    // 3레벨마다 투사체 개수 증가
+    if (this.level % 3 === 0) {
+      this.projectileCount++;
+    }
+    // 짝수 레벨마다 쿨다운 감소
+    if (this.level % 2 === 0) {
+      this.baseCooldown *= 0.9;
+      this.updateCooldown(player.cooldownReduction);
+    }
+  }
+}
+
+// OrbitOrb 클래스
 class OrbitWeapon extends Weapon {
   constructor() {
     super({
@@ -857,11 +912,21 @@ class OrbitWeapon extends Weapon {
     this.orbitAngle += this.orbitSpeed;
   }
   
-  // 업그레이드 시 구체 재생성
-  upgrade() {
-    this.damage += 3;
-    this.orbCount += 1;
-    this.orbitRadius += 15;
+  applyLevelBonus() {
+    super.applyLevelBonus();
+    
+    // 레벨에 따른 개선
+    if (this.level % 2 === 0) {
+      this.orbCount++; // 짝수 레벨마다 구체 개수 증가
+    }
+    if (this.level % 3 === 0) {
+      this.orbitRadius += 20; // 3레벨마다 반지름 증가
+    }
+    if (this.level >= 4) {
+      this.orbitSpeed += 0.005; // 4레벨부터 회전 속도 증가
+    }
+    
+    // 구체 재생성
     this.createOrbs();
   }
   
@@ -870,111 +935,18 @@ class OrbitWeapon extends Weapon {
   }
 }
 
-// OrbitOrb 클래스
-class OrbitOrb {
-  constructor(x, y, baseAngle, radius, damage, parent) {
-    this.x = x;
-    this.y = y;
-    this.baseAngle = baseAngle;
-    this.radius = radius;
-    this.damage = damage;
-    this.size = 8;
-    this.used = false;
-    this.parent = parent;
-    this.rotationAngle = Math.random() * Math.PI * 2;
-    this.rotationSpeed = 0.05;
-  }
-  
-  update() {
-    if (this.used) return;
-    
-    // 플레이어 주변 회전
-    const totalAngle = this.parent.orbitAngle + this.baseAngle;
-    this.x = player.x + Math.cos(totalAngle) * this.radius;
-    this.y = player.y + Math.sin(totalAngle) * this.radius;
-    
-    // 구체 자체 회전
-    this.rotationAngle += this.rotationSpeed;
-    
-    // 적과 충돌 검사
-    const currentTime = gameTimeSystem.getTime();
-    if (currentTime - this.parent.lastDamageTime >= this.parent.damageCooldown) {
-      for (let enemy of gameObjects.enemies) {
-        if (enemy.state === 'moving' && detectCollision(this, enemy)) {
-          enemy.takeDamage(this.damage);
-          this.parent.lastDamageTime = currentTime;
-          break;
-        }
-      }
-    }
-  }
-  
-  draw(offsetX, offsetY) {
-    // 첫 번째 구체(baseAngle이 0인 구체)만 궤도 링을 그리기
-    if (this.baseAngle === 0 || Math.abs(this.baseAngle) < 0.1) {
-      this.drawOrbitRing();
-    }
-    
-    // 구체 그리기
-    const drawSize = this.size * 3;
-      
-    ctx.save();
-    ctx.translate(this.x + offsetX, this.y + offsetY);
-    ctx.rotate(this.rotationAngle);
-        
-    // 이미지 그리기
-    if (assetManager.loaded.weapons && assetManager.images.weapons.orbit) {
-      ctx.globalAlpha = 1;
-      ctx.drawImage(
-        assetManager.images.weapons.orbit,
-        -drawSize / 2,
-        -drawSize / 2,
-        drawSize,
-        drawSize
-      );
-    }
-    ctx.restore();
-  }
-  
-  // 궤도 링 그리기 메서드
-  drawOrbitRing() {
-    ctx.save();
-    
-    // 더 선명하게 만들어서 테스트
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)'; // 투명도 높임
-    ctx.lineWidth = 3; // 두께 증가
-    // ctx.setLineDash 제거 (일단 실선으로)
-    
-    ctx.beginPath();
-    ctx.arc(
-      canvas.width / 2,  // 플레이어 화면 중앙 X
-      canvas.height / 2, // 플레이어 화면 중앙 Y
-      this.radius,       // 궤도 반지름
-      0, 
-      Math.PI * 2
-    );
-    ctx.stroke();
-    
-    ctx.restore();
-  }
-  
-  outOfBounds() {
-    return false; // 플레이어 주변에 고정됨
-  }
-}
-
 class FlameWeapon extends Weapon {
   constructor() {
     super({
       type: 'flame',
-      baseCooldown: 5000, // 쿨타임
-      damage: 15 // 데미지
+      baseCooldown: 5000,
+      damage: 15
     });
     this.flameAngle = Math.PI / 3; // 60도 부채꼴
-    this.range = 200; // 범위
-    this.duration = 3000; // 지속시간
-    this.activeFlames = []; // 활성화된 화염 효과 저장
-    this.isFiring = false; // 발사 중인지 여부
+    this.range = 200;
+    this.duration = 3000;
+    this.activeFlames = [];
+    this.isFiring = false;
   }
   
   update() {
@@ -983,10 +955,10 @@ class FlameWeapon extends Weapon {
     // 활성화된 화염 중 사용 완료된 것 제거
     this.activeFlames = this.activeFlames.filter(flame => !flame.used);
     
-    // 발사 중인지 확인 (활성 화염이 있으면 발사 중)
+    // 발사 중인지 확인
     this.isFiring = this.activeFlames.length > 0;
     
-    // 발사 중이 아니고 쿨다운이 지났으면 발사(발사 중엔 쿨타임 돌지 않음)
+    // 발사 중이 아니고 쿨다운이 지났으면 발사
     if (!this.isFiring && now - this.lastAttackTime - this.duration >= this.cooldown) {
       this.fire();
       this.lastAttackTime = now;
@@ -1005,6 +977,25 @@ class FlameWeapon extends Weapon {
     
     this.activeFlames.push(flame);
     gameObjects.bullets.push(flame);
+  }
+  
+  applyLevelBonus() {
+    super.applyLevelBonus();
+    
+    // 레벨에 따른 개선
+    if (this.level % 2 === 0) {
+      this.range += 30; // 짝수 레벨마다 범위 증가
+    }
+    if (this.level % 3 === 0) {
+      this.flameAngle += Math.PI / 12; // 3레벨마다 각도 증가 (15도씩)
+    }
+    if (this.level >= 5) {
+      this.duration += 500; // 5레벨부터 지속시간 증가
+    }
+    if (this.level >= 6) {
+      this.baseCooldown *= 0.8; // 6레벨부터 쿨다운 감소
+      this.updateCooldown(player.cooldownReduction);
+    }
   }
 }
 
@@ -1154,7 +1145,7 @@ class LightningWeapon extends Weapon {
   constructor() {
     super({
       type: 'lightning',
-        baseCooldown: 2000,
+      baseCooldown: 2000,
       damage: 15
     });
     this.chainCount = 3;
@@ -1172,12 +1163,31 @@ class LightningWeapon extends Weapon {
         new ChainLightningEffect(
           player.x, player.y,
           nearestEnemy.x, nearestEnemy.y,
-          15 * player.attackPower,
+          this.damage * player.attackPower,
           this.chainCount,
           this.chainRange,
           nearestEnemy
         )
       );
+    }
+  }
+  
+  applyLevelBonus() {
+    super.applyLevelBonus();
+    
+    // 레벨에 따른 개선
+    if (this.level % 2 === 0) {
+      this.chainCount++; // 짝수 레벨마다 체인 개수 증가
+    }
+    if (this.level % 3 === 0) {
+      this.chainRange += 30; // 3레벨마다 체인 범위 증가
+    }
+    if (this.level >= 4) {
+      this.maxTargetDistance += 50; // 4레벨부터 최대 거리 증가
+    }
+    if (this.level >= 6) {
+      this.baseCooldown *= 0.85; // 6레벨부터 쿨다운 감소
+      this.updateCooldown(player.cooldownReduction);
     }
   }
 }
@@ -1360,20 +1370,6 @@ const WeaponFactory = {
       default:
         return new BasicWeapon();
     }
-  },
-  
-  upgradeWeapon(weapon) {
-    if (weapon instanceof OrbitWeapon) {
-      weapon.bulletCount += 1;
-      weapon.orbitRadius += 10;
-    } else if (weapon instanceof FlameWeapon) {
-      weapon.range += 50;
-      weapon.coneAngle += Math.PI / 12;
-    } else if (weapon instanceof LightningWeapon) {
-      weapon.chainCount += 1;
-      weapon.chainRange += 25;
-    }     
-    weapon.updateCooldown(player.cooldownReduction);
   }
 };
 
@@ -2416,29 +2412,56 @@ function generateLevelUpOptions() {
     { type: 'moveSpeed', name: '이동속도 증가', value: 0.3, description: '이동속도 +0.3' },
     { type: 'pickupRadius', name: '획득 범위 증가', value: 20, description: '아이템 획득 범위 +20' },
     { type: 'expMultiplier', name: '경험치 증가', value: 0.1, description: '경험치 획득량 +10%' },
-    
-    // 무기 옵션들
+  ];
+  
+  // 무기 옵션들 - 기존 무기와 새 무기 모두 포함
+  const weaponUpgrades = [
+    { type: 'weapon', weaponType: 'basic', name: '기본 무기', description: '기본 투사체 공격' },
     { type: 'weapon', weaponType: 'orbit', name: '회전 구체', description: '플레이어 주변을 회전하며 공격' },
     { type: 'weapon', weaponType: 'flame', name: '화염방사기', description: '넓은 범위의 지속 데미지' },
     { type: 'weapon', weaponType: 'lightning', name: '번개 사슬', description: '적들 사이를 튀는 번개' },
   ];
   
-  // 플레이어가 이미 가지고 있는 무기 필터링
-  const playerWeaponTypes = player.weapons.map(w => w.constructor.name);
-  const availableUpgrades = allUpgrades.filter(upgrade => {
-    if (upgrade.type === 'weapon') {
-      const weaponClassName = upgrade.weaponType.charAt(0).toUpperCase() + 
-                            upgrade.weaponType.slice(1) + 'Weapon';
-      return !playerWeaponTypes.includes(weaponClassName);
+  // 기존 무기 업그레이드 옵션 추가
+  for (let weapon of player.weapons) {
+    if (!weapon.isMaxLevel()) {
+      const weaponName = getWeaponDisplayName(weapon.type);
+      weaponUpgrades.push({
+        type: 'weaponUpgrade',
+        weaponType: weapon.type,
+        name: `${weaponName} 업그레이드`,
+        description: `레벨 ${weapon.level} → ${weapon.level + 1}`,
+        weapon: weapon // 참조 저장
+      });
     }
-    return true;
-  });
+  }
+  
+  // 새로운 무기 옵션 추가 (아직 없는 무기만)
+  const playerWeaponTypes = player.weapons.map(w => w.type);
+  for (let weaponUpgrade of weaponUpgrades) {
+    if (weaponUpgrade.type === 'weapon' && !playerWeaponTypes.includes(weaponUpgrade.weaponType)) {
+      allUpgrades.push(weaponUpgrade);
+    } else if (weaponUpgrade.type === 'weaponUpgrade') {
+      allUpgrades.push(weaponUpgrade);
+    }
+  }
   
   // 랜덤하게 4개 선택
   levelUpOptions = [];
-  const shuffled = [...availableUpgrades].sort(() => Math.random() - 0.5);
+  const shuffled = [...allUpgrades].sort(() => Math.random() - 0.5);
   levelUpOptions = shuffled.slice(0, 4);
-  hoveredLevelUpOption = -1; // 초기에는 선택된 옵션 없음
+  hoveredLevelUpOption = -1;
+}
+
+// 무기 표시 이름 헬퍼 함수
+function getWeaponDisplayName(weaponType) {
+  const names = {
+    'basic': '기본 무기',
+    'orbit': '회전 구체',
+    'flame': '화염방사기',
+    'lightning': '번개 사슬'
+  };
+  return names[weaponType] || weaponType;
 }
 
 // 아티팩트 옵션 생성
@@ -2509,7 +2532,7 @@ function generateArtifactOptions() {
 
 // 레벨업 선택 적용
 function applyLevelUpChoice(optionIndex) {
-  console.log("Applying level up choice:", optionIndex); // 디버깅용
+  console.log("Applying level up choice:", optionIndex);
   
   if (optionIndex === undefined || optionIndex === -1 || !levelUpOptions[optionIndex]) {
     console.log("Invalid option index:", optionIndex);
@@ -2520,8 +2543,16 @@ function applyLevelUpChoice(optionIndex) {
   console.log("Selected option:", option);
 
   if (option.type === 'weapon') {
+    // 새로운 무기 추가
     addWeapon(option.weaponType);
+  } else if (option.type === 'weaponUpgrade') {
+    // 기존 무기 업그레이드
+    const weapon = option.weapon;
+    if (weapon && weapon.upgrade()) {
+      console.log(`${weapon.type} 무기가 레벨 ${weapon.level}로 업그레이드되었습니다.`);
+    }
   } else {
+    // 기존 로직 유지
     if (isArtifactSelection) {
       // 아티팩트 효과 적용
       switch(option.type) {
@@ -2532,8 +2563,8 @@ function applyLevelUpChoice(optionIndex) {
           player.attackPower *= 1.5;
           break;
         case 'increaseCooldownReduction':
-          player.cooldownReduction += 0.3; // 쿨타임 30% 감소
-          player.cooldownReduction = Math.min(player.cooldownReduction, 0.8); // 최대 값 제한
+          player.cooldownReduction += 0.3;
+          player.cooldownReduction = Math.min(player.cooldownReduction, 0.8);
           player.weapons.forEach(weapon => {
             weapon.updateCooldown(player.cooldownReduction);
           });
@@ -2556,12 +2587,10 @@ function applyLevelUpChoice(optionIndex) {
           currentGameState = GAME_STATE.PLAYING;
           totalPausedTime += gameTimeSystem.getTime() - pauseStartTime;
           
-          // 경험치 획득 후 레벨업 체크
           checkLevelUp();
           return;
       }
       
-      // 아티팩트 ID 기록
       if (option.artifactId && option.artifactId !== 0) {
         player.acquiredArtifacts.push(option.artifactId);
       }
@@ -2579,7 +2608,6 @@ function applyLevelUpChoice(optionIndex) {
           break;
         case 'cooldownReduction':
           player.cooldownReduction += option.value;
-          // 최대 값 제한 (80% 이상 감소 방지)
           player.cooldownReduction = Math.min(player.cooldownReduction, 0.8);
           player.weapons.forEach(weapon => {
             weapon.updateCooldown(player.cooldownReduction);
@@ -2835,9 +2863,29 @@ function drawOptionBox(x, y, width, height, option, isHovered) {
       ctx.drawImage(assetManager.images.artifactIcons[option.type], iconX, iconY, iconSize, iconSize);
     }
   } else {
-    // 무기 옵션인 경우
-    if (option.type === 'weapon' && assetManager.loaded.weaponIcons && assetManager.images.weaponIcons[option.weaponType]) {
+    // 무기 옵션인 경우 (새 무기 또는 업그레이드)
+    if ((option.type === 'weapon' || option.type === 'weaponUpgrade') && 
+        assetManager.loaded.weaponIcons && 
+        assetManager.images.weaponIcons[option.weaponType]) {
       ctx.drawImage(assetManager.images.weaponIcons[option.weaponType], iconX, iconY, iconSize, iconSize);
+      
+      // 무기 업그레이드인 경우 레벨 표시 오버레이
+      if (option.type === 'weaponUpgrade') {
+        // 레벨 배지 배경
+        ctx.fillStyle = 'rgba(255, 215, 0, 0.9)'; // 골드 배경
+        ctx.fillRect(iconX + iconSize - 30, iconY, 30, 25);
+        
+        // 레벨 배지 테두리
+        ctx.strokeStyle = '#B8860B';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(iconX + iconSize - 30, iconY, 30, 25);
+        
+        // 레벨 텍스트
+        ctx.fillStyle = '#000000';
+        ctx.font = 'bold 14px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(`+${option.weapon.level}`, iconX + iconSize - 15, iconY + 17);
+      }
     } 
     // 일반 레벨업 옵션인 경우
     else if (assetManager.loaded.levelUpIcons && assetManager.images.levelUpIcons[option.type]) {
@@ -2878,6 +2926,47 @@ function drawOptionBox(x, y, width, height, option, isHovered) {
     }
   }
   ctx.fillText(line, x + width/2, lineY);
+  
+  // 무기 업그레이드인 경우 추가 정보 표시
+  if (option.type === 'weaponUpgrade' && option.weapon) {
+    // 현재 레벨과 다음 레벨 표시
+    ctx.fillStyle = isHovered ? '#00FF00' : '#90EE90';
+    ctx.font = 'bold 20px Arial';
+    ctx.textAlign = 'center';
+    
+    // 레벨 정보를 박스 하단에 표시
+    const levelY = y + height - 25;
+    ctx.fillText(
+      `레벨 ${option.weapon.level} → ${option.weapon.level + 1}`, 
+      x + width/2, 
+      levelY
+    );
+    
+    // 현재 레벨이 높을수록 골드 색상으로 변경
+    if (option.weapon.level >= 6) {
+      ctx.fillStyle = isHovered ? '#FFD700' : '#DAA520';
+      ctx.fillText(
+        `레벨 ${option.weapon.level} → ${option.weapon.level + 1}`, 
+        x + width/2, 
+        levelY
+      );
+    }
+  }
+  
+  // 새로운 무기인 경우 "NEW!" 표시
+  if (option.type === 'weapon') {
+    ctx.fillStyle = 'rgba(255, 0, 0, 0.8)';
+    ctx.fillRect(iconX, iconY - 15, 40, 20);
+    
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(iconX, iconY - 15, 40, 20);
+    
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 12px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('NEW!', iconX + 20, iconY - 2);
+  }
 }
 
 function drawPauseScreen() {
