@@ -436,7 +436,7 @@ class AssetManager {
 
   loadWeaponImages() {
     this.loadImageSet('weapons', 
-      ['basic', 'orbit', 'flame', 'lightningChain', 'lightningImpact'], 
+      ['basic', 'orbit', 'flame', 'lightningChain', 'lightningImpact', 'fist'], 
       './img/weapons/{item}.png'
     );
   }
@@ -1428,15 +1428,14 @@ class FistWeapon extends MeleeWeapon {
       type: 'fist',
       baseCooldown: 400, // 빠른 공격속도
       damage: 15,
-      range: 40, // 짧은 사거리
-      effectDuration: 200
+      range: 100,
+      effectDuration: 300
     });
   }
 
-  findTargetsInRange(attackDirection) {
-    const targets = [];
-    
-    // 가장 가까운 적 1명만 공격
+  // fire 메서드를 오버라이드해서 자동으로 가장 가까운 적 공격
+  fire() {
+    // 범위 내에서 가장 가까운 적 찾기
     let nearestEnemy = null;
     let minDistance = this.range;
     
@@ -1453,19 +1452,28 @@ class FistWeapon extends MeleeWeapon {
       }
     }
     
+    // 적이 있으면 공격
     if (nearestEnemy) {
-      targets.push(nearestEnemy);
+      // 적에게 데미지 적용
+      nearestEnemy.takeDamage(this.damage * player.attackPower);
+      
+      // 적 방향 계산
+      const dx = nearestEnemy.x - player.x;
+      const dy = nearestEnemy.y - player.y;
+      const attackDirection = Math.atan2(dy, dx);
+      
+      // 시각적 효과 생성
+      this.createEffect(attackDirection, nearestEnemy);
     }
-    
-    return targets;
   }
 
-  createEffect(attackDirection) {
+  createEffect(attackDirection, targetEnemy) {
     const effect = new FistEffect(
-      player.x + Math.cos(attackDirection) * 25,
-      player.y + Math.sin(attackDirection) * 25,
+      player.x, // 플레이어 위치에서 시작
+      player.y,
       attackDirection,
-      this.effectDuration
+      this.effectDuration,
+      targetEnemy // 목표 적
     );
     gameObjects.bullets.push(effect);
   }
@@ -1479,7 +1487,7 @@ class FistWeapon extends MeleeWeapon {
     }
     // 3레벨마다 범위 증가
     if (this.level % 3 === 0) {
-      this.range += 10;
+      this.range += 15;
     }
   }
 }
@@ -1650,34 +1658,143 @@ class MeleeEffect {
 
 // 주먹 공격 이펙트
 class FistEffect extends MeleeEffect {
-  constructor(x, y, direction, duration) {
+  constructor(x, y, direction, duration, targetEnemy) {
     super(x, y, direction, duration);
-    this.maxSize = 30;
+    this.maxSize = 48; // 적절한 크기로 조정
+    this.rotationAngle = direction;
+    this.targetEnemy = targetEnemy;
+    this.speed = 12; // 빠른 이동 속도
+    this.hasReachedTarget = false;
+    this.impactStartTime = 0;
+    this.impactDuration = 200; // 임팩트 효과 지속시간
+    
+    // 목표 위치 저장 (적이 움직일 수 있으므로)
+    if (targetEnemy) {
+      this.targetX = targetEnemy.x;
+      this.targetY = targetEnemy.y;
+    } else {
+      // 목표가 없으면 방향으로 일정 거리
+      this.targetX = x + Math.cos(direction) * 100;
+      this.targetY = y + Math.sin(direction) * 100;
+    }
+    
+    // 시작 위치 저장
+    this.startX = x;
+    this.startY = y;
+  }
+
+  update() {
+    if (!this.hasReachedTarget) {
+      // 목표를 향해 이동
+      const dx = this.targetX - this.x;
+      const dy = this.targetY - this.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      
+      // 목표에 도달했거나 아주 가까워졌을 때
+      if (distance <= this.speed || distance < 5) {
+        this.x = this.targetX;
+        this.y = this.targetY;
+        this.hasReachedTarget = true;
+        this.impactStartTime = gameTimeSystem.getTime();
+      } else {
+        // 계속 이동
+        const normalizedX = dx / distance;
+        const normalizedY = dy / distance;
+        this.x += normalizedX * this.speed;
+        this.y += normalizedY * this.speed;
+      }
+    } else {
+      // 임팩트 효과 시간 체크
+      const impactElapsed = gameTimeSystem.getTime() - this.impactStartTime;
+      if (impactElapsed >= this.impactDuration) {
+        this.used = true;
+      }
+    }
+    
+    // 기본 지속시간도 체크
+    const elapsed = gameTimeSystem.getTime() - this.startTime;
+    if (elapsed >= this.duration) {
+      this.used = true;
+    }
   }
 
   draw(offsetX, offsetY) {
-    const progress = this.getProgress();
-    const size = this.maxSize * Math.sin(progress * Math.PI); // 0에서 시작해서 커졌다가 다시 작아짐
-    const alpha = 1 - progress;
+    const drawX = this.x + offsetX;
+    const drawY = this.y + offsetY;
     
-    ctx.save();
-    ctx.globalAlpha = alpha;
+    if (!this.hasReachedTarget) {
+      // 이동 중일 때 - 주먹이 날아가는 모습
+      this.drawMovingFist(drawX, drawY);
+    } else {
+      // 목표에 도달했을 때 - 임팩트 효과
+      this.drawImpactEffect(drawX, drawY);
+    }
+  }
+  
+  drawMovingFist(drawX, drawY) {
+    // fist.png 이미지가 로드되었는지 확인
+    if (assetManager.loaded.weapons && assetManager.images.weapons.fist) {
+      ctx.save();
+      
+      // 이동 중 약간의 투명도와 잔상 효과
+      ctx.globalAlpha = 0.9;
+      
+      // 이미지 크기
+      const imageSize = this.maxSize * 0.8; // 이동 중에는 약간 작게
+      
+      // 이미지 중심점으로 이동하고 회전
+      ctx.translate(drawX, drawY);
+      ctx.rotate(this.rotationAngle);
+      
+      // fist 이미지 그리기
+      ctx.drawImage(
+        assetManager.images.weapons.fist,
+        -imageSize / 2,
+        -imageSize / 2,
+        imageSize,
+        imageSize
+      );
+      
+      ctx.restore();
+    }
+  }
+  
+  drawImpactEffect(drawX, drawY) {
+    const impactElapsed = gameTimeSystem.getTime() - this.impactStartTime;
+    const impactProgress = Math.min(impactElapsed / this.impactDuration, 1);
     
-    // 주먹 효과 - 원형 충격파
-    ctx.strokeStyle = '#FFD700';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.arc(this.x + offsetX, this.y + offsetY, size, 0, Math.PI * 2);
-    ctx.stroke();
-    
-    // 내부 원
-    ctx.strokeStyle = '#FFA500';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(this.x + offsetX, this.y + offsetY, size * 0.6, 0, Math.PI * 2);
-    ctx.stroke();
-    
-    ctx.restore();
+    // fist.png 이미지가 로드되었는지 확인
+    if (assetManager.loaded.weapons && assetManager.images.weapons.fist) {
+      ctx.save();
+      
+      // 임팩트 시 점점 사라지는 효과
+      const alpha = Math.max(0, 1 - impactProgress);
+      ctx.globalAlpha = alpha;
+
+      // 이미지 크기
+      const imageSize = this.maxSize;
+      
+      // 이미지 중심점으로 이동하고 회전
+      ctx.translate(drawX, drawY);
+      ctx.rotate(this.rotationAngle);
+      
+      // fist 이미지 그리기
+      ctx.drawImage(
+        assetManager.images.weapons.fist,
+        -imageSize / 2,
+        -imageSize / 2,
+        imageSize,
+        imageSize
+      );      
+      ctx.restore();
+    }
+  }
+
+  // outOfBounds 메서드 추가 (Bullet 클래스처럼)
+  outOfBounds() {
+    // 화면에서 너무 멀리 나가면 제거
+    const maxDistance = 800;
+    return !isWithinDistance(this, player, maxDistance);
   }
 }
 
