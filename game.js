@@ -70,6 +70,204 @@ function loadGold() {
   return 0; // 저장된 골드가 없거나 사용자가 없으면 0 반환
 }
 
+// 영구 업그레이드 시스템
+const permanentUpgrades = {
+  upgrades: [
+    {
+      id: 'attackPower',
+      name: '공격력',
+      description: '공격력 +10%',
+      maxLevel: 10,
+      currentLevel: 0,
+      baseCost: 50,
+      costMultiplier: 1.5,
+      effect: 0.1 // 레벨당 10% 증가
+    },
+    {
+      id: 'cooldownReduction',
+      name: '쿨타임',
+      description: '쿨타임 -5%',
+      maxLevel: 10,
+      currentLevel: 0,
+      baseCost: 80,
+      costMultiplier: 1.6,
+      effect: 0.05 // 레벨당 5% 감소
+    },
+    {
+      id: 'maxHealth',
+      name: '최대체력',
+      description: '최대체력 +20',
+      maxLevel: 15,
+      currentLevel: 0,
+      baseCost: 60,
+      costMultiplier: 1.4,
+      effect: 20 // 레벨당 20 증가
+    },
+    {
+      id: 'moveSpeed',
+      name: '이동속도',
+      description: '이동속도 +0.2',
+      maxLevel: 10,
+      currentLevel: 0,
+      baseCost: 70,
+      costMultiplier: 1.5,
+      effect: 0.2 // 레벨당 0.2 증가
+    },
+    {
+      id: 'attackRange',
+      name: '공격범위',
+      description: '공격범위 +8%',
+      maxLevel: 12,
+      currentLevel: 0,
+      baseCost: 90,
+      costMultiplier: 1.7,
+      effect: 0.08 // 레벨당 8% 증가
+    },
+    {
+      id: 'pickupRadius',
+      name: '아이템획득반경',
+      description: '획득반경 +15',
+      maxLevel: 8,
+      currentLevel: 0,
+      baseCost: 40,
+      costMultiplier: 1.3,
+      effect: 15 // 레벨당 15 증가
+    },
+    {
+      id: 'dodgeRate',
+      name: '회피율',
+      description: '회피율 +3%',
+      maxLevel: 15,
+      currentLevel: 0,
+      baseCost: 120,
+      costMultiplier: 1.8,
+      effect: 0.03 // 레벨당 3% 증가
+    },
+    {
+      id: 'luck',
+      name: '행운',
+      description: '행운 +5%',
+      maxLevel: 12,
+      currentLevel: 0,
+      baseCost: 100,
+      costMultiplier: 1.6,
+      effect: 0.05 // 레벨당 5% 증가
+    },
+    {
+      id: 'expMultiplier',
+      name: '성장',
+      description: '경험치 +8%',
+      maxLevel: 10,
+      currentLevel: 0,
+      baseCost: 110,
+      costMultiplier: 1.7,
+      effect: 0.08 // 레벨당 8% 증가
+    },
+    {
+      id: 'healthRegen',
+      name: '초당체력회복량',
+      description: '체력회복 +1%',
+      maxLevel: 8,
+      currentLevel: 0,
+      baseCost: 150,
+      costMultiplier: 2.0,
+      effect: 0.01 // 레벨당 1% 증가
+    },
+    {
+      id: 'goldMultiplier',
+      name: '골드획득량',
+      description: '골드 +15%',
+      maxLevel: 8,
+      currentLevel: 0,
+      baseCost: 80,
+      costMultiplier: 1.8,
+      effect: 0.15 // 레벨당 15% 증가
+    }
+  ],
+
+  // 업그레이드 비용 계산
+  getCost(upgradeIndex) {
+    const upgrade = this.upgrades[upgradeIndex];
+    if (!upgrade || upgrade.currentLevel >= upgrade.maxLevel) return -1;
+    
+    return Math.floor(upgrade.baseCost * Math.pow(upgrade.costMultiplier, upgrade.currentLevel));
+  },
+
+  // 업그레이드 가능 여부 확인
+  canUpgrade(upgradeIndex) {
+    const upgrade = this.upgrades[upgradeIndex];
+    if (!upgrade || upgrade.currentLevel >= upgrade.maxLevel) return false;
+    
+    // 순서대로 해금: 이전 업그레이드가 최대 레벨이어야 다음 업그레이드 가능
+    if (upgradeIndex > 0) {
+      const prevUpgrade = this.upgrades[upgradeIndex - 1];
+      if (prevUpgrade.currentLevel < prevUpgrade.maxLevel) return false;
+    }
+    
+    const cost = this.getCost(upgradeIndex);
+    return cost !== -1 && gold >= cost;
+  },
+
+  // 업그레이드 구매
+  purchaseUpgrade(upgradeIndex) {
+    if (!this.canUpgrade(upgradeIndex)) return false;
+    
+    const cost = this.getCost(upgradeIndex);
+    gold -= cost;
+    this.upgrades[upgradeIndex].currentLevel++;
+    
+    this.saveUpgrades();
+    saveGold();
+    return true;
+  },
+
+  // 업그레이드 저장
+  saveUpgrades() {
+    if (userProfileSystem.currentUser) {
+      const upgradeData = this.upgrades.map(upgrade => ({
+        id: upgrade.id,
+        currentLevel: upgrade.currentLevel
+      }));
+      localStorage.setItem(`vampireSurvivorUpgrades_${userProfileSystem.currentUser}`, JSON.stringify(upgradeData));
+    }
+  },
+
+  // 업그레이드 불러오기
+  loadUpgrades() {
+    if (userProfileSystem.currentUser) {
+      const savedData = localStorage.getItem(`vampireSurvivorUpgrades_${userProfileSystem.currentUser}`);
+      if (savedData) {
+        const upgradeData = JSON.parse(savedData);
+        upgradeData.forEach(saved => {
+          const upgrade = this.upgrades.find(u => u.id === saved.id);
+          if (upgrade) {
+            upgrade.currentLevel = saved.currentLevel;
+          }
+        });
+      }
+    }
+  },
+
+  // 현재 업그레이드 효과값 계산
+  getUpgradeValue(upgradeId) {
+    const upgrade = this.upgrades.find(u => u.id === upgradeId);
+    return upgrade ? upgrade.effect * upgrade.currentLevel : 0;
+  },
+
+  // 해금된 업그레이드 개수
+  getUnlockedCount() {
+    let count = 1; // 첫 번째는 항상 해금
+    for (let i = 0; i < this.upgrades.length - 1; i++) {
+      if (this.upgrades[i].currentLevel >= this.upgrades[i].maxLevel) {
+        count++;
+      } else {
+        break;
+      }
+    }
+    return count;
+  }
+};
+
 // Game objects
 const gameObjects = {
   chunks: {}, 
@@ -128,7 +326,8 @@ const GAME_STATE = {
   CONFIRM_DIALOG: 6,
   LEVEL_UP: 7,
   PROFILE_SELECT: 8,
-  CREATE_USER: 9
+  CREATE_USER: 9,
+  UPGRADE: 10
 };
 
 // 사용자 이름 입력 관련 변수
@@ -2434,6 +2633,10 @@ class Enemy {
     const goldValue = this.goldValue || 10;
     
     player.exp += Math.floor(expValue * player.expMultiplier);
+    // 골드 획득량 영구 업그레이드 적용
+    goldValue = Math.floor(goldValue * (1 + permanentUpgrades.getUpgradeValue('goldMultiplier')));
+    
+    player.exp += Math.floor(expValue * player.expMultiplier);
     gold += goldValue;
     saveGold();
     
@@ -3270,7 +3473,41 @@ function resumeGame() {
   }
 }
 
+// 영구 업그레이드 적용 함수
+function applyPermanentUpgrades() {
+  // 영구 업그레이드 불러오기
+  permanentUpgrades.loadUpgrades();
+  
+  // 기본 스탯에 영구 업그레이드 효과 적용
+  const baseAttackPower = 1;
+  const baseCooldownReduction = 0;
+  const baseMaxHealth = 100;
+  const baseSpeed = 2;
+  const baseAttackRange = 1;
+  const basePickupRadius = 100;
+  const baseDodgeRate = 0;
+  const baseLuck = 0;
+  const baseExpMultiplier = 1;
+  const baseHealthRegen = 0;
+  
+  player.attackPower = baseAttackPower * (1 + permanentUpgrades.getUpgradeValue('attackPower'));
+  player.cooldownReduction = baseCooldownReduction + permanentUpgrades.getUpgradeValue('cooldownReduction');
+  player.maxHealth = baseMaxHealth + permanentUpgrades.getUpgradeValue('maxHealth');
+  player.speed = baseSpeed + permanentUpgrades.getUpgradeValue('moveSpeed');
+  player.attackRange = baseAttackRange + permanentUpgrades.getUpgradeValue('attackRange');
+  player.pickupRadius = basePickupRadius + permanentUpgrades.getUpgradeValue('pickupRadius');
+  player.dodgeRate = baseDodgeRate + permanentUpgrades.getUpgradeValue('dodgeRate');
+  player.luck = baseLuck + permanentUpgrades.getUpgradeValue('luck');
+  player.expMultiplier = baseExpMultiplier + permanentUpgrades.getUpgradeValue('expMultiplier');
+  player.healthRegeneration = baseHealthRegen + permanentUpgrades.getUpgradeValue('healthRegen');
+  
+  player.health = player.maxHealth; // 체력을 최대체력으로 설정
+}
+
 function resetGame() {
+  // 영구 업그레이드 적용
+  applyPermanentUpgrades();
+  
   // 플레이어 초기화
   player.x = 0;
   player.y = 0;
@@ -3870,20 +4107,25 @@ function drawStartScreen() {
     );
   }
   
-  // 게임 버튼
-  const buttonY = canvas.height - 100;
+  // 게임 버튼들 - 4개 버튼을 2x2로 배치
+  const buttonY = canvas.height - 120;
   const buttonWidth = 150;
   const buttonHeight = 40;
   const spacing = 40;
   
-  // 시작 버튼
+  // 상단 버튼들
+  // 게임 시작 버튼
   drawButton(canvas.width / 2 - buttonWidth - spacing/2, buttonY, buttonWidth, buttonHeight, '게임 시작', true);
   
   // 설정 버튼
   drawButton(canvas.width / 2 + spacing/2, buttonY, buttonWidth, buttonHeight, '설정', true);
   
+  // 하단 버튼들
+  // 업그레이드 버튼
+  drawButton(canvas.width / 2 - buttonWidth - spacing/2, buttonY + 60, buttonWidth, buttonHeight, '업그레이드', true);
+  
   // 프로필 변경 버튼
-  drawButton(canvas.width / 2 - buttonWidth/2, buttonY - 60, buttonWidth, buttonHeight, '프로필 변경', true);
+  drawButton(canvas.width / 2 + spacing/2, buttonY + 60, buttonWidth, buttonHeight, '프로필 변경', true);
 }
 
 // 버튼 그리기 함수
@@ -3971,6 +4213,114 @@ function drawGameOverScreen() {
   ctx.font = '24px Arial';
   ctx.fillText(`최종 골드: ${gold}`, canvas.width / 2, canvas.height / 2);
   ctx.fillText('클릭하여 다시 시작하세요', canvas.width / 2, canvas.height / 2 + 50);
+}
+
+// 업그레이드 화면 변수들
+let selectedUpgradeIndex = 0;
+let upgradeScrollOffset = 0;
+
+// 업그레이드 화면 그리기 함수
+function drawUpgradeScreen() {
+  ctx.fillStyle = 'black';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  
+  // 제목
+  ctx.fillStyle = '#FFD700';
+  ctx.font = '36px Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText('영구 업그레이드', canvas.width / 2, 60);
+  
+  // 현재 골드 표시
+  ctx.fillStyle = '#66fcf1';
+  ctx.font = '20px Arial';
+  ctx.fillText(`보유 골드: ${gold}`, canvas.width / 2, 100);
+  
+  // 업그레이드 목록
+  const startY = 140;
+  const itemHeight = 80;
+  const maxVisibleItems = 6;
+  const unlockedCount = permanentUpgrades.getUnlockedCount();
+  
+  for (let i = 0; i < Math.min(unlockedCount, maxVisibleItems); i++) {
+    const upgradeIndex = i + upgradeScrollOffset;
+    if (upgradeIndex >= unlockedCount) break;
+    
+    const upgrade = permanentUpgrades.upgrades[upgradeIndex];
+    const y = startY + i * itemHeight;
+    const isSelected = upgradeIndex === selectedUpgradeIndex;
+    const canUpgrade = permanentUpgrades.canUpgrade(upgradeIndex);
+    
+    // 배경
+    ctx.fillStyle = isSelected ? 'rgba(102, 252, 241, 0.3)' : 'rgba(69, 162, 158, 0.1)';
+    ctx.fillRect(50, y, canvas.width - 100, itemHeight - 5);
+    
+    // 테두리
+    ctx.strokeStyle = isSelected ? '#66fcf1' : '#45a29e';
+    ctx.lineWidth = isSelected ? 3 : 1;
+    ctx.strokeRect(50, y, canvas.width - 100, itemHeight - 5);
+    
+    // 업그레이드 이름
+    ctx.fillStyle = canUpgrade ? '#FFFFFF' : '#888888';
+    ctx.font = '24px Arial';
+    ctx.textAlign = 'left';
+    ctx.fillText(upgrade.name, 70, y + 25);
+    
+    // 레벨 정보
+    ctx.fillStyle = upgrade.currentLevel >= upgrade.maxLevel ? '#FFD700' : '#c5c6c7';
+    ctx.font = '18px Arial';
+    ctx.fillText(`레벨 ${upgrade.currentLevel}/${upgrade.maxLevel}`, 70, y + 50);
+    
+    // 설명
+    ctx.fillStyle = '#c5c6c7';
+    ctx.font = '16px Arial';
+    ctx.fillText(upgrade.description, 70, y + 70);
+    
+    // 비용 (최대 레벨이 아닌 경우)
+    if (upgrade.currentLevel < upgrade.maxLevel) {
+      const cost = permanentUpgrades.getCost(upgradeIndex);
+      ctx.fillStyle = canUpgrade ? '#00FF00' : '#FF0000';
+      ctx.font = '20px Arial';
+      ctx.textAlign = 'right';
+      ctx.fillText(`${cost} 골드`, canvas.width - 70, y + 35);
+      
+      // 구매 버튼
+      const buttonX = canvas.width - 150;
+      const buttonY = y + 45;
+      const buttonWidth = 80;
+      const buttonHeight = 25;
+      
+      ctx.fillStyle = canUpgrade ? '#66fcf1' : '#555555';
+      ctx.fillRect(buttonX, buttonY, buttonWidth, buttonHeight);
+      
+      ctx.strokeStyle = canUpgrade ? '#ffffff' : '#777777';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(buttonX, buttonY, buttonWidth, buttonHeight);
+      
+      ctx.fillStyle = canUpgrade ? '#000000' : '#AAAAAA';
+      ctx.font = '14px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText('구매', buttonX + buttonWidth/2, buttonY + 17);
+    } else {
+      // 최대 레벨 표시
+      ctx.fillStyle = '#FFD700';
+      ctx.font = '18px Arial';
+      ctx.textAlign = 'right';
+      ctx.fillText('최대 레벨', canvas.width - 70, y + 35);
+    }
+  }
+  
+  // 뒤로가기 버튼
+  const backButtonY = canvas.height - 60;
+  drawButton(canvas.width / 2 - 75, backButtonY, 150, 40, '뒤로가기', true);
+  
+  // 스크롤 표시 (해금된 업그레이드가 많을 때)
+  if (unlockedCount > maxVisibleItems) {
+    ctx.fillStyle = '#66fcf1';
+    ctx.font = '16px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText(`${upgradeScrollOffset + 1}-${Math.min(upgradeScrollOffset + maxVisibleItems, unlockedCount)} / ${unlockedCount}`, 
+                 canvas.width / 2, startY + maxVisibleItems * itemHeight + 20);
+  }
 }
 
 function drawHUD() {
@@ -5013,7 +5363,7 @@ function setupMouseHandlers() {
 }
 
 function handleMouseClick() {
-  console.log("Mouse clicked, game state:", currentGameState); // 디버깅용
+  console.log("Mouse clicked, game state:", currentGameState);
 
   switch(currentGameState) {
     case GAME_STATE.PROFILE_SELECT:
@@ -5024,6 +5374,9 @@ function handleMouseClick() {
       break;
     case GAME_STATE.SETTINGS:
       handleSettingsScreenClick();
+      break;
+    case GAME_STATE.UPGRADE:  // 새로 추가
+      handleUpgradeScreenClick();
       break;
     case GAME_STATE.PAUSED:
       handlePauseScreenClick();
@@ -5041,11 +5394,12 @@ function handleMouseClick() {
 }
 
 function handleStartScreenClick() {
-  const buttonY = canvas.height - 100;
+  const buttonY = canvas.height - 120;
   const buttonWidth = 150;
   const buttonHeight = 40;
   const spacing = 40;
   
+  // 상단 버튼들
   // 시작 버튼
   if (mouseX >= canvas.width / 2 - buttonWidth - spacing/2 && 
       mouseX <= canvas.width / 2 - spacing/2 &&
@@ -5064,10 +5418,21 @@ function handleStartScreenClick() {
     return;
   }
   
+  // 하단 버튼들
+  // 업그레이드 버튼
+  if (mouseX >= canvas.width / 2 - buttonWidth - spacing/2 && 
+      mouseX <= canvas.width / 2 - spacing/2 &&
+      mouseY >= buttonY + 60 && mouseY <= buttonY + 60 + buttonHeight) {
+    currentGameState = GAME_STATE.UPGRADE;
+    selectedUpgradeIndex = 0;
+    upgradeScrollOffset = 0;
+    return;
+  }
+  
   // 프로필 변경 버튼
-  if (mouseX >= canvas.width / 2 - buttonWidth/2 && 
-      mouseX <= canvas.width / 2 + buttonWidth/2 &&
-      mouseY >= buttonY - 60 && mouseY <= buttonY - 60 + buttonHeight) {
+  if (mouseX >= canvas.width / 2 + spacing/2 && 
+      mouseX <= canvas.width / 2 + spacing/2 + buttonWidth &&
+      mouseY >= buttonY + 60 && mouseY <= buttonY + 60 + buttonHeight) {
     currentGameState = GAME_STATE.PROFILE_SELECT;
     return;
   }
@@ -5200,6 +5565,54 @@ function handleLevelUpScreenClick() {
   }
 }
 
+// 업그레이드 화면 클릭 핸들러
+function handleUpgradeScreenClick() {
+  const startY = 140;
+  const itemHeight = 80;
+  const maxVisibleItems = 6;
+  const unlockedCount = permanentUpgrades.getUnlockedCount();
+  
+  // 업그레이드 항목 클릭 확인
+  for (let i = 0; i < Math.min(unlockedCount, maxVisibleItems); i++) {
+    const upgradeIndex = i + upgradeScrollOffset;
+    if (upgradeIndex >= unlockedCount) break;
+    
+    const y = startY + i * itemHeight;
+    const upgrade = permanentUpgrades.upgrades[upgradeIndex];
+    
+    // 구매 버튼 클릭 확인
+    if (upgrade.currentLevel < upgrade.maxLevel) {
+      const buttonX = canvas.width - 150;
+      const buttonY = y + 45;
+      const buttonWidth = 80;
+      const buttonHeight = 25;
+      
+      if (mouseX >= buttonX && mouseX <= buttonX + buttonWidth &&
+          mouseY >= buttonY && mouseY <= buttonY + buttonHeight) {
+        if (permanentUpgrades.purchaseUpgrade(upgradeIndex)) {
+          // 구매 성공 시 아무것도 하지 않음 (화면이 자동으로 업데이트됨)
+        }
+        return;
+      }
+    }
+    
+    // 항목 전체 클릭 시 선택
+    if (mouseX >= 50 && mouseX <= canvas.width - 50 &&
+        mouseY >= y && mouseY <= y + itemHeight - 5) {
+      selectedUpgradeIndex = upgradeIndex;
+      return;
+    }
+  }
+  
+  // 뒤로가기 버튼 클릭 확인
+  const backButtonY = canvas.height - 60;
+  if (mouseX >= canvas.width / 2 - 75 && mouseX <= canvas.width / 2 + 75 &&
+      mouseY >= backButtonY && mouseY <= backButtonY + 40) {
+    currentGameState = GAME_STATE.START_SCREEN;
+    return;
+  }
+}
+
 // 창이 비활성화될 때 게임 일시정지
 window.addEventListener('blur', () => {
   if (currentGameState === GAME_STATE.PLAYING) {
@@ -5314,7 +5727,10 @@ function gameLoop(timestamp) {
         previewAnimation.frameTime = 0;
         previewAnimation.currentFrame = (previewAnimation.currentFrame + 1) % player.frameCount;
       }
-    } 
+    }
+    else if (currentGameState === GAME_STATE.UPGRADE) {
+      drawUpgradeScreen();
+    }
     else if (currentGameState === GAME_STATE.GAME_OVER) {
       drawGameOverScreen();
     } 
