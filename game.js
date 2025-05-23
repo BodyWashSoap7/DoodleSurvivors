@@ -73,148 +73,226 @@ function loadGold() {
 // 영구 업그레이드 시스템
 const permanentUpgrades = {
   upgrades: [
+    // 창조 (체술) - 경험치획득량, 아이템획득반경
     {
-      id: 'attackPower',
-      name: '공격력',
-      description: '공격력 +10%',
+      id: 'creation_physical_exp',
+      category: 'creation',
+      type: 'physical',
+      name: '경험치 성장',
+      description: '경험치 +8%',
+      maxLevel: 10,
+      currentLevel: 0,
+      baseCost: 110,
+      costMultiplier: 1.7,
+      effect: 0.08
+    },
+    {
+      id: 'creation_physical_pickup',
+      category: 'creation',
+      type: 'physical', 
+      name: '수집 범위',
+      description: '획득반경 +15',
+      maxLevel: 8,
+      currentLevel: 0,
+      baseCost: 40,
+      costMultiplier: 1.3,
+      effect: 15
+    },
+    
+    // 창조 (마술) - 골드획득량, 행운
+    {
+      id: 'creation_magic_gold',
+      category: 'creation',
+      type: 'magic',
+      name: '황금술',
+      description: '골드 +15%',
+      maxLevel: 8,
+      currentLevel: 0,
+      baseCost: 80,
+      costMultiplier: 1.8,
+      effect: 0.15
+    },
+    {
+      id: 'creation_magic_luck',
+      category: 'creation',
+      type: 'magic',
+      name: '행운의 별',
+      description: '행운 +5%',
+      maxLevel: 12,
+      currentLevel: 0,
+      baseCost: 100,
+      costMultiplier: 1.6,
+      effect: 0.05
+    },
+    
+    // 파괴 (체술) - 근접무기 데미지, 공격력 증가 I, 공격속도
+    {
+      id: 'destruction_physical_melee',
+      category: 'destruction',
+      type: 'physical',
+      name: '무예 수련',
+      description: '근접무기 데미지 +12%',
+      maxLevel: 10,
+      currentLevel: 0,
+      baseCost: 60,
+      costMultiplier: 1.5,
+      effect: 0.12
+    },
+    {
+      id: 'destruction_physical_attack1',
+      category: 'destruction',
+      type: 'physical',
+      name: '공격력 증가 I',
+      description: '전체 공격력 +10%',
       maxLevel: 10,
       currentLevel: 0,
       baseCost: 50,
       costMultiplier: 1.5,
-      effect: 0.1 // 레벨당 10% 증가
+      effect: 0.10
     },
     {
-      id: 'cooldownReduction',
-      name: '쿨타임',
+      id: 'destruction_physical_speed',
+      category: 'destruction',
+      type: 'physical',
+      name: '공격속도',
       description: '쿨타임 -5%',
       maxLevel: 10,
       currentLevel: 0,
       baseCost: 80,
       costMultiplier: 1.6,
-      effect: 0.05 // 레벨당 5% 감소
+      effect: 0.05
     },
+    
+    // 파괴 (마술) - 원거리무기 데미지, 공격력 증가 II, 공격범위
     {
-      id: 'maxHealth',
-      name: '최대체력',
-      description: '최대체력 +20',
-      maxLevel: 15,
-      currentLevel: 0,
-      baseCost: 60,
-      costMultiplier: 1.4,
-      effect: 20 // 레벨당 20 증가
-    },
-    {
-      id: 'moveSpeed',
-      name: '이동속도',
-      description: '이동속도 +0.2',
+      id: 'destruction_magic_ranged',
+      category: 'destruction',
+      type: 'magic',
+      name: '마법 숙련',
+      description: '원거리무기 데미지 +12%',
       maxLevel: 10,
       currentLevel: 0,
-      baseCost: 70,
+      baseCost: 60,
       costMultiplier: 1.5,
-      effect: 0.2 // 레벨당 0.2 증가
+      effect: 0.12
     },
     {
-      id: 'attackRange',
+      id: 'destruction_magic_attack2',
+      category: 'destruction',
+      type: 'magic',
+      name: '공격력 증가 II',
+      description: '전체 공격력 +10%',
+      maxLevel: 10,
+      currentLevel: 0,
+      baseCost: 50,
+      costMultiplier: 1.5,
+      effect: 0.10
+    },
+    {
+      id: 'destruction_magic_range',
+      category: 'destruction',
+      type: 'magic',
       name: '공격범위',
       description: '공격범위 +8%',
       maxLevel: 12,
       currentLevel: 0,
       baseCost: 90,
       costMultiplier: 1.7,
-      effect: 0.08 // 레벨당 8% 증가
+      effect: 0.08
     },
+    
+    // 의지 (체술) - 이동속도, 최대체력
     {
-      id: 'pickupRadius',
-      name: '아이템획득반경',
-      description: '획득반경 +15',
-      maxLevel: 8,
+      id: 'will_physical_speed',
+      category: 'will',
+      type: 'physical',
+      name: '신속함',
+      description: '이동속도 +0.2',
+      maxLevel: 10,
       currentLevel: 0,
-      baseCost: 40,
-      costMultiplier: 1.3,
-      effect: 15 // 레벨당 15 증가
+      baseCost: 70,
+      costMultiplier: 1.5,
+      effect: 0.2
     },
     {
-      id: 'dodgeRate',
-      name: '회피율',
+      id: 'will_physical_health',
+      category: 'will',
+      type: 'physical',
+      name: '생명력',
+      description: '최대체력 +20',
+      maxLevel: 15,
+      currentLevel: 0,
+      baseCost: 60,
+      costMultiplier: 1.4,
+      effect: 20
+    },
+    
+    // 의지 (마술) - 회피율, 체력회복
+    {
+      id: 'will_magic_dodge',
+      category: 'will',
+      type: 'magic',
+      name: '회피술',
       description: '회피율 +3%',
       maxLevel: 15,
       currentLevel: 0,
       baseCost: 120,
       costMultiplier: 1.8,
-      effect: 0.03 // 레벨당 3% 증가
+      effect: 0.03
     },
     {
-      id: 'luck',
-      name: '행운',
-      description: '행운 +5%',
-      maxLevel: 12,
-      currentLevel: 0,
-      baseCost: 100,
-      costMultiplier: 1.6,
-      effect: 0.05 // 레벨당 5% 증가
-    },
-    {
-      id: 'expMultiplier',
-      name: '성장',
-      description: '경험치 +8%',
-      maxLevel: 10,
-      currentLevel: 0,
-      baseCost: 110,
-      costMultiplier: 1.7,
-      effect: 0.08 // 레벨당 8% 증가
-    },
-    {
-      id: 'healthRegen',
-      name: '초당체력회복량',
+      id: 'will_magic_regen',
+      category: 'will',
+      type: 'magic',
+      name: '재생술',
       description: '체력회복 +1%',
       maxLevel: 8,
       currentLevel: 0,
       baseCost: 150,
       costMultiplier: 2.0,
-      effect: 0.01 // 레벨당 1% 증가
-    },
-    {
-      id: 'goldMultiplier',
-      name: '골드획득량',
-      description: '골드 +15%',
-      maxLevel: 8,
-      currentLevel: 0,
-      baseCost: 80,
-      costMultiplier: 1.8,
-      effect: 0.15 // 레벨당 15% 증가
+      effect: 0.01
     }
   ],
 
+  // 카테고리별 업그레이드 목록 반환
+  getUpgradesByCategory(category, type) {
+    return this.upgrades.filter(upgrade => 
+      upgrade.category === category && upgrade.type === type
+    );
+  },
+
+  // 특성별 총 효과값 계산
+  getUpgradeValue(upgradeId) {
+    const upgrade = this.upgrades.find(u => u.id === upgradeId);
+    return upgrade ? upgrade.effect * upgrade.currentLevel : 0;
+  },
+
   // 업그레이드 비용 계산
-  getCost(upgradeIndex) {
-    const upgrade = this.upgrades[upgradeIndex];
+  getCost(upgradeId) {
+    const upgrade = this.upgrades.find(u => u.id === upgradeId);
     if (!upgrade || upgrade.currentLevel >= upgrade.maxLevel) return -1;
     
     return Math.floor(upgrade.baseCost * Math.pow(upgrade.costMultiplier, upgrade.currentLevel));
   },
 
   // 업그레이드 가능 여부 확인
-  canUpgrade(upgradeIndex) {
-    const upgrade = this.upgrades[upgradeIndex];
+  canUpgrade(upgradeId) {
+    const upgrade = this.upgrades.find(u => u.id === upgradeId);
     if (!upgrade || upgrade.currentLevel >= upgrade.maxLevel) return false;
     
-    // 순서대로 해금: 이전 업그레이드가 최대 레벨이어야 다음 업그레이드 가능
-    if (upgradeIndex > 0) {
-      const prevUpgrade = this.upgrades[upgradeIndex - 1];
-      if (prevUpgrade.currentLevel < prevUpgrade.maxLevel) return false;
-    }
-    
-    const cost = this.getCost(upgradeIndex);
+    const cost = this.getCost(upgradeId);
     return cost !== -1 && gold >= cost;
   },
 
   // 업그레이드 구매
-  purchaseUpgrade(upgradeIndex) {
-    if (!this.canUpgrade(upgradeIndex)) return false;
+  purchaseUpgrade(upgradeId) {
+    if (!this.canUpgrade(upgradeId)) return false;
     
-    const cost = this.getCost(upgradeIndex);
+    const cost = this.getCost(upgradeId);
     gold -= cost;
-    this.upgrades[upgradeIndex].currentLevel++;
+    
+    const upgrade = this.upgrades.find(u => u.id === upgradeId);
+    upgrade.currentLevel++;
     
     this.saveUpgrades();
     saveGold();
@@ -246,25 +324,6 @@ const permanentUpgrades = {
         });
       }
     }
-  },
-
-  // 현재 업그레이드 효과값 계산
-  getUpgradeValue(upgradeId) {
-    const upgrade = this.upgrades.find(u => u.id === upgradeId);
-    return upgrade ? upgrade.effect * upgrade.currentLevel : 0;
-  },
-
-  // 해금된 업그레이드 개수
-  getUnlockedCount() {
-    let count = 1; // 첫 번째는 항상 해금
-    for (let i = 0; i < this.upgrades.length - 1; i++) {
-      if (this.upgrades[i].currentLevel >= this.upgrades[i].maxLevel) {
-        count++;
-      } else {
-        break;
-      }
-    }
-    return count;
   }
 };
 
@@ -811,57 +870,82 @@ const player = {
   
   // 총 값 계산 메서드들
   getTotalAttackPower() {
-    const permanentBonus = permanentUpgrades.getUpgradeValue('attackPower');
-    return this.baseAttackPower * (1 + permanentBonus + this.levelAttackBonus);
+    // 전체 공격력 증가 보너스
+    const attack1Bonus = permanentUpgrades.getUpgradeValue('destruction_physical_attack1');
+    const attack2Bonus = permanentUpgrades.getUpgradeValue('destruction_magic_attack2');
+    
+    // 모든 보너스 합산
+    const totalPermanentBonus = attack1Bonus + attack2Bonus;
+    return this.baseAttackPower * (1 + totalPermanentBonus + this.levelAttackBonus);
+  },
+  
+  // 근접무기 전용 공격력 (무예 수련 + 공격력 증가 I,II)
+  getTotalMeleeAttackPower() {
+    const attack1Bonus = permanentUpgrades.getUpgradeValue('destruction_physical_attack1');
+    const attack2Bonus = permanentUpgrades.getUpgradeValue('destruction_magic_attack2');
+    const meleeBonus = permanentUpgrades.getUpgradeValue('destruction_physical_melee');
+    
+    const totalBonus = attack1Bonus + attack2Bonus + meleeBonus;
+    return this.baseAttackPower * (1 + totalBonus + this.levelAttackBonus);
+  },
+  
+  // 원거리무기 전용 공격력 (마법 숙련 + 공격력 증가 I,II)
+  getTotalRangedAttackPower() {
+    const attack1Bonus = permanentUpgrades.getUpgradeValue('destruction_physical_attack1');
+    const attack2Bonus = permanentUpgrades.getUpgradeValue('destruction_magic_attack2');
+    const rangedBonus = permanentUpgrades.getUpgradeValue('destruction_magic_ranged');
+    
+    const totalBonus = attack1Bonus + attack2Bonus + rangedBonus;
+    return this.baseAttackPower * (1 + totalBonus + this.levelAttackBonus);
   },
   
   getTotalCooldownReduction() {
-    const permanentBonus = permanentUpgrades.getUpgradeValue('cooldownReduction');
+    const permanentBonus = permanentUpgrades.getUpgradeValue('destruction_physical_speed');
     return Math.min(this.baseCooldownReduction + permanentBonus + this.levelCooldownBonus, 0.8);
   },
   
   getTotalAttackRange() {
-    const permanentBonus = permanentUpgrades.getUpgradeValue('attackRange');
+    const permanentBonus = permanentUpgrades.getUpgradeValue('destruction_magic_range');
     return this.baseAttackRange + permanentBonus + this.levelAttackRangeBonus;
   },
   
   getTotalMoveSpeed() {
-    const permanentBonus = permanentUpgrades.getUpgradeValue('moveSpeed');
+    const permanentBonus = permanentUpgrades.getUpgradeValue('will_physical_speed');
     return this.baseMoveSpeed + permanentBonus + this.levelMoveSpeedBonus;
   },
   
   getTotalMaxHealth() {
-    const permanentBonus = permanentUpgrades.getUpgradeValue('maxHealth');
+    const permanentBonus = permanentUpgrades.getUpgradeValue('will_physical_health');
     return this.baseMaxHealth + permanentBonus + this.levelMaxHealthBonus;
   },
   
   getTotalPickupRadius() {
-    const permanentBonus = permanentUpgrades.getUpgradeValue('pickupRadius');
+    const permanentBonus = permanentUpgrades.getUpgradeValue('creation_physical_pickup');
     return this.basePickupRadius + permanentBonus + this.levelPickupRadiusBonus;
   },
   
   getTotalDodgeRate() {
-    const permanentBonus = permanentUpgrades.getUpgradeValue('dodgeRate');
+    const permanentBonus = permanentUpgrades.getUpgradeValue('will_magic_dodge');
     return Math.min(this.baseDodgeRate + permanentBonus + this.levelDodgeRateBonus, 0.8);
   },
   
   getTotalLuck() {
-    const permanentBonus = permanentUpgrades.getUpgradeValue('luck');
+    const permanentBonus = permanentUpgrades.getUpgradeValue('creation_magic_luck');
     return this.baseLuck + permanentBonus + this.levelLuckBonus;
   },
   
   getTotalHealthRegen() {
-    const permanentBonus = permanentUpgrades.getUpgradeValue('healthRegen');
+    const permanentBonus = permanentUpgrades.getUpgradeValue('will_magic_regen');
     return this.baseHealthRegen + permanentBonus + this.levelHealthRegenBonus;
   },
   
   getTotalGoldMultiplier() {
-    const permanentBonus = permanentUpgrades.getUpgradeValue('goldMultiplier');
+    const permanentBonus = permanentUpgrades.getUpgradeValue('creation_magic_gold');
     return this.baseGoldMultiplier + permanentBonus + this.levelGoldMultiplierBonus;
   },
   
   getTotalExpMultiplier() {
-    const permanentBonus = permanentUpgrades.getUpgradeValue('expMultiplier');
+    const permanentBonus = permanentUpgrades.getUpgradeValue('creation_physical_exp');
     return this.baseExpMultiplier + permanentBonus + this.levelExpMultiplierBonus;
   },
 
