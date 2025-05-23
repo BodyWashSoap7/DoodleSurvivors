@@ -469,6 +469,7 @@ const userProfileSystem = {
       
       // 삭제한 사용자 데이터도 제거
       localStorage.removeItem(`vampireSurvivorGold_${username}`);
+      localStorage.removeItem(`vampireSurvivorUpgrades_${username}`); // 이 줄 추가
       
       // 현재 사용자가 삭제된 경우, 다른 사용자 선택 또는 빈 상태로
       if (this.currentUser === username) {
@@ -738,7 +739,6 @@ const player = {
   x: 0,
   y: 0,
   health: 100,
-  maxHealth: 100,
   level: 1,
   exp: 0,
   nextLevelExp: 50,
@@ -748,17 +748,34 @@ const player = {
   image: null,
   
   size: 15,
-  speed: 2,
-  attackPower: 1,
-  cooldownReduction: 0,
-  pickupRadius: 30,
-  expMultiplier: 1,
-
-  attackRange: 1,      // 공격 범위 (배율)
-  dodgeRate: 0,        // 회피율 (0~1)
-  luck: 0,             // 행운 (0~1, 각종 확률에 영향)
   
-  // 애니메이션 관련 속성
+  // 기본값들
+  baseAttackPower: 1,
+  baseCooldownReduction: 0,
+  baseAttackRange: 1,
+  baseMoveSpeed: 2,
+  baseMaxHealth: 100,
+  basePickupRadius: 100,
+  baseDodgeRate: 0,
+  baseLuck: 0,
+  baseHealthRegen: 0,
+  baseGoldMultiplier: 1,
+  baseExpMultiplier: 1,
+  
+  // 레벨업 보너스들
+  levelAttackBonus: 0,
+  levelCooldownBonus: 0,
+  levelAttackRangeBonus: 0,
+  levelMoveSpeedBonus: 0,
+  levelMaxHealthBonus: 0,
+  levelPickupRadiusBonus: 0,
+  levelDodgeRateBonus: 0,
+  levelLuckBonus: 0,
+  levelHealthRegenBonus: 0,
+  levelGoldMultiplierBonus: 0,
+  levelExpMultiplierBonus: 0,
+
+  // 애니메이션 관련 속성들
   animationState: 'idle',
   currentFrame: 0,
   frameCount: 4,
@@ -767,7 +784,7 @@ const player = {
   spriteWidth: 64,
   spriteHeight: 64,
   
-  // 방향 및 피격 효과 속성
+  // 방향 및 피격 효과 속성들
   direction: 'left',
   isHit: false,
   hitStartTime: 0,
@@ -776,24 +793,79 @@ const player = {
   hitFrameTime: 0,
   hitFrameDuration: 50,
   
-  // 아티팩트 관련 속성
+  // 아티팩트 관련 속성들
   acquiredArtifacts: [],
-  healthRegeneration: 0,
   enemySpeedReduction: 0,
   enemyHealthReduction: 0,
 
-    // 자석 효과 관련 속성
+  // 자석 효과 관련 속성들
   magnetActive: false,
   magnetDuration: 0,
-  magnetMaxDuration: 2000, // 2초
+  magnetMaxDuration: 2000,
 
-  // 무적 상태 관련 속성
+  // 무적 상태 관련 속성들
   invincible: false,
-  invincibilityDuration: 500, // 무적 시간 (0.5초)
+  invincibilityDuration: 500,
   invincibilityStartTime: 0,
-  isDodging: false,    // 회피 상태인지 여부
+  isDodging: false,
   
-  // 플레이어 초기화
+  // 총 값 계산 메서드들
+  getTotalAttackPower() {
+    const permanentBonus = permanentUpgrades.getUpgradeValue('attackPower');
+    return this.baseAttackPower * (1 + permanentBonus + this.levelAttackBonus);
+  },
+  
+  getTotalCooldownReduction() {
+    const permanentBonus = permanentUpgrades.getUpgradeValue('cooldownReduction');
+    return Math.min(this.baseCooldownReduction + permanentBonus + this.levelCooldownBonus, 0.8);
+  },
+  
+  getTotalAttackRange() {
+    const permanentBonus = permanentUpgrades.getUpgradeValue('attackRange');
+    return this.baseAttackRange + permanentBonus + this.levelAttackRangeBonus;
+  },
+  
+  getTotalMoveSpeed() {
+    const permanentBonus = permanentUpgrades.getUpgradeValue('moveSpeed');
+    return this.baseMoveSpeed + permanentBonus + this.levelMoveSpeedBonus;
+  },
+  
+  getTotalMaxHealth() {
+    const permanentBonus = permanentUpgrades.getUpgradeValue('maxHealth');
+    return this.baseMaxHealth + permanentBonus + this.levelMaxHealthBonus;
+  },
+  
+  getTotalPickupRadius() {
+    const permanentBonus = permanentUpgrades.getUpgradeValue('pickupRadius');
+    return this.basePickupRadius + permanentBonus + this.levelPickupRadiusBonus;
+  },
+  
+  getTotalDodgeRate() {
+    const permanentBonus = permanentUpgrades.getUpgradeValue('dodgeRate');
+    return Math.min(this.baseDodgeRate + permanentBonus + this.levelDodgeRateBonus, 0.8);
+  },
+  
+  getTotalLuck() {
+    const permanentBonus = permanentUpgrades.getUpgradeValue('luck');
+    return this.baseLuck + permanentBonus + this.levelLuckBonus;
+  },
+  
+  getTotalHealthRegen() {
+    const permanentBonus = permanentUpgrades.getUpgradeValue('healthRegen');
+    return this.baseHealthRegen + permanentBonus + this.levelHealthRegenBonus;
+  },
+  
+  getTotalGoldMultiplier() {
+    const permanentBonus = permanentUpgrades.getUpgradeValue('goldMultiplier');
+    return this.baseGoldMultiplier + permanentBonus + this.levelGoldMultiplierBonus;
+  },
+  
+  getTotalExpMultiplier() {
+    const permanentBonus = permanentUpgrades.getUpgradeValue('expMultiplier');
+    return this.baseExpMultiplier + permanentBonus + this.levelExpMultiplierBonus;
+  },
+
+  // 플레이어 초기화 메서드
   init(characterIndex) {
     this.characterType = characterIndex + 1;
     this.image = assetManager.images.players[characterIndex].image;
@@ -892,7 +964,7 @@ class Bullet {
     this.speed = speed;
     this.angle = angle;
     this.baseDamage = damage;
-    this.damage = damage * player.attackPower;
+    this.damage = damage * player.getTotalAttackPower();
     this.used = false;
   }
 
@@ -967,7 +1039,7 @@ class BasicWeapon extends Weapon {
           new Bullet(
             player.x, player.y, 5, this.baseProjectileSpeed,
             angle,
-            this.damage * player.attackPower // 공격력 특성 적용
+            this.damage * player.getTotalAttackPower() // 공격력 특성 적용
           )
         );
       }
@@ -983,7 +1055,7 @@ class BasicWeapon extends Weapon {
     // 짝수 레벨마다 쿨다운 감소
     if (this.level % 2 === 0) {
       this.baseCooldown *= 0.9;
-      this.updateCooldown(player.cooldownReduction); // 쿨타임 감소 특성 적용
+      this.updateCooldown(player.getTotalCooldownReduction()); // 쿨타임 감소 특성 적용
     }
   }
 }
@@ -1010,8 +1082,8 @@ class OrbitWeapon extends Weapon {
   
   // 공격 범위 특성 적용 - 구체 크기만 변경
   updateRange() {
-    this.orbSize = this.baseOrbSize * player.attackRange;
-    this.createOrbs(); // 구체들 재생성하여 새 크기 적용
+    this.orbSize = this.baseOrbSize * player.getTotalAttackRange();
+    this.createOrbs();
   }
   
   createOrbs() {
@@ -1027,7 +1099,7 @@ class OrbitWeapon extends Weapon {
         angle,
         this.orbitRadius, // 고정된 반지름
         this.orbSize, // 공격 범위 특성이 적용된 크기
-        this.damage * player.attackPower, // 공격력 특성 적용
+        this.damage * player.getTotalAttackPower(), // 공격력 특성 적용
         this
       );
       gameObjects.bullets.push(orb);
@@ -1170,7 +1242,7 @@ class FlameWeapon extends Weapon {
   
   // 공격 범위 특성 적용
   updateRange() {
-    this.range = this.baseRange * player.attackRange;
+    this.range = this.baseRange * player.getTotalAttackRange();
   }
   
   update() {
@@ -1195,7 +1267,7 @@ class FlameWeapon extends Weapon {
       player.y,
       this.flameAngle,
       this.range, // 공격 범위 특성이 적용된 범위
-      this.damage * player.attackPower, // 공격력 특성 적용
+      this.damage * player.getTotalAttackPower(), // 공격력 특성 적용
       this.duration
     );
     
@@ -1219,7 +1291,7 @@ class FlameWeapon extends Weapon {
     }
     if (this.level >= 6) {
       this.baseCooldown *= 0.8; // 6레벨부터 쿨다운 감소
-      this.updateCooldown(player.cooldownReduction); // 쿨타임 감소 특성 적용
+      this.updateCooldown(player.getTotalCooldownReduction()); // 쿨타임 감소 특성 적용
     }
   }
 }
@@ -1376,8 +1448,8 @@ class LightningWeapon extends Weapon {
   
   // 공격 범위 특성 적용
   updateRange() {
-    this.chainRange = this.baseChainRange * player.attackRange;
-    this.maxTargetDistance = this.baseMaxTargetDistance * player.attackRange;
+    this.chainRange = this.baseChainRange * player.getTotalAttackRange();
+    this.maxTargetDistance = this.baseMaxTargetDistance * player.getTotalAttackRange();
   }
   
   fire() {
@@ -1404,7 +1476,7 @@ class LightningWeapon extends Weapon {
         new ChainLightningEffect(
           player.x, player.y,
           nearestEnemy.x, nearestEnemy.y,
-          this.damage * player.attackPower, // 공격력 특성 적용
+          this.damage * player.getTotalAttackPower(), // 공격력 특성 적용
           this.chainCount,
           this.chainRange, // 공격 범위 특성이 적용된 체인 범위
           nearestEnemy
@@ -1430,7 +1502,7 @@ class LightningWeapon extends Weapon {
     }
     if (this.level >= 6) {
       this.baseCooldown *= 0.85; // 6레벨부터 쿨다운 감소
-      this.updateCooldown(player.cooldownReduction); // 쿨타임 감소 특성 적용
+      this.updateCooldown(player.getTotalCooldownReduction()); // 쿨타임 감소 특성 적용
     }
   }
 }
@@ -1646,7 +1718,7 @@ class MeleeWeapon extends Weapon {
     
     // 적들에게 데미지 적용
     targets.forEach(enemy => {
-      enemy.takeDamage(this.damage * player.attackPower);
+      enemy.takeDamage(this.damage * player.getTotalAttackPower());
     });
     
     // 시각적 효과 생성
@@ -1678,7 +1750,7 @@ class FistWeapon extends MeleeWeapon {
 
   // 공격 범위 특성 적용
   updateRange() {
-    this.range = this.baseRange * player.attackRange;
+    this.range = this.baseRange * player.getTotalAttackRange();
   }
 
   // fire 메서드를 오버라이드해서 자동으로 가장 가까운 적 공격
@@ -1703,7 +1775,7 @@ class FistWeapon extends MeleeWeapon {
     // 적이 있으면 공격
     if (nearestEnemy) {
       // 적에게 데미지 적용 (공격력 특성 적용)
-      nearestEnemy.takeDamage(this.damage * player.attackPower);
+      nearestEnemy.takeDamage(this.damage * player.getTotalAttackPower());
       
       // 적 방향 계산
       const dx = nearestEnemy.x - player.x;
@@ -1731,7 +1803,7 @@ class FistWeapon extends MeleeWeapon {
     // 레벨업 시 공격속도 증가 (쿨타임 감소 특성과 별개)
     if (this.level % 2 === 0) {
       this.baseCooldown *= 0.9;
-      this.updateCooldown(player.cooldownReduction); // 쿨타임 감소 특성도 적용
+      this.updateCooldown(player.getTotalCooldownReduction()); // 쿨타임 감소 특성도 적용
     }
     // 3레벨마다 기본 범위 증가
     if (this.level % 3 === 0) {
@@ -1757,7 +1829,7 @@ class SwordWeapon extends MeleeWeapon {
 
   // 공격 범위 특성 적용
   updateRange() {
-    this.range = this.baseRange * player.attackRange;
+    this.range = this.baseRange * player.getTotalAttackRange();
   }
 
   findTargetsInRange(attackDirection) {
@@ -1801,7 +1873,7 @@ class SwordWeapon extends MeleeWeapon {
     
     // 적들에게 데미지 적용 (공격력 특성 적용)
     targets.forEach(enemy => {
-      enemy.takeDamage(this.damage * player.attackPower);
+      enemy.takeDamage(this.damage * player.getTotalAttackPower());
     });
     
     // 시각적 효과 생성
@@ -1851,7 +1923,7 @@ class SpearWeapon extends MeleeWeapon {
 
   // 공격 범위 특성 적용
   updateRange() {
-    this.range = this.baseRange * player.attackRange;
+    this.range = this.baseRange * player.getTotalAttackRange();
   }
 
   findTargetsInRange(attackDirection) {
@@ -1890,7 +1962,7 @@ class SpearWeapon extends MeleeWeapon {
     
     // 적들에게 데미지 적용 (공격력 특성 적용)
     targets.forEach(enemy => {
-      enemy.takeDamage(this.damage * player.attackPower);
+      enemy.takeDamage(this.damage * player.getTotalAttackPower());
     });
     
     // 시각적 효과 생성
@@ -1960,7 +2032,7 @@ class FistEffect extends MeleeEffect {
   constructor(x, y, direction, duration, targetEnemy) {
     super(x, y, direction, duration);
     this.baseMaxSize = 48; // 기본 최대 크기
-    this.maxSize = this.baseMaxSize * player.attackRange; // 공격 범위에 따라 크기 조정
+    this.maxSize = this.baseMaxSize * player.getTotalAttackRange(); // 공격 범위에 따라 크기 조정
     this.rotationAngle = direction;
     this.targetEnemy = targetEnemy;
     this.speed = 12;
@@ -2630,30 +2702,31 @@ class Enemy {
     
     // 경험치 및 골드 획득
     const expValue = this.expValue || 3;
-    const goldValue = this.goldValue || 10;
+    let goldValue = this.goldValue || 10;
     
-    player.exp += Math.floor(expValue * player.expMultiplier);
-    // 골드 획득량 영구 업그레이드 적용
-    goldValue = Math.floor(goldValue * (1 + permanentUpgrades.getUpgradeValue('goldMultiplier')));
+    // 총 경험치 배율 적용
+    const finalExpGained = Math.floor(expValue * player.getTotalExpMultiplier());
+    player.exp += finalExpGained;
     
-    player.exp += Math.floor(expValue * player.expMultiplier);
+    // 총 골드 배율 적용
+    goldValue = Math.floor(goldValue * player.getTotalGoldMultiplier());
     gold += goldValue;
     saveGold();
     
-    // 행운이 보석 드롭 확률에 영향
+    // 행운이 보석 드롭 확률에 영향 (총 행운 사용)
     const baseDrop = 0.1;
-    const luckBonus = player.luck * 0.5; // 행운 1당 50% 보너스
-    const dropChance = Math.min(baseDrop * (1 + luckBonus), 0.8); // 최대 80%
+    const luckBonus = player.getTotalLuck() * 0.5;
+    const dropChance = Math.min(baseDrop * (1 + luckBonus), 0.8);
     
     if (!this.isBoss && Math.random() < dropChance) {
       const jewelType = getWeightedRandomJewelType();
       gameObjects.jewels.push(new Jewel(this.x, this.y, jewelType));
     }
   
-    // 행운이 보물상자 드롭 확률에 영향
+    // 행운이 보물상자 드롭 확률에 영향 (총 행운 사용)
     const baseTreasure = 0.01;
-    const treasureLuckBonus = player.luck * 2; // 행운이 보물상자에 더 큰 영향
-    const treasureChance = Math.min(baseTreasure * (1 + treasureLuckBonus), 0.2); // 최대 20%
+    const treasureLuckBonus = player.getTotalLuck() * 2;
+    const treasureChance = Math.min(baseTreasure * (1 + treasureLuckBonus), 0.2);
     
     if (!this.isBoss && Math.random() < treasureChance) {
       gameObjects.terrain.push(new Treasure(this.x, this.y));
@@ -2736,7 +2809,7 @@ class Enemy {
     
     if (currentTime - this.lastAttackTime >= this.attackCooldown && !player.invincible) {
       // 회피율 확률 체크
-      if (Math.random() < player.dodgeRate) {
+      if (Math.random() < player.getTotalDodgeRate()) {
         // 회피 성공 - 무적 상태 활성화 및 시각적 효과
         this.lastAttackTime = currentTime; // 쿨다운은 적용
         
@@ -2949,22 +3022,27 @@ class Jewel extends GameObject {
   }
 
   update() {    
-    // 플레이어 주변 아이템 끌어당기기
-    if (detectCollision(this, { x: player.x, y: player.y, size: player.pickupRadius })) {
-      const angle = Math.atan2(player.y - this.y, player.x - this.x);
+    // 끌어당기는 범위는 업그레이드 적용, 획득 범위는 고정
+    const magnetRange = player.getTotalPickupRadius();
+    const pickupRange = 25; // 고정된 획득 범위
+    
+    const dx = player.x - this.x;
+    const dy = player.y - this.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    
+    // 끌어당기기 (자석 범위 내에서)
+    if (distance <= magnetRange && distance > pickupRange) {
+      const angle = Math.atan2(dy, dx);
       
-      // 기본 속도 계수 (자석 보석은 더 빠름)
-      const speedFactor = 4;
-      
-      // 최대 이동 속도 설정 (픽셀/프레임)
-      const maxSpeed = 6;
-      
-      // 이동 거리 계산 및 상한 적용
-      const moveDistance = Math.min(speedFactor, maxSpeed);
+      // 거리에 따른 속도 조절 (가까울수록 빨라짐)
+      const distanceRatio = Math.max(0, (magnetRange - distance) / magnetRange);
+      const baseSpeed = player.magnetActive ? 4 : 2; // 자석 아이템 사용 시 더 빠름
+      const maxSpeed = player.magnetActive ? 12 : 8;
+      const currentSpeed = baseSpeed + (maxSpeed - baseSpeed) * distanceRatio;
       
       // 이동 적용
-      this.x += Math.cos(angle) * moveDistance;
-      this.y += Math.sin(angle) * moveDistance;
+      this.x += Math.cos(angle) * currentSpeed;
+      this.y += Math.sin(angle) * currentSpeed;
     }
   }
 
@@ -2983,33 +3061,48 @@ class Jewel extends GameObject {
     }
   }
 
+  // Jewel 클래스의 collect() 메서드
   collect() {
     if (this.collected) return;
     this.collected = true;
     
-    // 보석 타입에 따른 효과 적용
     switch(this.type) {
       case 0: // 소 jewel
       case 1: // 중 jewel
       case 2: // 대 jewel
-        const expGained = Math.floor(this.expValue * player.expMultiplier);
-        player.exp += expGained;
-        gold += this.type + 5; // 큰 보석일수록 더 많은 골드
+        // 총 경험치 배율 적용
+        const finalExpGained = Math.floor(this.expValue * player.getTotalExpMultiplier());
+        player.exp += finalExpGained;
+        
+        // 총 골드 배율 적용
+        let goldValue = this.type + 5;
+        goldValue = Math.floor(goldValue * player.getTotalGoldMultiplier());
+        gold += goldValue;
         saveGold();
         break;
         
-      case 3: // 자석 jewel - 자석 효과 활성화
-        player.exp += Math.floor(this.expValue * player.expMultiplier);
-        gold += 10;
+      case 3: // 자석 jewel
+        // 총 경험치 배율 적용
+        const magnetExpGained = Math.floor(this.expValue * player.getTotalExpMultiplier());
+        player.exp += magnetExpGained;
         
-        // 자석 효과 활성화
+        // 총 골드 배율 적용
+        let magnetGold = 10;
+        magnetGold = Math.floor(magnetGold * player.getTotalGoldMultiplier());
+        gold += magnetGold;
+        
         player.magnetActive = true;
         player.magnetDuration = player.magnetMaxDuration;
+        break;
         
-      case 4: // 체력 jewel - 최대 체력의 30% 회복
+      case 4: // 체력 jewel
         const healAmount = Math.floor(player.maxHealth * 0.3);
         player.health = Math.min(player.health + healAmount, player.maxHealth);
-        gold += 15;
+        
+        // 총 골드 배율 적용
+        let healthGold = 15;
+        healthGold = Math.floor(healthGold * player.getTotalGoldMultiplier());
+        gold += healthGold;
         break;
     }
     
@@ -3262,7 +3355,6 @@ function generateArtifactOptions() {
 }
 
 // 레벨업 선택 적용
-// 레벨업 선택 적용
 function applyLevelUpChoice(optionIndex) {
   console.log("Applying level up choice:", optionIndex);
   
@@ -3275,37 +3367,34 @@ function applyLevelUpChoice(optionIndex) {
   console.log("Selected option:", option);
 
   if (option.type === 'weapon') {
-    // 새로운 무기 추가
     addWeapon(option.weaponType);
   } else if (option.type === 'weaponUpgrade') {
-    // 기존 무기 업그레이드
     const weapon = option.weapon;
     if (weapon && weapon.upgrade()) {
       console.log(`${weapon.type} 무기가 레벨 ${weapon.level}로 업그레이드되었습니다.`);
     }
   } else {
-    // 아티팩트 또는 일반 레벨업 옵션 처리
     if (isArtifactSelection) {
-      // 아티팩트 효과 적용
+      // 아티팩트 효과 적용 (기존과 동일)
       switch(option.type) {
         case 'reducePlayerSize':
           player.size *= 0.75;
           break;
         case 'increaseAttackPower':
-          player.attackPower *= 1.5;
+          player.levelAttackBonus += 0.5; // 50% 증가
           break;
         case 'increaseCooldownReduction':
-          player.cooldownReduction += 0.3;
-          player.cooldownReduction = Math.min(player.cooldownReduction, 0.8);
+          player.levelCooldownBonus += 0.3; // 30% 감소
+          // 모든 무기의 쿨다운 업데이트
           player.weapons.forEach(weapon => {
-            weapon.updateCooldown(player.cooldownReduction);
+            weapon.updateCooldown(player.getTotalCooldownReduction());
           });
           break;
         case 'increaseMoveSpeed':
-          player.speed *= 1.5;
+          player.levelMoveSpeedBonus += player.baseMoveSpeed * 0.5; // 50% 증가
           break;
         case 'enableHealthRegen':
-          player.healthRegeneration = 0.02;
+          player.levelHealthRegenBonus += 0.02; // 2% 회복
           break;
         case 'reduceEnemySpeed':
           player.enemySpeedReduction = 0.5;
@@ -3315,10 +3404,8 @@ function applyLevelUpChoice(optionIndex) {
           break;
         case 'expGain':
           player.exp += option.value;
-          
           currentGameState = GAME_STATE.PLAYING;
           totalPausedTime += gameTimeSystem.getTime() - pauseStartTime;
-          
           checkLevelUp();
           return;
       }
@@ -3332,68 +3419,61 @@ function applyLevelUpChoice(optionIndex) {
       // 일반 레벨업 옵션 적용
       switch(option.type) {
         case 'attackPower':
-          player.attackPower += option.value;
-          console.log(`공격력이 ${option.value * 100}% 증가했습니다. 현재: ${player.attackPower}`);
+          player.levelAttackBonus += option.value;
+          console.log(`공격력이 ${option.value * 100}% 증가했습니다. 현재: ${Math.round(player.getTotalAttackPower() * 100)}%`);
           break;
           
         case 'maxHealth':
-          player.maxHealth += option.value;
-          player.health = player.maxHealth; // 체력 완전 회복
+          player.levelMaxHealthBonus += option.value;
+          const oldMaxHealth = player.maxHealth;
+          player.maxHealth = player.getTotalMaxHealth();
+          player.health += (player.maxHealth - oldMaxHealth); // 체력 회복
           console.log(`최대 체력이 ${option.value} 증가했습니다. 현재: ${player.maxHealth}`);
           break;
           
         case 'cooldownReduction':
-          player.cooldownReduction += option.value;
-          player.cooldownReduction = Math.min(player.cooldownReduction, 0.8); // 최대 80% 감소
+          player.levelCooldownBonus += option.value;
           // 모든 무기의 쿨다운 업데이트
           player.weapons.forEach(weapon => {
-            weapon.updateCooldown(player.cooldownReduction);
+            weapon.updateCooldown(player.getTotalCooldownReduction());
           });
-          console.log(`쿨타임이 ${option.value * 100}% 감소했습니다. 현재: ${Math.round(player.cooldownReduction * 100)}%`);
+          console.log(`쿨타임이 ${option.value * 100}% 감소했습니다. 현재: ${Math.round(player.getTotalCooldownReduction() * 100)}%`);
           break;
           
         case 'moveSpeed':
-          player.speed += option.value;
-          console.log(`이동속도가 ${option.value} 증가했습니다. 현재: ${player.speed}`);
+          player.levelMoveSpeedBonus += option.value;
+          console.log(`이동속도가 ${option.value} 증가했습니다. 현재: ${player.getTotalMoveSpeed()}`);
           break;
           
         case 'attackRange':
-          player.attackRange += option.value;
+          player.levelAttackRangeBonus += option.value;
           // 모든 무기의 범위 업데이트
           player.weapons.forEach(weapon => {
             if (weapon.updateRange) {
               weapon.updateRange();
             }
-            // 특정 무기들의 범위 직접 업데이트
-            if (weapon.range !== undefined && weapon.baseRange !== undefined) {
-              weapon.range = weapon.baseRange * player.attackRange;
-            }
-            if (weapon.orbitRadius !== undefined && weapon.baseOrbitRadius !== undefined) {
-              weapon.orbitRadius = weapon.baseOrbitRadius * player.attackRange;
-            }
           });
-          console.log(`공격 범위가 ${option.value * 100}% 증가했습니다. 현재: ${Math.round(player.attackRange * 100)}%`);
+          console.log(`공격 범위가 ${option.value * 100}% 증가했습니다. 현재: ${Math.round(player.getTotalAttackRange() * 100)}%`);
           break;
           
         case 'pickupRadius':
-          player.pickupRadius += option.value;
-          console.log(`아이템 획득 범위가 ${option.value} 증가했습니다. 현재: ${player.pickupRadius}`);
+          player.levelPickupRadiusBonus += option.value;
+          console.log(`아이템 획득 범위가 ${option.value} 증가했습니다. 현재: ${player.getTotalPickupRadius()}`);
           break;
           
         case 'dodgeRate':
-          player.dodgeRate += option.value;
-          player.dodgeRate = Math.min(player.dodgeRate, 0.8); // 최대 80% 회피율
-          console.log(`회피율이 ${option.value * 100}% 증가했습니다. 현재: ${Math.round(player.dodgeRate * 100)}%`);
+          player.levelDodgeRateBonus += option.value;
+          console.log(`회피율이 ${option.value * 100}% 증가했습니다. 현재: ${Math.round(player.getTotalDodgeRate() * 100)}%`);
           break;
           
         case 'luck':
-          player.luck += option.value;
-          console.log(`행운이 ${option.value * 100}% 증가했습니다. 현재: ${Math.round(player.luck * 100)}%`);
+          player.levelLuckBonus += option.value;
+          console.log(`행운이 ${option.value * 100}% 증가했습니다. 현재: ${Math.round(player.getTotalLuck() * 100)}%`);
           break;
           
         case 'expMultiplier':
-          player.expMultiplier += option.value;
-          console.log(`경험치 획득률이 ${option.value * 100}% 증가했습니다. 현재: ${Math.round(player.expMultiplier * 100)}%`);
+          player.levelExpMultiplierBonus += option.value;
+          console.log(`경험치 획득률이 ${option.value * 100}% 증가했습니다. 현재: ${Math.round(player.getTotalExpMultiplier() * 100)}%`);
           break;
           
         default:
@@ -3414,7 +3494,7 @@ function applyLevelUpChoice(optionIndex) {
 // 무기 추가
 function addWeapon(weaponType) {
   const weapon = WeaponFactory.createWeapon(weaponType);
-  weapon.updateCooldown(player.cooldownReduction); // 쿨타임 감소 특성 적용
+  weapon.updateCooldown(player.getTotalCooldownReduction());
   
   // 공격 범위 특성 적용
   if (weapon.updateRange) {
@@ -3473,42 +3553,25 @@ function resumeGame() {
   }
 }
 
+function restartGame() {
+  startGame();
+}
+
 // 영구 업그레이드 적용 함수
 function applyPermanentUpgrades() {
   // 영구 업그레이드 불러오기
   permanentUpgrades.loadUpgrades();
   
-  // 기본 스탯에 영구 업그레이드 효과 적용
-  const baseAttackPower = 1;
-  const baseCooldownReduction = 0;
-  const baseMaxHealth = 100;
-  const baseSpeed = 2;
-  const baseAttackRange = 1;
-  const basePickupRadius = 100;
-  const baseDodgeRate = 0;
-  const baseLuck = 0;
-  const baseExpMultiplier = 1;
-  const baseHealthRegen = 0;
-  
-  player.attackPower = baseAttackPower * (1 + permanentUpgrades.getUpgradeValue('attackPower'));
-  player.cooldownReduction = baseCooldownReduction + permanentUpgrades.getUpgradeValue('cooldownReduction');
-  player.maxHealth = baseMaxHealth + permanentUpgrades.getUpgradeValue('maxHealth');
-  player.speed = baseSpeed + permanentUpgrades.getUpgradeValue('moveSpeed');
-  player.attackRange = baseAttackRange + permanentUpgrades.getUpgradeValue('attackRange');
-  player.pickupRadius = basePickupRadius + permanentUpgrades.getUpgradeValue('pickupRadius');
-  player.dodgeRate = baseDodgeRate + permanentUpgrades.getUpgradeValue('dodgeRate');
-  player.luck = baseLuck + permanentUpgrades.getUpgradeValue('luck');
-  player.expMultiplier = baseExpMultiplier + permanentUpgrades.getUpgradeValue('expMultiplier');
-  player.healthRegeneration = baseHealthRegen + permanentUpgrades.getUpgradeValue('healthRegen');
-  
-  player.health = player.maxHealth; // 체력을 최대체력으로 설정
+  // 최대 체력 설정 (영구 업그레이드 반영)
+  player.maxHealth = player.getTotalMaxHealth();
+  player.health = player.maxHealth;
 }
 
 function resetGame() {
   // 영구 업그레이드 적용
   applyPermanentUpgrades();
   
-  // 플레이어 초기화
+  // 플레이어 위치 및 상태 초기화
   player.x = 0;
   player.y = 0;
   player.health = player.maxHealth;
@@ -3516,7 +3579,27 @@ function resetGame() {
   player.exp = 0;
   player.nextLevelExp = 50;
   player.prevLevelExp = 0;
-  player.weapons = [new BasicWeapon()];
+  
+  // 모든 레벨업 보너스 초기화
+  player.levelAttackBonus = 0;
+  player.levelCooldownBonus = 0;
+  player.levelAttackRangeBonus = 0;
+  player.levelMoveSpeedBonus = 0;
+  player.levelMaxHealthBonus = 0;
+  player.levelPickupRadiusBonus = 0;
+  player.levelDodgeRateBonus = 0;
+  player.levelLuckBonus = 0;
+  player.levelHealthRegenBonus = 0;
+  player.levelGoldMultiplierBonus = 0;
+  player.levelExpMultiplierBonus = 0;
+  
+  // 초기 무기 생성 및 영구 업그레이드 적용
+  const initialWeapon = new BasicWeapon();
+  initialWeapon.updateCooldown(player.getTotalCooldownReduction());
+  if (initialWeapon.updateRange) {
+    initialWeapon.updateRange();
+  }
+  player.weapons = [initialWeapon];
 
   // 무적 상태 초기화
   player.invincible = false;
@@ -3524,7 +3607,6 @@ function resetGame() {
   
   // 아티팩트 초기화
   player.acquiredArtifacts = [];
-  player.healthRegeneration = 0;
   player.enemySpeedReduction = 0;
   player.enemyHealthReduction = 0;
 
@@ -3534,18 +3616,8 @@ function resetGame() {
   gameObjects.jewels = [];
   gameObjects.terrain = [];
   gameObjects.chunks = {};
-  gold = loadGold(); // 저장된 골드 불러오기
+  gold = loadGold();
 
-  // 능력치 초기화
-  player.attackPower = 1;
-  player.cooldownReduction = 0;
-  player.pickupRadius = 100;
-  player.expMultiplier = 1;
-
-  player.attackRange = 1;
-  player.dodgeRate = 0;
-  player.luck = 0;
-  
   // 애니메이션 초기화
   player.animationState = 'idle';
   player.currentFrame = 0;
@@ -3561,7 +3633,7 @@ function resetGame() {
   totalPausedTime = 0;
   
   // 게임 효과 변수 초기화
-  lastEnemySpawnTime = gameTimeSystem.getTime(); // 게임 시간으로 초기화
+  lastEnemySpawnTime = gameTimeSystem.getTime();
   screenShakeTime = 0;
   screenShakeIntensity = 0;
   
@@ -4990,46 +5062,40 @@ function update() {
     elapsedTime = Math.floor(totalElapsed / 1000);
   }
 
-  // 마우스 월드 좌표 재계산 - 이 코드를 추가
+  // 마우스 월드 좌표 재계산
   const rect = canvas.getBoundingClientRect();
   mouseWorldX = player.x + (mouseX - canvas.width / 2);
   mouseWorldY = player.y + (mouseY - canvas.height / 2);
   
-  // 플레이어 이동
+  // 플레이어 이동 (getTotalMoveSpeed() 사용)
   let dx = 0;
   let dy = 0;
   let playerMoved = false;
   
-  // 월드 좌표와 플레이어 좌표 차이로 방향 계산
   const targetX = mouseWorldX;
   const targetY = mouseWorldY;
   
-  // 플레이어와 마우스 사이의 거리 계산
   const distX = targetX - player.x;
   const distY = targetY - player.y;
   const distance = Math.sqrt(distX * distX + distY * distY);
   
-  // 거리에 따른 속도 계수 계산
   let speedFactor = 0;
   if (distance > 30) {
     if (distance >= 80) {
-      speedFactor = 1; // 최대 속도
+      speedFactor = 1;
     } else {
-      // 15-50 범위에서 선형적으로 속도 증가
       speedFactor = (distance - 30) / (80 - 30);
     }
     
     playerMoved = true;
     
-    // 정규화된 방향 벡터 계산
     dx = distX / distance;
     dy = distY / distance;
     
-    // 플레이어 이동 (속도 계수 적용)
-    player.x += dx * player.speed * speedFactor;
-    player.y += dy * player.speed * speedFactor;
+    // 총 이동속도 사용
+    player.x += dx * player.getTotalMoveSpeed() * speedFactor;
+    player.y += dy * player.getTotalMoveSpeed() * speedFactor;
     
-    // 방향 업데이트
     if (dx < 0) {
       player.direction = 'left';
     } else if (dx > 0) {
@@ -5135,9 +5201,10 @@ function update() {
     const jewel = gameObjects.jewels[i];
     if (isWithinDistance(jewel, player, activeRadius)) {
       jewel.update();
-
-      // 플레이어 충돌 체크
-      if (detectCollision(player, jewel)) {
+  
+      // 플레이어 충돌 체크 (고정된 획득 반경 사용)
+      const pickupRange = 25; // 고정된 획득 범위
+      if (detectCollision(jewel, { x: player.x, y: player.y, size: pickupRange })) {
         jewel.collect();
         gameObjects.jewels.splice(i, 1);
       }
@@ -5146,43 +5213,9 @@ function update() {
 
   // 자석 효과 업데이트
   if (player.magnetActive) {
-    // 지속 시간 감소
-    player.magnetDuration -= 16; // 프레임당 시간 감소 (60fps 기준)
-    
+    player.magnetDuration -= 16;
     if (player.magnetDuration <= 0) {
       player.magnetActive = false;
-    } else {
-      // 모든 보석을 플레이어에게 끌어당기기
-      for (let jewel of gameObjects.jewels) {
-        const dx = player.x - jewel.x;
-        const dy = player.y - jewel.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        
-        if (dist < 800) { // 자석 효과의 범위
-          // 거리에 따라 끌어당김 강도 조절
-          const strength = 0.1 + (1 - Math.min(dist, 500) / 500) * 0.3;
-          
-          // 최대 속도 상한 설정 (픽셀/프레임)
-          const maxSpeed = 8;
-          
-          // 이동량 계산 및 상한 적용
-          const moveX = dx * strength;
-          const moveY = dy * strength;
-          const moveDistance = Math.sqrt(moveX * moveX + moveY * moveY);
-          
-          // 속도가 최대값을 초과하는 경우 정규화
-          if (moveDistance > maxSpeed && moveDistance > 0) {
-            const normalizedX = moveX / moveDistance * maxSpeed;
-            const normalizedY = moveY / moveDistance * maxSpeed;
-            jewel.x += normalizedX;
-            jewel.y += normalizedY;
-          } else {
-            // 속도가 최대값 이하인 경우 그대로 적용
-            jewel.x += moveX;
-            jewel.y += moveY;
-          }
-        }
-      }
     }
   }
 
@@ -5197,9 +5230,9 @@ function update() {
     }
   }
 
-  // 체력 재생 적용
-  if (player.healthRegeneration > 0) {
-    const regenAmount = player.maxHealth * player.healthRegeneration / 60;
+  // 체력 재생 적용 (getTotalHealthRegen() 사용)
+  if (player.getTotalHealthRegen() > 0) {
+    const regenAmount = player.maxHealth * player.getTotalHealthRegen() / 60;
     player.health = Math.min(player.health + regenAmount, player.maxHealth);
   }
   
