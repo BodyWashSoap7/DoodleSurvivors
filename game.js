@@ -556,7 +556,7 @@ const player = {
   expMultiplier: 1,
 
   attackRange: 1,      // 공격 범위 (배율)
-  dodgeRate: 0.9,        // 회피율 (0~1)
+  dodgeRate: 0,        // 회피율 (0~1)
   luck: 0,             // 행운 (0~1, 각종 확률에 영향)
   
   // 애니메이션 관련 속성
