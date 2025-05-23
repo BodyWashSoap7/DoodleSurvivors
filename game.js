@@ -2723,13 +2723,15 @@ class Enemy {
       gameObjects.jewels.push(new Jewel(this.x, this.y, jewelType));
     }
   
-    // 행운이 보물상자 드롭 확률에 영향 (총 행운 사용)
-    const baseTreasure = 0.01;
-    const treasureLuckBonus = player.getTotalLuck() * 2;
-    const treasureChance = Math.min(baseTreasure * (1 + treasureLuckBonus), 0.2);
-    
-    if (!this.isBoss && Math.random() < treasureChance) {
-      gameObjects.terrain.push(new Treasure(this.x, this.y));
+    // 행운이 보물상자 드롭 확률에 영향 (5레벨 이상일 때만)
+    if (player.level >= 5) {
+      const baseTreasure = 0.01;
+      const treasureLuckBonus = player.getTotalLuck() * 2;
+      const treasureChance = Math.min(baseTreasure * (1 + treasureLuckBonus), 0.2);
+      
+      if (!this.isBoss && Math.random() < treasureChance) {
+        gameObjects.terrain.push(new Treasure(this.x, this.y));
+      }
     }
     
     checkLevelUp();
@@ -3112,23 +3114,29 @@ class Jewel extends GameObject {
 
 // 가중치 기반으로 보석 타입을 결정하는 함수
 function getWeightedRandomJewelType() {
+  // 5레벨 미만일 때는 대형 보석 제외
+  const weights = { ...JEWEL_WEIGHTS };
+  if (player.level < 5) {
+    weights.LARGE = 0; // 대형 보석 가중치를 0으로 설정
+  }
+  
   // 총 가중치 계산
-  const totalWeight = Object.values(JEWEL_WEIGHTS).reduce((sum, weight) => sum + weight, 0);
+  const totalWeight = Object.values(weights).reduce((sum, weight) => sum + weight, 0);
   
   // 0부터 총 가중치 사이의 랜덤 값 생성
   let random = Math.random() * totalWeight;
   
   // 가중치에 따른 선택
-  if ((random -= JEWEL_WEIGHTS.SMALL) <= 0) {
+  if ((random -= weights.SMALL) <= 0) {
     return JEWEL_TYPES.SMALL;
   }
-  if ((random -= JEWEL_WEIGHTS.MEDIUM) <= 0) {
+  if ((random -= weights.MEDIUM) <= 0) {
     return JEWEL_TYPES.MEDIUM;
   }
-  if ((random -= JEWEL_WEIGHTS.LARGE) <= 0) {
+  if ((random -= weights.LARGE) <= 0) {
     return JEWEL_TYPES.LARGE;
   }
-  if ((random -= JEWEL_WEIGHTS.HEALTH) <= 0) {
+  if ((random -= weights.HEALTH) <= 0) {
     return JEWEL_TYPES.HEALTH;
   }
   return JEWEL_TYPES.MAGNET;
@@ -4821,16 +4829,17 @@ function generateChunk(chunkX, chunkY) {
     const jewel = new Jewel(x, y, jewelType);
     chunk.items.push(jewel);
     gameObjects.jewels.push(jewel);
-  } // 닫는 중괄호 추가
+  }
   
-  // 보물 생성 (5% 확률)
-  if (Math.random() < 0.05) {
+  // 보물 생성 (5% 확률, 5레벨 이상일 때만)
+  if (player.level >= 5 && Math.random() < 0.05) {
     const x = chunkX * CHUNK_SIZE + Math.random() * CHUNK_SIZE;
     const y = chunkY * CHUNK_SIZE + Math.random() * CHUNK_SIZE;
     const treasure = new Treasure(x, y);
     chunk.terrain.push(treasure);
     gameObjects.terrain.push(treasure);
   }
+  
   // 청크 저장
   const chunkKey = `${chunkX},${chunkY}`;
   gameObjects.chunks[chunkKey] = chunk;
