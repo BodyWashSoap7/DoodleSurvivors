@@ -556,7 +556,7 @@ const player = {
   expMultiplier: 1,
 
   attackRange: 1,      // 공격 범위 (배율)
-  dodgeRate: 0,        // 회피율 (0~1)
+  dodgeRate: 0.9,        // 회피율 (0~1)
   luck: 0,             // 행운 (0~1, 각종 확률에 영향)
   
   // 애니메이션 관련 속성
@@ -592,6 +592,7 @@ const player = {
   invincible: false,
   invincibilityDuration: 500, // 무적 시간 (0.5초)
   invincibilityStartTime: 0,
+  isDodging: false,    // 회피 상태인지 여부
   
   // 플레이어 초기화
   init(characterIndex) {
@@ -2533,8 +2534,14 @@ class Enemy {
     if (currentTime - this.lastAttackTime >= this.attackCooldown && !player.invincible) {
       // 회피율 확률 체크
       if (Math.random() < player.dodgeRate) {
-        // 회피 성공 - 공격 무효화
+        // 회피 성공 - 무적 상태 활성화 및 시각적 효과
         this.lastAttackTime = currentTime; // 쿨다운은 적용
+        
+        // 회피 시에도 무적 상태 활성화
+        player.invincible = true;
+        player.invincibilityStartTime = currentTime;
+        player.isDodging = true; // 회피 상태 표시
+        
         console.log("공격을 회피했습니다!");
         return;
       }
@@ -2550,6 +2557,7 @@ class Enemy {
       
       player.invincible = true;
       player.invincibilityStartTime = currentTime;
+      player.isDodging = false; // 피격 상태
       
       const damageRatio = this.attackStrength / player.maxHealth;
       screenShakeTime = 400 + damageRatio * 2000;
@@ -4067,8 +4075,8 @@ function draw() {
     const spriteX = player.currentFrame * player.spriteWidth;
     const spriteY = player.animationState === 'idle' ? 0 : player.spriteHeight;
     
-    // 피격 효과 처리
-    if (player.isHit) {
+    // 피격 효과 또는 회피 효과 처리
+    if (player.isHit || (player.invincible && player.isDodging)) {
       // 임시 캔버스 사용
       const tempCanvas = document.createElement('canvas');
       tempCanvas.width = playerSize * 2;
@@ -4096,15 +4104,29 @@ function draw() {
         tempCtx.setTransform(1, 0, 0, 1, 0, 0);
       }
       
-      // 피격 효과 (빨간색 오버레이)
+      // 효과 오버레이
       const currentTime = gameTimeSystem.getTime();
-      const hitProgress = (currentTime - player.hitStartTime) / player.hitDuration;
-      const blinkSpeed = 10;
-      const alpha = Math.abs(Math.sin(hitProgress * Math.PI * blinkSpeed)) * 0.8;
+      let alpha = 0;
       
-      tempCtx.globalCompositeOperation = 'source-atop';
-      tempCtx.fillStyle = `rgba(255, 0, 0, ${alpha})`;
-      tempCtx.fillRect(0, 0, playerSize * 2, playerSize * 2);
+      if (player.isHit) {
+        // 피격 효과 (빨간색 깜빡임)
+        const hitProgress = (currentTime - player.hitStartTime) / player.hitDuration;
+        const blinkSpeed = 10;
+        alpha = Math.abs(Math.sin(hitProgress * Math.PI * blinkSpeed)) * 0.8;
+        
+        tempCtx.globalCompositeOperation = 'source-atop';
+        tempCtx.fillStyle = `rgba(255, 0, 0, ${alpha})`;
+        tempCtx.fillRect(0, 0, playerSize * 2, playerSize * 2);
+      } else if (player.invincible && player.isDodging) {
+        // 회피 효과 (하얀색 빛남)
+        const dodgeProgress = (currentTime - player.invincibilityStartTime) / player.invincibilityDuration;
+        const glowIntensity = Math.sin(dodgeProgress * Math.PI * 8) * 0.5 + 0.5; // 부드러운 깜빡임
+        alpha = glowIntensity * 0.9;
+        
+        tempCtx.globalCompositeOperation = 'source-atop';
+        tempCtx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+        tempCtx.fillRect(0, 0, playerSize * 2, playerSize * 2);
+      }
       
       // 최종 이미지 그리기
       ctx.drawImage(
@@ -4113,8 +4135,8 @@ function draw() {
         canvas.height / 2 - playerSize
       );
       
-      // 피격 효과 이미지
-      if (assetManager.loaded.hitEffect) {
+      // 피격 효과 이미지 (피격 시에만)
+      if (player.isHit && assetManager.loaded.hitEffect) {
         const hitFrameX = player.hitFrame * 64; // 프레임 너비 64
         const hitEffectSize = playerSize * 2;
         
@@ -4129,7 +4151,7 @@ function draw() {
         );
       }
     } else {
-      // 일반 상태 그리기
+      // 일반 상태 그리기 (기존 코드와 동일)
       ctx.save();
       
       // 캔버스 중앙으로 이동
