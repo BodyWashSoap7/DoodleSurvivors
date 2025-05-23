@@ -582,7 +582,10 @@ class AssetManager {
       enemies: {},
       hitEffect: null,
       treasure: null,
-      jewels: []
+      jewels: [],
+      // 새로 추가
+      traitIcons: {},
+      traitBackground: null
     };
     
     this.loaded = {
@@ -595,7 +598,10 @@ class AssetManager {
       enemies: false,
       hitEffect: false,
       treasure: false,
-      jewels: false
+      jewels: false,
+      // 새로 추가
+      traitIcons: false,
+      traitBackground: false
     };
   }
 
@@ -760,6 +766,25 @@ class AssetManager {
     );
   }
 
+  loadTraitIcons() {
+    const traitTypes = [
+      'creation_physical', 'creation_magic',
+      'destruction_physical', 'destruction_magic', 
+      'will_physical', 'will_magic'
+    ];
+    
+    this.loadImageSet('traitIcons', traitTypes, './img/traits/{item}_icon.png');
+  }
+
+  loadTraitBackground() {
+    this.images.traitBackground = new Image();
+    this.images.traitBackground.src = './img/traits/trait_background.png';
+    this.images.traitBackground.onload = () => {
+      this.loaded.traitBackground = true;
+      console.log('특성 배경 이미지 로드 완료');
+    };
+  }
+
   loadAll(callback) {
     this.loadPlayerImages();
     this.loadMapTiles();
@@ -770,6 +795,8 @@ class AssetManager {
     this.loadEnemyImages();
     this.loadMiscImages();
     this.loadJewelImages();
+    this.loadTraitIcons();
+    this.loadTraitBackground();
     
     // 모든 이미지가 로드되었는지 주기적으로 확인
     const checkAllLoaded = () => {
@@ -870,13 +897,17 @@ const player = {
   
   // 총 값 계산 메서드들
   getTotalAttackPower() {
-    // 전체 공격력 증가 보너스
+    // 기본 공격력 보너스들 (공격력 증가 I, II)
     const attack1Bonus = permanentUpgrades.getUpgradeValue('destruction_physical_attack1');
     const attack2Bonus = permanentUpgrades.getUpgradeValue('destruction_magic_attack2');
+    const basicAttackBonus = attack1Bonus + attack2Bonus;
     
-    // 모든 보너스 합산
-    const totalPermanentBonus = attack1Bonus + attack2Bonus;
-    return this.baseAttackPower * (1 + totalPermanentBonus + this.levelAttackBonus);
+    // 무기별 데미지 보너스 (추가로 적용)
+    const meleeBonus = permanentUpgrades.getUpgradeValue('destruction_physical_melee');
+    const rangedBonus = permanentUpgrades.getUpgradeValue('destruction_magic_ranged');
+    const weaponBonus = meleeBonus + rangedBonus;
+    
+    return this.baseAttackPower * (1 + basicAttackBonus + weaponBonus + this.levelAttackBonus);
   },
   
   // 근접무기 전용 공격력 (무예 수련 + 공격력 증가 I,II)
@@ -947,6 +978,26 @@ const player = {
   getTotalExpMultiplier() {
     const permanentBonus = permanentUpgrades.getUpgradeValue('creation_physical_exp');
     return this.baseExpMultiplier + permanentBonus + this.levelExpMultiplierBonus;
+  },
+
+  getTotalMeleeAttackPower() {
+    // 기본 공격력 + 공격력 증가 보너스 + 근접무기 전용 보너스
+    const attack1Bonus = permanentUpgrades.getUpgradeValue('destruction_physical_attack1');
+    const attack2Bonus = permanentUpgrades.getUpgradeValue('destruction_magic_attack2');
+    const meleeBonus = permanentUpgrades.getUpgradeValue('destruction_physical_melee');
+    const totalBonus = attack1Bonus + attack2Bonus + meleeBonus;
+    
+    return this.baseAttackPower * (1 + totalBonus + this.levelAttackBonus);
+  },
+
+  getTotalRangedAttackPower() {
+    // 기본 공격력 + 공격력 증가 보너스 + 원거리무기 전용 보너스
+    const attack1Bonus = permanentUpgrades.getUpgradeValue('destruction_physical_attack1');
+    const attack2Bonus = permanentUpgrades.getUpgradeValue('destruction_magic_attack2');
+    const rangedBonus = permanentUpgrades.getUpgradeValue('destruction_magic_ranged');
+    const totalBonus = attack1Bonus + attack2Bonus + rangedBonus;
+    
+    return this.baseAttackPower * (1 + totalBonus + this.levelAttackBonus);
   },
 
   // 플레이어 초기화 메서드
@@ -1048,7 +1099,7 @@ class Bullet {
     this.speed = speed;
     this.angle = angle;
     this.baseDamage = damage;
-    this.damage = damage * player.getTotalAttackPower();
+    this.damage = damage * player.getTotalRangedAttackPower();
     this.used = false;
   }
 
@@ -1123,7 +1174,7 @@ class BasicWeapon extends Weapon {
           new Bullet(
             player.x, player.y, 5, this.baseProjectileSpeed,
             angle,
-            this.damage * player.getTotalAttackPower() // 공격력 특성 적용
+            this.damage * player.getTotalRangedAttackPower() // 공격력 특성 적용
           )
         );
       }
@@ -1183,7 +1234,7 @@ class OrbitWeapon extends Weapon {
         angle,
         this.orbitRadius, // 고정된 반지름
         this.orbSize, // 공격 범위 특성이 적용된 크기
-        this.damage * player.getTotalAttackPower(), // 공격력 특성 적용
+        this.damage * player.getTotalRangedAttackPower(), // 공격력 특성 적용
         this
       );
       gameObjects.bullets.push(orb);
@@ -1351,7 +1402,7 @@ class FlameWeapon extends Weapon {
       player.y,
       this.flameAngle,
       this.range, // 공격 범위 특성이 적용된 범위
-      this.damage * player.getTotalAttackPower(), // 공격력 특성 적용
+      this.damage * player.getTotalRangedAttackPower(), // 공격력 특성 적용
       this.duration
     );
     
@@ -1560,7 +1611,7 @@ class LightningWeapon extends Weapon {
         new ChainLightningEffect(
           player.x, player.y,
           nearestEnemy.x, nearestEnemy.y,
-          this.damage * player.getTotalAttackPower(), // 공격력 특성 적용
+          this.damage * player.getTotalRangedAttackPower(), // 공격력 특성 적용
           this.chainCount,
           this.chainRange, // 공격 범위 특성이 적용된 체인 범위
           nearestEnemy
@@ -1802,7 +1853,7 @@ class MeleeWeapon extends Weapon {
     
     // 적들에게 데미지 적용
     targets.forEach(enemy => {
-      enemy.takeDamage(this.damage * player.getTotalAttackPower());
+      enemy.takeDamage(this.damage * player.getTotalMeleeAttackPower());
     });
     
     // 시각적 효과 생성
@@ -1859,7 +1910,7 @@ class FistWeapon extends MeleeWeapon {
     // 적이 있으면 공격
     if (nearestEnemy) {
       // 적에게 데미지 적용 (공격력 특성 적용)
-      nearestEnemy.takeDamage(this.damage * player.getTotalAttackPower());
+      nearestEnemy.takeDamage(this.damage * player.getTotalMeleeAttackPower());
       
       // 적 방향 계산
       const dx = nearestEnemy.x - player.x;
@@ -1957,7 +2008,7 @@ class SwordWeapon extends MeleeWeapon {
     
     // 적들에게 데미지 적용 (공격력 특성 적용)
     targets.forEach(enemy => {
-      enemy.takeDamage(this.damage * player.getTotalAttackPower());
+      enemy.takeDamage(this.damage * player.getTotalMeleeAttackPower());
     });
     
     // 시각적 효과 생성
@@ -2046,7 +2097,7 @@ class SpearWeapon extends MeleeWeapon {
     
     // 적들에게 데미지 적용 (공격력 특성 적용)
     targets.forEach(enemy => {
-      enemy.takeDamage(this.damage * player.getTotalAttackPower());
+      enemy.takeDamage(this.damage * player.getTotalMeleeAttackPower());
     });
     
     // 시각적 효과 생성
@@ -4285,8 +4336,8 @@ function drawStartScreen() {
   drawButton(canvas.width / 2 + spacing/2, buttonY, buttonWidth, buttonHeight, '설정', true);
   
   // 하단 버튼들
-  // 업그레이드 버튼
-  drawButton(canvas.width / 2 - buttonWidth - spacing/2, buttonY + 60, buttonWidth, buttonHeight, '업그레이드', true);
+  // 특성 강화 버튼
+  drawButton(canvas.width / 2 - buttonWidth - spacing/2, buttonY + 60, buttonWidth, buttonHeight, '특성 강화', true);
   
   // 프로필 변경 버튼
   drawButton(canvas.width / 2 + spacing/2, buttonY + 60, buttonWidth, buttonHeight, '프로필 변경', true);
@@ -4380,78 +4431,161 @@ function drawGameOverScreen() {
 }
 
 // 업그레이드 화면 변수들
-let selectedUpgradeIndex = 0;
-let upgradeScrollOffset = 0;
+let selectedTraitCategory = 'creation';
+let selectedTraitType = 'physical';
+let selectedTraitUpgrade = 0;
 
 // 업그레이드 화면 그리기 함수
-function drawUpgradeScreen() {
+function drawTraitScreen() {
   ctx.fillStyle = 'black';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
+  
+  // 배경 이미지 그리기
+  if (assetManager.loaded.traitBackground && assetManager.images.traitBackground) {
+    // 배경을 화면 전체에 타일링하거나 중앙에 배치
+    const bgSize = 256;
+    const tilesX = Math.ceil(canvas.width / bgSize) + 1;
+    const tilesY = Math.ceil(canvas.height / bgSize) + 1;
+    
+    ctx.globalAlpha = 0.3; // 배경을 반투명하게
+    for (let x = 0; x < tilesX; x++) {
+      for (let y = 0; y < tilesY; y++) {
+        ctx.drawImage(
+          assetManager.images.traitBackground,
+          x * bgSize - (bgSize/2),
+          y * bgSize - (bgSize/2),
+          bgSize, bgSize
+        );
+      }
+    }
+    ctx.globalAlpha = 1.0;
+  }
   
   // 제목
   ctx.fillStyle = '#FFD700';
   ctx.font = '36px Arial';
   ctx.textAlign = 'center';
-  ctx.fillText('영구 업그레이드', canvas.width / 2, 60);
+  ctx.fillText('특성 강화', canvas.width / 2, 60);
   
   // 현재 골드 표시
   ctx.fillStyle = '#66fcf1';
   ctx.font = '20px Arial';
   ctx.fillText(`보유 골드: ${gold}`, canvas.width / 2, 100);
   
-  // 업그레이드 목록
-  const startY = 140;
-  const itemHeight = 80;
-  const maxVisibleItems = 6;
-  const unlockedCount = permanentUpgrades.getUnlockedCount();
+  // 6개 특성 카테고리 아이콘 배치 (2x3 그리드)
+  const iconSize = 80;
+  const spacing = 120;
+  const startX = canvas.width / 2 - spacing;
+  const startY = 180;
   
-  for (let i = 0; i < Math.min(unlockedCount, maxVisibleItems); i++) {
-    const upgradeIndex = i + upgradeScrollOffset;
-    if (upgradeIndex >= unlockedCount) break;
+  const categories = [
+    { category: 'creation', type: 'magic', name: '창조술', x: startX - spacing, y: startY },
+    { category: 'will', type: 'magic', name: '의지술', x: startX, y: startY },
+    { category: 'destruction', type: 'magic', name: '파괴술', x: startX + spacing, y: startY },
+    { category: 'creation', type: 'physical', name: '창조체', x: startX - spacing, y: startY + spacing },
+    { category: 'will', type: 'physical', name: '의지체', x: startX, y: startY + spacing },
+    { category: 'destruction', type: 'physical', name: '파괴체', x: startX + spacing, y: startY + spacing }
+  ];
+  
+  categories.forEach((cat, index) => {
+    const isSelected = (cat.category === selectedTraitCategory && cat.type === selectedTraitType);
     
-    const upgrade = permanentUpgrades.upgrades[upgradeIndex];
-    const y = startY + i * itemHeight;
-    const isSelected = upgradeIndex === selectedUpgradeIndex;
-    const canUpgrade = permanentUpgrades.canUpgrade(upgradeIndex);
+    // 아이콘 배경
+    ctx.fillStyle = isSelected ? 'rgba(102, 252, 241, 0.4)' : 'rgba(69, 162, 158, 0.2)';
+    ctx.fillRect(cat.x - iconSize/2, cat.y - iconSize/2, iconSize, iconSize);
     
-    // 배경
-    ctx.fillStyle = isSelected ? 'rgba(102, 252, 241, 0.3)' : 'rgba(69, 162, 158, 0.1)';
-    ctx.fillRect(50, y, canvas.width - 100, itemHeight - 5);
-    
-    // 테두리
+    // 아이콘 테두리
     ctx.strokeStyle = isSelected ? '#66fcf1' : '#45a29e';
     ctx.lineWidth = isSelected ? 3 : 1;
-    ctx.strokeRect(50, y, canvas.width - 100, itemHeight - 5);
+    ctx.strokeRect(cat.x - iconSize/2, cat.y - iconSize/2, iconSize, iconSize);
+    
+    // 아이콘 이미지
+    const iconKey = `${cat.category}_${cat.type}`;
+    if (assetManager.loaded.traitIcons && assetManager.images.traitIcons[iconKey]) {
+      ctx.drawImage(
+        assetManager.images.traitIcons[iconKey],
+        cat.x - iconSize/2 + 8,
+        cat.y - iconSize/2 + 8,
+        iconSize - 16, iconSize - 16
+      );
+    }
+    
+    // 카테고리 이름
+    ctx.fillStyle = isSelected ? '#FFFFFF' : '#c5c6c7';
+    ctx.font = '16px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText(cat.name, cat.x, cat.y + iconSize/2 + 20);
+  });
+  
+  // 선택된 카테고리의 업그레이드 목록 표시
+  if (selectedTraitCategory && selectedTraitType) {
+    drawTraitUpgradeList();
+  }
+  
+  // 뒤로가기 버튼
+  const backButtonY = canvas.height - 60;
+  drawButton(canvas.width / 2 - 75, backButtonY, 150, 40, '뒤로가기', true);
+}
+
+function drawTraitUpgradeList() {
+  const upgrades = permanentUpgrades.getUpgradesByCategory(selectedTraitCategory, selectedTraitType);
+  
+  if (upgrades.length === 0) return;
+  
+  const listStartY = 380;
+  const itemHeight = 50;
+  const listX = 50;
+  const listWidth = canvas.width - 100;
+  
+  // 스크롤 가능하도록 최대 표시 개수 설정
+  const maxVisibleItems = 5;
+  const visibleUpgrades = upgrades.slice(0, maxVisibleItems);
+  
+  // 배경
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+  ctx.fillRect(listX, listStartY, listWidth, visibleUpgrades.length * itemHeight + 20);
+  
+  // 테두리
+  ctx.strokeStyle = '#45a29e';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(listX, listStartY, listWidth, visibleUpgrades.length * itemHeight + 20);
+  
+  visibleUpgrades.forEach((upgrade, index) => {
+    const y = listStartY + 10 + index * itemHeight;
+    const isSelected = index === selectedTraitUpgrade;
+    const canUpgrade = permanentUpgrades.canUpgrade(upgrade.id);
+    
+    // 선택된 항목 배경
+    if (isSelected) {
+      ctx.fillStyle = 'rgba(102, 252, 241, 0.3)';
+      ctx.fillRect(listX + 5, y, listWidth - 10, itemHeight - 5);
+    }
     
     // 업그레이드 이름
     ctx.fillStyle = canUpgrade ? '#FFFFFF' : '#888888';
-    ctx.font = '24px Arial';
+    ctx.font = '16px Arial';
     ctx.textAlign = 'left';
-    ctx.fillText(upgrade.name, 70, y + 25);
+    ctx.fillText(upgrade.name, listX + 15, y + 20);
     
     // 레벨 정보
     ctx.fillStyle = upgrade.currentLevel >= upgrade.maxLevel ? '#FFD700' : '#c5c6c7';
-    ctx.font = '18px Arial';
-    ctx.fillText(`레벨 ${upgrade.currentLevel}/${upgrade.maxLevel}`, 70, y + 50);
+    ctx.font = '12px Arial';
+    ctx.fillText(`레벨 ${upgrade.currentLevel}/${upgrade.maxLevel}`, listX + 15, y + 35);
     
     // 설명
     ctx.fillStyle = '#c5c6c7';
-    ctx.font = '16px Arial';
-    ctx.fillText(upgrade.description, 70, y + 70);
+    ctx.font = '12px Arial';
+    ctx.fillText(upgrade.description, listX + 150, y + 20);
     
-    // 비용 (최대 레벨이 아닌 경우)
+    // 비용 또는 최대레벨 표시
     if (upgrade.currentLevel < upgrade.maxLevel) {
-      const cost = permanentUpgrades.getCost(upgradeIndex);
-      ctx.fillStyle = canUpgrade ? '#00FF00' : '#FF0000';
-      ctx.font = '20px Arial';
-      ctx.textAlign = 'right';
-      ctx.fillText(`${cost} 골드`, canvas.width - 70, y + 35);
+      const cost = permanentUpgrades.getCost(upgrade.id);
       
       // 구매 버튼
-      const buttonX = canvas.width - 150;
-      const buttonY = y + 45;
-      const buttonWidth = 80;
-      const buttonHeight = 25;
+      const buttonX = listX + listWidth - 100;
+      const buttonY = y + 10;
+      const buttonWidth = 60;
+      const buttonHeight = 20;
       
       ctx.fillStyle = canUpgrade ? '#66fcf1' : '#555555';
       ctx.fillRect(buttonX, buttonY, buttonWidth, buttonHeight);
@@ -4461,29 +4595,102 @@ function drawUpgradeScreen() {
       ctx.strokeRect(buttonX, buttonY, buttonWidth, buttonHeight);
       
       ctx.fillStyle = canUpgrade ? '#000000' : '#AAAAAA';
-      ctx.font = '14px Arial';
+      ctx.font = '10px Arial';
       ctx.textAlign = 'center';
-      ctx.fillText('구매', buttonX + buttonWidth/2, buttonY + 17);
-    } else {
-      // 최대 레벨 표시
-      ctx.fillStyle = '#FFD700';
-      ctx.font = '18px Arial';
+      ctx.fillText('구매', buttonX + buttonWidth/2, buttonY + 14);
+      
+      // 비용 표시
+      ctx.fillStyle = canUpgrade ? '#00FF00' : '#FF0000';
+      ctx.font = '12px Arial';
       ctx.textAlign = 'right';
-      ctx.fillText('최대 레벨', canvas.width - 70, y + 35);
+      ctx.fillText(`${cost} 골드`, buttonX - 10, y + 25);
+    } else {
+      ctx.fillStyle = '#FFD700';
+      ctx.font = '12px Arial';
+      ctx.textAlign = 'right';
+      ctx.fillText('최대 레벨', listX + listWidth - 15, y + 25);
+    }
+  });
+  
+  // 더 많은 업그레이드가 있을 때 표시
+  if (upgrades.length > maxVisibleItems) {
+    ctx.fillStyle = '#c5c6c7';
+    ctx.font = '12px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText(`... 외 ${upgrades.length - maxVisibleItems}개`, canvas.width / 2, listStartY + visibleUpgrades.length * itemHeight + 35);
+  }
+}
+
+function handleTraitScreenClick() {
+  // 카테고리 아이콘 클릭 확인
+  const iconSize = 80;
+  const spacing = 120;
+  const startX = canvas.width / 2 - spacing;
+  const startY = 180;
+  
+  const categories = [
+    { category: 'creation', type: 'magic', x: startX - spacing, y: startY },
+    { category: 'will', type: 'magic', x: startX, y: startY },
+    { category: 'destruction', type: 'magic', x: startX + spacing, y: startY },
+    { category: 'creation', type: 'physical', x: startX - spacing, y: startY + spacing },
+    { category: 'will', type: 'physical', x: startX, y: startY + spacing },
+    { category: 'destruction', type: 'physical', x: startX + spacing, y: startY + spacing }
+  ];
+  
+  // 카테고리 아이콘 클릭 확인
+  for (let cat of categories) {
+    if (mouseX >= cat.x - iconSize/2 && mouseX <= cat.x + iconSize/2 &&
+        mouseY >= cat.y - iconSize/2 && mouseY <= cat.y + iconSize/2) {
+      selectedTraitCategory = cat.category;
+      selectedTraitType = cat.type;
+      selectedTraitUpgrade = 0;
+      return;
     }
   }
   
-  // 뒤로가기 버튼
-  const backButtonY = canvas.height - 60;
-  drawButton(canvas.width / 2 - 75, backButtonY, 150, 40, '뒤로가기', true);
+  // 업그레이드 목록 클릭 확인
+  if (selectedTraitCategory && selectedTraitType) {
+    const upgrades = permanentUpgrades.getUpgradesByCategory(selectedTraitCategory, selectedTraitType);
+    const maxVisibleItems = 5;
+    const visibleUpgrades = upgrades.slice(0, maxVisibleItems);
+    const listStartY = 380;
+    const itemHeight = 50;
+    const listX = 50;
+    const listWidth = canvas.width - 100;
+    
+    for (let i = 0; i < visibleUpgrades.length; i++) {
+      const upgrade = visibleUpgrades[i];
+      const y = listStartY + 10 + i * itemHeight;
+      
+      // 구매 버튼 클릭 확인
+      if (upgrade.currentLevel < upgrade.maxLevel) {
+        const buttonX = listX + listWidth - 100;
+        const buttonY = y + 10;
+        const buttonWidth = 60;
+        const buttonHeight = 20;
+        
+        if (mouseX >= buttonX && mouseX <= buttonX + buttonWidth &&
+            mouseY >= buttonY && mouseY <= buttonY + buttonHeight) {
+          permanentUpgrades.purchaseUpgrade(upgrade.id);
+          return;
+        }
+      }
+      
+      // 항목 전체 클릭 시 선택
+      if (mouseX >= listX && mouseX <= listX + listWidth &&
+          mouseY >= y && mouseY <= y + itemHeight - 5) {
+        selectedTraitUpgrade = i;
+        return;
+      }
+    }
+  }
   
-  // 스크롤 표시 (해금된 업그레이드가 많을 때)
-  if (unlockedCount > maxVisibleItems) {
-    ctx.fillStyle = '#66fcf1';
-    ctx.font = '16px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText(`${upgradeScrollOffset + 1}-${Math.min(upgradeScrollOffset + maxVisibleItems, unlockedCount)} / ${unlockedCount}`, 
-                 canvas.width / 2, startY + maxVisibleItems * itemHeight + 20);
+  // 뒤로가기 버튼 클릭 확인
+  const backButtonY = canvas.height - 60;
+  if (mouseX >= canvas.width / 2 - 75 && mouseX <= canvas.width / 2 + 75 &&
+      mouseY >= backButtonY && mouseY <= backButtonY + 40) {
+    currentGameState = GAME_STATE.START_SCREEN;
+    return;
   }
 }
 
@@ -5501,8 +5708,8 @@ function handleMouseClick() {
     case GAME_STATE.SETTINGS:
       handleSettingsScreenClick();
       break;
-    case GAME_STATE.UPGRADE:  // 새로 추가
-      handleUpgradeScreenClick();
+    case GAME_STATE.UPGRADE:
+      handleTraitScreenClick();
       break;
     case GAME_STATE.PAUSED:
       handlePauseScreenClick();
@@ -5545,13 +5752,14 @@ function handleStartScreenClick() {
   }
   
   // 하단 버튼들
-  // 업그레이드 버튼
+  // 특성 강화 버튼
   if (mouseX >= canvas.width / 2 - buttonWidth - spacing/2 && 
       mouseX <= canvas.width / 2 - spacing/2 &&
       mouseY >= buttonY + 60 && mouseY <= buttonY + 60 + buttonHeight) {
     currentGameState = GAME_STATE.UPGRADE;
-    selectedUpgradeIndex = 0;
-    upgradeScrollOffset = 0;
+    selectedTraitCategory = 'creation';
+    selectedTraitType = 'physical';
+    selectedTraitUpgrade = 0;
     return;
   }
   
@@ -5855,7 +6063,7 @@ function gameLoop(timestamp) {
       }
     }
     else if (currentGameState === GAME_STATE.UPGRADE) {
-      drawUpgradeScreen();
+      drawTraitScreen();
     }
     else if (currentGameState === GAME_STATE.GAME_OVER) {
       drawGameOverScreen();
