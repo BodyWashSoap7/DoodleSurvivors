@@ -450,7 +450,7 @@ class AssetManager {
   
   loadLevelUpIcons() {
     this.loadImageSet('levelUpIcons', 
-      ['attackPower', 'maxHealth', 'cooldownReduction', 'projectileSpeed', 'moveSpeed', 'pickupRadius', 'expMultiplier'], 
+      ['attackPower', 'maxHealth', 'cooldownReduction', 'moveSpeed', 'pickupRadius', 'expMultiplier'], 
       './img/levelup/{item}_icon.png'
     );
   }
@@ -552,9 +552,12 @@ const player = {
   speed: 2,
   attackPower: 1,
   cooldownReduction: 0,
-  projectileSpeed: 1,
   pickupRadius: 30,
   expMultiplier: 1,
+
+  attackRange: 1,      // 공격 범위 (배율)
+  dodgeRate: 0,        // 회피율 (0~1)
+  luck: 0,             // 행운 (0~1, 각종 확률에 영향)
   
   // 애니메이션 관련 속성
   animationState: 'idle',
@@ -686,7 +689,7 @@ class Bullet {
     this.y = y;
     this.size = size;
     this.baseSpeed = speed;
-    this.speed = speed * player.projectileSpeed;
+    this.speed = speed;
     this.angle = angle;
     this.baseDamage = damage;
     this.damage = damage * player.attackPower;
@@ -743,6 +746,7 @@ class BasicWeapon extends Weapon {
       damage: 10
     });
     this.projectileCount = 1;
+    this.baseProjectileSpeed = 7; // 기본 투사체 속도 (고정)
   }
   
   fire() {
@@ -761,9 +765,9 @@ class BasicWeapon extends Weapon {
         
         gameObjects.bullets.push(
           new Bullet(
-            player.x, player.y, 5, 7,
+            player.x, player.y, 5, this.baseProjectileSpeed,
             angle,
-            this.damage * player.attackPower
+            this.damage * player.attackPower // 공격력 특성 적용
           )
         );
       }
@@ -779,7 +783,7 @@ class BasicWeapon extends Weapon {
     // 짝수 레벨마다 쿨다운 감소
     if (this.level % 2 === 0) {
       this.baseCooldown *= 0.9;
-      this.updateCooldown(player.cooldownReduction);
+      this.updateCooldown(player.cooldownReduction); // 쿨타임 감소 특성 적용
     }
   }
 }
@@ -791,7 +795,8 @@ class OrbitWeapon extends Weapon {
       baseCooldown: 50,
       damage: 8
     });
-    this.orbitRadius = 150;        
+    this.baseOrbitRadius = 150; // 기본 궤도 반지름
+    this.orbitRadius = this.baseOrbitRadius;
     this.orbitSpeed = 0.03;       
     this.orbitAngle = 0;          
     this.orbCount = 1;            
@@ -800,6 +805,12 @@ class OrbitWeapon extends Weapon {
     
     // 구체를 게임 객체로 생성
     this.createOrbs();
+  }
+  
+  // 공격 범위 특성 적용
+  updateRange() {
+    this.orbitRadius = this.baseOrbitRadius * player.attackRange;
+    this.createOrbs(); // 구체들 재생성하여 새 반지름 적용
   }
   
   createOrbs() {
@@ -813,8 +824,8 @@ class OrbitWeapon extends Weapon {
         player.x, 
         player.y,
         angle,
-        this.orbitRadius,
-        this.damage * player.attackPower,
+        this.orbitRadius, // 공격 범위 특성이 적용된 반지름
+        this.damage * player.attackPower, // 공격력 특성 적용
         this
       );
       gameObjects.bullets.push(orb);
@@ -832,10 +843,15 @@ class OrbitWeapon extends Weapon {
   
   // 업그레이드 시 구체 재생성
   upgrade() {
-    this.damage += 3;
-    this.orbCount += 1;
-    this.orbitRadius += 15;
-    this.createOrbs();
+    if (this.level < this.maxLevel) {
+      this.level++;
+      this.damage += 3;
+      this.orbCount += 1;
+      this.baseOrbitRadius += 15; // 기본 반지름 증가
+      this.updateRange(); // 실제 반지름 재계산 및 구체 재생성
+      return true;
+    }
+    return false;
   }
   
   fire() {
@@ -909,20 +925,19 @@ class OrbitOrb {
     ctx.restore();
   }
   
-  // 궤도 링 그리기 메서드
+  // 궤도 링 그리기 메서드 - 크기와 두께 고정
   drawOrbitRing() {
     ctx.save();
     
-    // 더 선명하게 만들어서 테스트
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)'; // 투명도 높임
-    ctx.lineWidth = 3; // 두께 증가
-    // ctx.setLineDash 제거 (일단 실선으로)
+    // 고정된 두께로 유지
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+    ctx.lineWidth = 3;
     
     ctx.beginPath();
     ctx.arc(
       canvas.width / 2,  // 플레이어 화면 중앙 X
       canvas.height / 2, // 플레이어 화면 중앙 Y
-      this.radius,       // 궤도 반지름
+      this.radius,       // 궤도 반지름 (범위는 변하지만 링 두께는 고정)
       0, 
       Math.PI * 2
     );
@@ -936,6 +951,7 @@ class OrbitOrb {
   }
 }
 
+
 class FlameWeapon extends Weapon {
   constructor() {
     super({
@@ -944,10 +960,16 @@ class FlameWeapon extends Weapon {
       damage: 15
     });
     this.flameAngle = Math.PI / 3; // 60도 부채꼴
-    this.range = 200;
+    this.baseRange = 200; // 기본 범위
+    this.range = this.baseRange;
     this.duration = 3000;
     this.activeFlames = [];
     this.isFiring = false;
+  }
+  
+  // 공격 범위 특성 적용
+  updateRange() {
+    this.range = this.baseRange * player.attackRange;
   }
   
   update() {
@@ -971,8 +993,8 @@ class FlameWeapon extends Weapon {
       player.x, 
       player.y,
       this.flameAngle,
-      this.range,
-      this.damage * player.attackPower,
+      this.range, // 공격 범위 특성이 적용된 범위
+      this.damage * player.attackPower, // 공격력 특성 적용
       this.duration
     );
     
@@ -985,7 +1007,8 @@ class FlameWeapon extends Weapon {
     
     // 레벨에 따른 개선
     if (this.level % 2 === 0) {
-      this.range += 30; // 짝수 레벨마다 범위 증가
+      this.baseRange += 30; // 기본 범위 증가
+      this.updateRange(); // 실제 범위 재계산
     }
     if (this.level % 3 === 0) {
       this.flameAngle += Math.PI / 12; // 3레벨마다 각도 증가 (15도씩)
@@ -995,7 +1018,7 @@ class FlameWeapon extends Weapon {
     }
     if (this.level >= 6) {
       this.baseCooldown *= 0.8; // 6레벨부터 쿨다운 감소
-      this.updateCooldown(player.cooldownReduction);
+      this.updateCooldown(player.cooldownReduction); // 쿨타임 감소 특성 적용
     }
   }
 }
@@ -1006,7 +1029,7 @@ class FlameEffect {
     this.x = x;
     this.y = y;
     this.angle = angle; // 부채꼴 각도
-    this.range = range; // 최대 범위
+    this.range = range; // 최대 범위 (공격 범위 특성이 적용된 값)
     this.damage = damage; // 데미지
     this.duration = duration; // 지속 시간
     this.startTime = gameTimeSystem.getTime(); // 생성 시간
@@ -1083,13 +1106,13 @@ class FlameEffect {
     }
     
     // 현재 마우스 방향으로 화염 방향 실시간 업데이트
-    let currentDirection = this.lastDirection || 0; // 저장된 마지막 방향 사용
+    let currentDirection = this.lastDirection || 0;
     
     if (currentGameState === GAME_STATE.PLAYING) {
       const dx = mouseWorldX - player.x;
       const dy = mouseWorldY - player.y;
       currentDirection = Math.atan2(dy, dx);
-      this.lastDirection = currentDirection; // 현재 방향 저장
+      this.lastDirection = currentDirection;
     }
     
     // 화염 효과 그리기
@@ -1099,35 +1122,29 @@ class FlameEffect {
     ctx.translate(this.x + offsetX, this.y + offsetY);
     ctx.rotate(currentDirection);
     
-    // 투명도 설정 - PAUSED가 아닐 때만 페이드아웃 계산
+    // 투명도 설정
     let opacity;
     if (currentGameState === GAME_STATE.PLAYING) {
-      // 플레이 중일 때만 실제 경과 시간 계산
       const elapsed = gameTimeSystem.getTime() - this.startTime;
       const progress = elapsed / this.duration;
       
-      // 페이드아웃 계산 (지속 시간의 85% 이후부터 페이드아웃)
       if (progress >= this.fadeOutStart) {
-        // 페이드아웃 구간 내 진행률 계산 (0~1)
         const fadeProgress = (progress - this.fadeOutStart) / (1 - this.fadeOutStart);
-        // 부드러운 S 커브 페이드아웃 (급격하게 사라지는 느낌)
         opacity = Math.pow(1 - fadeProgress, 2);
       } else {
         opacity = 1.0;
       }
       
-      // 현재 불투명도 저장 (일시정지 시 사용)
       this.currentOpacity = opacity;
     } else {
-      // 일시정지 상태에서는 저장된 불투명도 사용
       opacity = this.currentOpacity || 1.0;
     }
     
     ctx.globalAlpha = opacity;
     
-    // 화염 애니메이션 프레임 그리기
+    // 화염 애니메이션 프레임 그리기 - 범위에 맞춰 크기 조정
     const frameX = this.currentFrame * this.frameWidth;
-    const drawSize = this.range * 0.9; // 화면에 표시될 크기
+    const drawSize = this.range * 0.9; // 범위에 비례하여 크기 결정
     
     ctx.drawImage(
       assetManager.images.weapons.flame,
@@ -1150,13 +1167,35 @@ class LightningWeapon extends Weapon {
       damage: 15
     });
     this.chainCount = 3;
-    this.chainRange = 150;
-    this.maxTargetDistance = 400;
+    this.baseChainRange = 150; // 기본 체인 범위
+    this.chainRange = this.baseChainRange;
+    this.baseMaxTargetDistance = 400; // 기본 최대 거리
+    this.maxTargetDistance = this.baseMaxTargetDistance;
+  }
+  
+  // 공격 범위 특성 적용
+  updateRange() {
+    this.chainRange = this.baseChainRange * player.attackRange;
+    this.maxTargetDistance = this.baseMaxTargetDistance * player.attackRange;
   }
   
   fire() {
-    // 가장 가까운 적 찾기
-    const nearestEnemy = findNearestEnemy();
+    // 공격 범위 내에서 가장 가까운 적 직접 찾기
+    let nearestEnemy = null;
+    let minDistance = this.maxTargetDistance; // 공격 범위 특성이 적용된 거리
+    
+    for (let enemy of gameObjects.enemies) {
+      if (enemy.state === 'moving') {
+        const dx = enemy.x - player.x;
+        const dy = enemy.y - player.y;
+        const distance = Math.hypot(dx, dy);
+        
+        if (distance < minDistance) {
+          minDistance = distance;
+          nearestEnemy = enemy;
+        }
+      }
+    }
     
     if (nearestEnemy) {
       // 적을 찾으면 체인 라이트닝 효과 생성
@@ -1164,9 +1203,9 @@ class LightningWeapon extends Weapon {
         new ChainLightningEffect(
           player.x, player.y,
           nearestEnemy.x, nearestEnemy.y,
-          this.damage * player.attackPower,
+          this.damage * player.attackPower, // 공격력 특성 적용
           this.chainCount,
-          this.chainRange,
+          this.chainRange, // 공격 범위 특성이 적용된 체인 범위
           nearestEnemy
         )
       );
@@ -1181,14 +1220,16 @@ class LightningWeapon extends Weapon {
       this.chainCount++; // 짝수 레벨마다 체인 개수 증가
     }
     if (this.level % 3 === 0) {
-      this.chainRange += 30; // 3레벨마다 체인 범위 증가
+      this.baseChainRange += 30; // 3레벨마다 기본 체인 범위 증가
+      this.updateRange(); // 실제 범위 재계산
     }
     if (this.level >= 4) {
-      this.maxTargetDistance += 50; // 4레벨부터 최대 거리 증가
+      this.baseMaxTargetDistance += 50; // 4레벨부터 기본 최대 거리 증가
+      this.updateRange(); // 실제 거리 재계산
     }
     if (this.level >= 6) {
       this.baseCooldown *= 0.85; // 6레벨부터 쿨다운 감소
-      this.updateCooldown(player.cooldownReduction);
+      this.updateCooldown(player.cooldownReduction); // 쿨타임 감소 특성 적용
     }
   }
 }
@@ -1431,13 +1472,19 @@ class FistWeapon extends MeleeWeapon {
       range: 100,
       effectDuration: 300
     });
+    this.baseRange = 100; // 기본 범위 저장
+  }
+
+  // 공격 범위 특성 적용
+  updateRange() {
+    this.range = this.baseRange * player.attackRange;
   }
 
   // fire 메서드를 오버라이드해서 자동으로 가장 가까운 적 공격
   fire() {
     // 범위 내에서 가장 가까운 적 찾기
     let nearestEnemy = null;
-    let minDistance = this.range;
+    let minDistance = this.range; // 공격 범위 특성이 적용된 범위 사용
     
     for (let enemy of gameObjects.enemies) {
       if (enemy.state !== 'moving') continue;
@@ -1454,7 +1501,7 @@ class FistWeapon extends MeleeWeapon {
     
     // 적이 있으면 공격
     if (nearestEnemy) {
-      // 적에게 데미지 적용
+      // 적에게 데미지 적용 (공격력 특성 적용)
       nearestEnemy.takeDamage(this.damage * player.attackPower);
       
       // 적 방향 계산
@@ -1480,14 +1527,15 @@ class FistWeapon extends MeleeWeapon {
 
   applyLevelBonus() {
     super.applyLevelBonus();
-    // 레벨업 시 공격속도 증가
+    // 레벨업 시 공격속도 증가 (쿨타임 감소 특성과 별개)
     if (this.level % 2 === 0) {
       this.baseCooldown *= 0.9;
-      this.updateCooldown(player.cooldownReduction);
+      this.updateCooldown(player.cooldownReduction); // 쿨타임 감소 특성도 적용
     }
-    // 3레벨마다 범위 증가
+    // 3레벨마다 기본 범위 증가
     if (this.level % 3 === 0) {
-      this.range += 15;
+      this.baseRange += 15;
+      this.updateRange(); // 실제 범위 재계산
     }
   }
 }
@@ -1503,6 +1551,12 @@ class SwordWeapon extends MeleeWeapon {
       attackAngle: Math.PI / 3, // 60도 부채꼴
       effectDuration: 400
     });
+    this.baseRange = 70; // 기본 범위 저장
+  }
+
+  // 공격 범위 특성 적용
+  updateRange() {
+    this.range = this.baseRange * player.attackRange;
   }
 
   findTargetsInRange(attackDirection) {
@@ -1515,7 +1569,7 @@ class SwordWeapon extends MeleeWeapon {
       const dy = enemy.y - player.y;
       const distance = Math.sqrt(dx * dx + dy * dy);
       
-      if (distance <= this.range) {
+      if (distance <= this.range) { // 공격 범위 특성이 적용된 범위 사용
         // 적과 플레이어 사이의 각도
         const angleToEnemy = Math.atan2(dy, dx);
         
@@ -1535,12 +1589,30 @@ class SwordWeapon extends MeleeWeapon {
     return targets;
   }
 
+  fire() {
+    // 마우스 방향으로 공격
+    const dx = mouseWorldX - player.x;
+    const dy = mouseWorldY - player.y;
+    const attackDirection = Math.atan2(dy, dx);
+    
+    // 공격 범위 내 적들 찾기
+    const targets = this.findTargetsInRange(attackDirection);
+    
+    // 적들에게 데미지 적용 (공격력 특성 적용)
+    targets.forEach(enemy => {
+      enemy.takeDamage(this.damage * player.attackPower);
+    });
+    
+    // 시각적 효과 생성
+    this.createEffect(attackDirection);
+  }
+
   createEffect(attackDirection) {
     const effect = new SwordEffect(
       player.x,
       player.y,
       attackDirection,
-      this.range,
+      this.range, // 공격 범위 특성이 적용된 범위 사용
       this.attackAngle,
       this.effectDuration
     );
@@ -1549,9 +1621,10 @@ class SwordWeapon extends MeleeWeapon {
 
   applyLevelBonus() {
     super.applyLevelBonus();
-    // 레벨업 시 범위 증가
+    // 레벨업 시 기본 범위 증가
     if (this.level % 2 === 0) {
-      this.range += 15;
+      this.baseRange += 15;
+      this.updateRange(); // 실제 범위 재계산
     }
     // 3레벨마다 각도 증가
     if (this.level % 3 === 0) {
@@ -1571,7 +1644,13 @@ class SpearWeapon extends MeleeWeapon {
       width: 30, // 창의 폭
       effectDuration: 500
     });
+    this.baseRange = 100; // 기본 범위 저장
     this.width = 30;
+  }
+
+  // 공격 범위 특성 적용
+  updateRange() {
+    this.range = this.baseRange * player.attackRange;
   }
 
   findTargetsInRange(attackDirection) {
@@ -1589,7 +1668,7 @@ class SpearWeapon extends MeleeWeapon {
       const rotatedX = dx * cos - dy * sin;
       const rotatedY = dx * sin + dy * cos;
       
-      // 직사각형 범위 내에 있는지 확인
+      // 직사각형 범위 내에 있는지 확인 (공격 범위 특성이 적용된 범위 사용)
       if (rotatedX >= 0 && rotatedX <= this.range && 
           Math.abs(rotatedY) <= this.width / 2) {
         targets.push(enemy);
@@ -1599,12 +1678,30 @@ class SpearWeapon extends MeleeWeapon {
     return targets;
   }
 
+  fire() {
+    // 마우스 방향으로 공격
+    const dx = mouseWorldX - player.x;
+    const dy = mouseWorldY - player.y;
+    const attackDirection = Math.atan2(dy, dx);
+    
+    // 공격 범위 내 적들 찾기
+    const targets = this.findTargetsInRange(attackDirection);
+    
+    // 적들에게 데미지 적용 (공격력 특성 적용)
+    targets.forEach(enemy => {
+      enemy.takeDamage(this.damage * player.attackPower);
+    });
+    
+    // 시각적 효과 생성
+    this.createEffect(attackDirection);
+  }
+
   createEffect(attackDirection) {
     const effect = new SpearEffect(
       player.x,
       player.y,
       attackDirection,
-      this.range,
+      this.range, // 공격 범위 특성이 적용된 범위 사용
       this.width,
       this.effectDuration
     );
@@ -1613,9 +1710,10 @@ class SpearWeapon extends MeleeWeapon {
 
   applyLevelBonus() {
     super.applyLevelBonus();
-    // 레벨업 시 사거리 증가
+    // 레벨업 시 기본 사거리 증가
     if (this.level % 2 === 0) {
-      this.range += 20;
+      this.baseRange += 20;
+      this.updateRange(); // 실제 범위 재계산
     }
     // 3레벨마다 폭 증가
     if (this.level % 3 === 0) {
@@ -1660,25 +1758,24 @@ class MeleeEffect {
 class FistEffect extends MeleeEffect {
   constructor(x, y, direction, duration, targetEnemy) {
     super(x, y, direction, duration);
-    this.maxSize = 48; // 적절한 크기로 조정
+    this.baseMaxSize = 48; // 기본 최대 크기
+    this.maxSize = this.baseMaxSize * player.attackRange; // 공격 범위에 따라 크기 조정
     this.rotationAngle = direction;
     this.targetEnemy = targetEnemy;
-    this.speed = 12; // 빠른 이동 속도
+    this.speed = 12;
     this.hasReachedTarget = false;
     this.impactStartTime = 0;
-    this.impactDuration = 200; // 임팩트 효과 지속시간
+    this.impactDuration = 200;
     
-    // 목표 위치 저장 (적이 움직일 수 있으므로)
+    // 목표 위치 저장
     if (targetEnemy) {
       this.targetX = targetEnemy.x;
       this.targetY = targetEnemy.y;
     } else {
-      // 목표가 없으면 방향으로 일정 거리
       this.targetX = x + Math.cos(direction) * 100;
       this.targetY = y + Math.sin(direction) * 100;
     }
     
-    // 시작 위치 저장
     this.startX = x;
     this.startY = y;
   }
@@ -1732,21 +1829,17 @@ class FistEffect extends MeleeEffect {
   }
   
   drawMovingFist(drawX, drawY) {
-    // fist.png 이미지가 로드되었는지 확인
     if (assetManager.loaded.weapons && assetManager.images.weapons.fist) {
       ctx.save();
       
-      // 이동 중 약간의 투명도와 잔상 효과
       ctx.globalAlpha = 0.9;
       
-      // 이미지 크기
-      const imageSize = this.maxSize * 0.8; // 이동 중에는 약간 작게
+      // 범위에 따라 조정된 크기
+      const imageSize = this.maxSize * 0.8;
       
-      // 이미지 중심점으로 이동하고 회전
       ctx.translate(drawX, drawY);
       ctx.rotate(this.rotationAngle);
       
-      // fist 이미지 그리기
       ctx.drawImage(
         assetManager.images.weapons.fist,
         -imageSize / 2,
@@ -1763,22 +1856,18 @@ class FistEffect extends MeleeEffect {
     const impactElapsed = gameTimeSystem.getTime() - this.impactStartTime;
     const impactProgress = Math.min(impactElapsed / this.impactDuration, 1);
     
-    // fist.png 이미지가 로드되었는지 확인
     if (assetManager.loaded.weapons && assetManager.images.weapons.fist) {
       ctx.save();
       
-      // 임팩트 시 점점 사라지는 효과
       const alpha = Math.max(0, 1 - impactProgress);
       ctx.globalAlpha = alpha;
 
-      // 이미지 크기
+      // 범위에 따라 조정된 크기
       const imageSize = this.maxSize;
       
-      // 이미지 중심점으로 이동하고 회전
       ctx.translate(drawX, drawY);
       ctx.rotate(this.rotationAngle);
       
-      // fist 이미지 그리기
       ctx.drawImage(
         assetManager.images.weapons.fist,
         -imageSize / 2,
@@ -1789,33 +1878,26 @@ class FistEffect extends MeleeEffect {
       ctx.restore();
     }
   }
-
-  // outOfBounds 메서드 추가 (Bullet 클래스처럼)
-  outOfBounds() {
-    // 화면에서 너무 멀리 나가면 제거
-    const maxDistance = 800;
-    return !isWithinDistance(this, player, maxDistance);
-  }
 }
 
 // 검 공격 이펙트
 class SwordEffect extends MeleeEffect {
   constructor(x, y, direction, range, angle, duration) {
     super(x, y, direction, duration);
-    this.range = range;
+    this.range = range; // 공격 범위 특성이 적용된 범위
     this.angle = angle;
   }
 
   draw(offsetX, offsetY) {
     const progress = this.getProgress();
     const alpha = 1 - progress;
-    const currentRange = this.range * progress;
+    const currentRange = this.range * progress; // 범위에 맞춰 조정
     
     ctx.save();
     ctx.globalAlpha = alpha;
     ctx.fillStyle = '#87CEEB';
     ctx.strokeStyle = '#4169E1';
-    ctx.lineWidth = 2;
+    ctx.lineWidth = Math.max(2, this.range / 50); // 범위에 따라 선 두께도 조정
     
     // 부채꼴 그리기
     ctx.translate(this.x + offsetX, this.y + offsetY);
@@ -1836,20 +1918,20 @@ class SwordEffect extends MeleeEffect {
 class SpearEffect extends MeleeEffect {
   constructor(x, y, direction, range, width, duration) {
     super(x, y, direction, duration);
-    this.range = range;
+    this.range = range; // 공격 범위 특성이 적용된 범위
     this.width = width;
   }
 
   draw(offsetX, offsetY) {
     const progress = this.getProgress();
     const alpha = 1 - progress;
-    const currentRange = this.range * progress;
+    const currentRange = this.range * progress; // 범위에 맞춰 조정
     
     ctx.save();
     ctx.globalAlpha = alpha;
     ctx.fillStyle = '#CD853F';
     ctx.strokeStyle = '#8B4513';
-    ctx.lineWidth = 2;
+    ctx.lineWidth = Math.max(2, this.range / 100); // 범위에 따라 선 두께도 조정
     
     // 직사각형 그리기
     ctx.translate(this.x + offsetX, this.y + offsetY);
@@ -1858,10 +1940,10 @@ class SpearEffect extends MeleeEffect {
     ctx.fillRect(0, -this.width / 2, currentRange, this.width);
     ctx.strokeRect(0, -this.width / 2, currentRange, this.width);
     
-    // 창끝 부분 강조
+    // 창끝 부분 강조 - 크기도 범위에 비례
     if (progress > 0.3) {
       ctx.fillStyle = '#FFD700';
-      const tipSize = this.width * 0.3;
+      const tipSize = Math.max(this.width * 0.3, this.range / 20); // 범위에 따라 팁 크기 조정
       ctx.fillRect(currentRange - tipSize, -tipSize / 2, tipSize, tipSize);
     }
     
@@ -2353,13 +2435,22 @@ class Enemy {
     gold += goldValue;
     saveGold();
     
-    // 아이템 드롭
-    if (!this.isBoss && Math.random() < 0.1) {
+    // 행운이 보석 드롭 확률에 영향
+    const baseDrop = 0.1;
+    const luckBonus = player.luck * 0.5; // 행운 1당 50% 보너스
+    const dropChance = Math.min(baseDrop * (1 + luckBonus), 0.8); // 최대 80%
+    
+    if (!this.isBoss && Math.random() < dropChance) {
       const jewelType = getWeightedRandomJewelType();
       gameObjects.jewels.push(new Jewel(this.x, this.y, jewelType));
     }
-
-    if (!this.isBoss && Math.random() < 0.01) {
+  
+    // 행운이 보물상자 드롭 확률에 영향
+    const baseTreasure = 0.01;
+    const treasureLuckBonus = player.luck * 2; // 행운이 보물상자에 더 큰 영향
+    const treasureChance = Math.min(baseTreasure * (1 + treasureLuckBonus), 0.2); // 최대 20%
+    
+    if (!this.isBoss && Math.random() < treasureChance) {
       gameObjects.terrain.push(new Treasure(this.x, this.y));
     }
     
@@ -2439,6 +2530,15 @@ class Enemy {
     const currentTime = gameTimeSystem.getTime();
     
     if (currentTime - this.lastAttackTime >= this.attackCooldown && !player.invincible) {
+      // 회피율 확률 체크
+      if (Math.random() < player.dodgeRate) {
+        // 회피 성공 - 공격 무효화
+        this.lastAttackTime = currentTime; // 쿨다운은 적용
+        console.log("공격을 회피했습니다!");
+        return;
+      }
+      
+      // 회피 실패 - 기존 공격 로직
       player.health -= this.attackStrength;
       this.lastAttackTime = currentTime;
       
@@ -2811,15 +2911,23 @@ function generateLevelUpOptions() {
   
   const allUpgrades = [
     { type: 'attackPower', name: '공격력 증가', value: 0.2, description: '공격력 +20%' },
-    { type: 'maxHealth', name: '최대 체력 증가', value: 20, description: '최대 체력 +20' },
     { type: 'cooldownReduction', name: '쿨타임 감소', value: 0.1, description: '쿨타임 -10%' },
-    { type: 'projectileSpeed', name: '투사체 속도', value: 0.2, description: '투사체 속도 +20%' },
+    { type: 'maxHealth', name: '최대 체력 증가', value: 20, description: '최대 체력 +20' },
     { type: 'moveSpeed', name: '이동속도 증가', value: 0.3, description: '이동속도 +0.3' },
-    { type: 'pickupRadius', name: '획득 범위 증가', value: 20, description: '아이템 획득 범위 +20' },
-    { type: 'expMultiplier', name: '경험치 증가', value: 0.1, description: '경험치 획득량 +10%' },
+    { type: 'attackRange', name: '공격 범위 증가', value: 0.15, description: '공격 범위 +15%' },
+    { type: 'pickupRadius', name: '아이템 획득 반경', value: 20, description: '아이템 획득 범위 +20' },
+    { type: 'dodgeRate', name: '회피율 증가', value: 0.05, description: '회피율 +5%' },
+    { type: 'luck', name: '행운 증가', value: 0.1, description: '행운 +10%' },
+    { type: 'expMultiplier', name: '경험치 획득률', value: 0.1, description: '경험치 획득량 +10%' },
   ];
   
-  // 무기 옵션들 - 기존 무기와 새 무기 모두 포함
+  // 행운에 따른 4번째 선택지 확률 계산
+  const baseLevelUpOptions = 3;
+  const fourthOptionChance = Math.min(player.luck * 0.5, 0.8); // 최대 80% 확률
+  const shouldShowFourthOption = Math.random() < fourthOptionChance;
+  const optionCount = shouldShowFourthOption ? 4 : 3;
+  
+  // 무기 옵션들 추가
   const weaponUpgrades = [
     { type: 'weapon', weaponType: 'basic', name: '기본 무기', description: '기본 투사체 공격' },
     { type: 'weapon', weaponType: 'orbit', name: '회전 구체', description: '플레이어 주변을 회전하며 공격' },
@@ -2839,12 +2947,12 @@ function generateLevelUpOptions() {
         weaponType: weapon.type,
         name: `${weaponName} 업그레이드`,
         description: `레벨 ${weapon.level} → ${weapon.level + 1}`,
-        weapon: weapon // 참조 저장
+        weapon: weapon
       });
     }
   }
   
-  // 새로운 무기 옵션 추가 (아직 없는 무기만)
+  // 새로운 무기 옵션 추가
   const playerWeaponTypes = player.weapons.map(w => w.type);
   for (let weaponUpgrade of weaponUpgrades) {
     if (weaponUpgrade.type === 'weapon' && !playerWeaponTypes.includes(weaponUpgrade.weaponType)) {
@@ -2854,10 +2962,10 @@ function generateLevelUpOptions() {
     }
   }
   
-  // 랜덤하게 4개 선택
+  // 랜덤하게 선택지 생성
   levelUpOptions = [];
   const shuffled = [...allUpgrades].sort(() => Math.random() - 0.5);
-  levelUpOptions = shuffled.slice(0, 4);
+  levelUpOptions = shuffled.slice(0, optionCount);
   hoveredLevelUpOption = -1;
 }
 
@@ -2942,6 +3050,7 @@ function generateArtifactOptions() {
 }
 
 // 레벨업 선택 적용
+// 레벨업 선택 적용
 function applyLevelUpChoice(optionIndex) {
   console.log("Applying level up choice:", optionIndex);
   
@@ -2963,7 +3072,7 @@ function applyLevelUpChoice(optionIndex) {
       console.log(`${weapon.type} 무기가 레벨 ${weapon.level}로 업그레이드되었습니다.`);
     }
   } else {
-    // 기존 로직 유지
+    // 아티팩트 또는 일반 레벨업 옵션 처리
     if (isArtifactSelection) {
       // 아티팩트 효과 적용
       switch(option.type) {
@@ -3012,29 +3121,71 @@ function applyLevelUpChoice(optionIndex) {
       switch(option.type) {
         case 'attackPower':
           player.attackPower += option.value;
+          console.log(`공격력이 ${option.value * 100}% 증가했습니다. 현재: ${player.attackPower}`);
           break;
+          
         case 'maxHealth':
           player.maxHealth += option.value;
-          player.health = player.maxHealth;
+          player.health = player.maxHealth; // 체력 완전 회복
+          console.log(`최대 체력이 ${option.value} 증가했습니다. 현재: ${player.maxHealth}`);
           break;
+          
         case 'cooldownReduction':
           player.cooldownReduction += option.value;
-          player.cooldownReduction = Math.min(player.cooldownReduction, 0.8);
+          player.cooldownReduction = Math.min(player.cooldownReduction, 0.8); // 최대 80% 감소
+          // 모든 무기의 쿨다운 업데이트
           player.weapons.forEach(weapon => {
             weapon.updateCooldown(player.cooldownReduction);
           });
+          console.log(`쿨타임이 ${option.value * 100}% 감소했습니다. 현재: ${Math.round(player.cooldownReduction * 100)}%`);
           break;
-        case 'projectileSpeed':
-          player.projectileSpeed += option.value;
-          break;
+          
         case 'moveSpeed':
           player.speed += option.value;
+          console.log(`이동속도가 ${option.value} 증가했습니다. 현재: ${player.speed}`);
           break;
+          
+        case 'attackRange':
+          player.attackRange += option.value;
+          // 모든 무기의 범위 업데이트
+          player.weapons.forEach(weapon => {
+            if (weapon.updateRange) {
+              weapon.updateRange();
+            }
+            // 특정 무기들의 범위 직접 업데이트
+            if (weapon.range !== undefined && weapon.baseRange !== undefined) {
+              weapon.range = weapon.baseRange * player.attackRange;
+            }
+            if (weapon.orbitRadius !== undefined && weapon.baseOrbitRadius !== undefined) {
+              weapon.orbitRadius = weapon.baseOrbitRadius * player.attackRange;
+            }
+          });
+          console.log(`공격 범위가 ${option.value * 100}% 증가했습니다. 현재: ${Math.round(player.attackRange * 100)}%`);
+          break;
+          
         case 'pickupRadius':
           player.pickupRadius += option.value;
+          console.log(`아이템 획득 범위가 ${option.value} 증가했습니다. 현재: ${player.pickupRadius}`);
           break;
+          
+        case 'dodgeRate':
+          player.dodgeRate += option.value;
+          player.dodgeRate = Math.min(player.dodgeRate, 0.8); // 최대 80% 회피율
+          console.log(`회피율이 ${option.value * 100}% 증가했습니다. 현재: ${Math.round(player.dodgeRate * 100)}%`);
+          break;
+          
+        case 'luck':
+          player.luck += option.value;
+          console.log(`행운이 ${option.value * 100}% 증가했습니다. 현재: ${Math.round(player.luck * 100)}%`);
+          break;
+          
         case 'expMultiplier':
           player.expMultiplier += option.value;
+          console.log(`경험치 획득률이 ${option.value * 100}% 증가했습니다. 현재: ${Math.round(player.expMultiplier * 100)}%`);
+          break;
+          
+        default:
+          console.log("알 수 없는 옵션 타입:", option.type);
           break;
       }
     }
@@ -3044,12 +3195,20 @@ function applyLevelUpChoice(optionIndex) {
   console.log("Resuming game after level up choice");
   currentGameState = GAME_STATE.PLAYING;
   totalPausedTime += gameTimeSystem.getTime() - pauseStartTime;
+  
+  gameTimeSystem.resume();
 }
 
 // 무기 추가
 function addWeapon(weaponType) {
   const weapon = WeaponFactory.createWeapon(weaponType);
-  weapon.updateCooldown(player.cooldownReduction);
+  weapon.updateCooldown(player.cooldownReduction); // 쿨타임 감소 특성 적용
+  
+  // 공격 범위 특성 적용
+  if (weapon.updateRange) {
+    weapon.updateRange();
+  }
+  
   player.weapons.push(weapon);
 }
 
@@ -3134,9 +3293,12 @@ function resetGame() {
   // 능력치 초기화
   player.attackPower = 1;
   player.cooldownReduction = 0;
-  player.projectileSpeed = 1;
   player.pickupRadius = 100;
   player.expMultiplier = 1;
+
+  player.attackRange = 1;
+  player.dodgeRate = 0;
+  player.luck = 0;
   
   // 애니메이션 초기화
   player.animationState = 'idle';
