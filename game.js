@@ -795,22 +795,23 @@ class OrbitWeapon extends Weapon {
       baseCooldown: 50,
       damage: 8
     });
-    this.baseOrbitRadius = 150; // 기본 궤도 반지름
-    this.orbitRadius = this.baseOrbitRadius;
+    this.orbitRadius = 150; // 고정된 궤도 반지름
     this.orbitSpeed = 0.03;       
     this.orbitAngle = 0;          
     this.orbCount = 1;            
     this.damageCooldown = 100;    
     this.lastDamageTime = 0;
+    this.baseOrbSize = 8; // 기본 구체 크기
+    this.orbSize = this.baseOrbSize; // 현재 구체 크기
     
     // 구체를 게임 객체로 생성
     this.createOrbs();
   }
   
-  // 공격 범위 특성 적용
+  // 공격 범위 특성 적용 - 구체 크기만 변경
   updateRange() {
-    this.orbitRadius = this.baseOrbitRadius * player.attackRange;
-    this.createOrbs(); // 구체들 재생성하여 새 반지름 적용
+    this.orbSize = this.baseOrbSize * player.attackRange;
+    this.createOrbs(); // 구체들 재생성하여 새 크기 적용
   }
   
   createOrbs() {
@@ -824,7 +825,8 @@ class OrbitWeapon extends Weapon {
         player.x, 
         player.y,
         angle,
-        this.orbitRadius, // 공격 범위 특성이 적용된 반지름
+        this.orbitRadius, // 고정된 반지름
+        this.orbSize, // 공격 범위 특성이 적용된 크기
         this.damage * player.attackPower, // 공격력 특성 적용
         this
       );
@@ -847,8 +849,7 @@ class OrbitWeapon extends Weapon {
       this.level++;
       this.damage += 3;
       this.orbCount += 1;
-      this.baseOrbitRadius += 15; // 기본 반지름 증가
-      this.updateRange(); // 실제 반지름 재계산 및 구체 재생성
+      this.createOrbs(); // 구체 재생성
       return true;
     }
     return false;
@@ -861,13 +862,13 @@ class OrbitWeapon extends Weapon {
 
 // OrbitOrb 클래스
 class OrbitOrb {
-  constructor(x, y, baseAngle, radius, damage, parent) {
+  constructor(x, y, baseAngle, radius, size, damage, parent) {
     this.x = x;
     this.y = y;
     this.baseAngle = baseAngle;
-    this.radius = radius;
+    this.radius = radius; // 고정된 궤도 반지름
+    this.size = size; // 공격 범위 특성이 적용된 크기
     this.damage = damage;
-    this.size = 8;
     this.used = false;
     this.parent = parent;
     this.rotationAngle = Math.random() * Math.PI * 2;
@@ -877,7 +878,7 @@ class OrbitOrb {
   update() {
     if (this.used) return;
     
-    // 플레이어 주변 회전
+    // 플레이어 주변 회전 (고정된 반지름 사용)
     const totalAngle = this.parent.orbitAngle + this.baseAngle;
     this.x = player.x + Math.cos(totalAngle) * this.radius;
     this.y = player.y + Math.sin(totalAngle) * this.radius;
@@ -904,8 +905,8 @@ class OrbitOrb {
       this.drawOrbitRing();
     }
     
-    // 구체 그리기
-    const drawSize = this.size * 3;
+    // 구체 그리기 - 크기가 공격 범위에 따라 조정됨
+    const drawSize = this.size * 3; // 공격 범위가 적용된 크기
       
     ctx.save();
     ctx.translate(this.x + offsetX, this.y + offsetY);
@@ -925,7 +926,7 @@ class OrbitOrb {
     ctx.restore();
   }
   
-  // 궤도 링 그리기 메서드 - 크기와 두께 고정
+  // 궤도 링 그리기 메서드 - 고정된 반지름과 두께
   drawOrbitRing() {
     ctx.save();
     
@@ -937,7 +938,7 @@ class OrbitOrb {
     ctx.arc(
       canvas.width / 2,  // 플레이어 화면 중앙 X
       canvas.height / 2, // 플레이어 화면 중앙 Y
-      this.radius,       // 궤도 반지름 (범위는 변하지만 링 두께는 고정)
+      this.radius,       // 고정된 궤도 반지름
       0, 
       Math.PI * 2
     );
