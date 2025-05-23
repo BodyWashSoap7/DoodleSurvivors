@@ -5358,4 +5358,3 @@ window.onload = function() {
   window.addEventListener('resize', resizeCanvas);
 };
 
-
