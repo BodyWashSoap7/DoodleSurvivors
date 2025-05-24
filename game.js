@@ -767,18 +767,21 @@ class AssetManager {
   }
 
   loadPerkIcons() {
-    const perkTypes = [
-      'creation_physical', 'creation_magic',
-      'destruction_physical', 'destruction_magic', 
-      'will_physical', 'will_magic'
+    const perkIds = [
+      'creation_physical_exp', 'creation_physical_pickup',
+      'creation_magic_gold', 'creation_magic_luck',
+      'destruction_physical_melee', 'destruction_physical_attack1', 'destruction_physical_speed',
+      'destruction_magic_ranged', 'destruction_magic_attack2', 'destruction_magic_range', 
+      'will_physical_speed', 'will_physical_health',
+      'will_magic_dodge', 'will_magic_regen'
     ];
     
-    this.loadImageSet('perkIcons', perkTypes, './img/perks/{item}_icon.png');
+    this.loadImageSet('perkIcons', perkIds, './img/perks/{item}_icon.png');
   }
 
-  loadPerkBackground() {
+    loadPerkBackground() {
     this.images.perkBackground = new Image();
-    this.images.perkBackground.src = './img/perks/perk_background.png';
+    this.images.perkBackground.src = './img/perks/perk_background.png'; // 800x600 이미지
     this.images.perkBackground.onload = () => {
       this.loaded.perkBackground = true;
       console.log('특성 배경 이미지 로드 완료');
@@ -4430,34 +4433,22 @@ function drawGameOverScreen() {
   ctx.fillText('클릭하여 다시 시작하세요', canvas.width / 2, canvas.height / 2 + 50);
 }
 
-// 업그레이드 화면 변수들
-let selectedPerkCategory = 'creation';
-let selectedPerkType = 'physical';
-let selectedPerkUpgrade = 0;
+// 업그레이드 화면 변수
+let selectedPerkId = null;
 
 // 업그레이드 화면 그리기 함수
 function drawPerkScreen() {
   ctx.fillStyle = 'black';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   
-  // 배경 이미지 그리기
+  // 배경 이미지 그리기 (800x600 전체 화면)
   if (assetManager.loaded.perkBackground && assetManager.images.perkBackground) {
-    // 배경을 화면 전체에 타일링하거나 중앙에 배치
-    const bgSize = 256;
-    const tilesX = Math.ceil(canvas.width / bgSize) + 1;
-    const tilesY = Math.ceil(canvas.height / bgSize) + 1;
-    
-    ctx.globalAlpha = 0.3; // 배경을 반투명하게
-    for (let x = 0; x < tilesX; x++) {
-      for (let y = 0; y < tilesY; y++) {
-        ctx.drawImage(
-          assetManager.images.perkBackground,
-          x * bgSize - (bgSize/2),
-          y * bgSize - (bgSize/2),
-          bgSize, bgSize
-        );
-      }
-    }
+    ctx.globalAlpha = 0.4; // 배경을 반투명하게
+    ctx.drawImage(
+      assetManager.images.perkBackground,
+      0, 0,
+      canvas.width, canvas.height
+    );
     ctx.globalAlpha = 1.0;
   }
   
@@ -4472,54 +4463,12 @@ function drawPerkScreen() {
   ctx.font = '20px Arial';
   ctx.fillText(`보유 골드: ${gold}`, canvas.width / 2, 100);
   
-  // 6개 특성 카테고리 아이콘 배치 (2x3 그리드)
-  const iconSize = 80;
-  const spacing = 120;
-  const startX = canvas.width / 2 - spacing;
-  const startY = 180;
+  // 특성들을 3개 구역으로 배치 (제목 없이)
+  drawPerkCategories();
   
-  const categories = [
-    { category: 'creation', type: 'magic', name: '창조술', x: startX - spacing, y: startY },
-    { category: 'will', type: 'magic', name: '의지술', x: startX, y: startY },
-    { category: 'destruction', type: 'magic', name: '파괴술', x: startX + spacing, y: startY },
-    { category: 'creation', type: 'physical', name: '창조체', x: startX - spacing, y: startY + spacing },
-    { category: 'will', type: 'physical', name: '의지체', x: startX, y: startY + spacing },
-    { category: 'destruction', type: 'physical', name: '파괴체', x: startX + spacing, y: startY + spacing }
-  ];
-  
-  categories.forEach((cat, index) => {
-    const isSelected = (cat.category === selectedPerkCategory && cat.type === selectedPerkType);
-    
-    // 아이콘 배경
-    ctx.fillStyle = isSelected ? 'rgba(102, 252, 241, 0.4)' : 'rgba(69, 162, 158, 0.2)';
-    ctx.fillRect(cat.x - iconSize/2, cat.y - iconSize/2, iconSize, iconSize);
-    
-    // 아이콘 테두리
-    ctx.strokeStyle = isSelected ? '#66fcf1' : '#45a29e';
-    ctx.lineWidth = isSelected ? 3 : 1;
-    ctx.strokeRect(cat.x - iconSize/2, cat.y - iconSize/2, iconSize, iconSize);
-    
-    // 아이콘 이미지
-    const iconKey = `${cat.category}_${cat.type}`;
-    if (assetManager.loaded.perkIcons && assetManager.images.perkIcons[iconKey]) {
-      ctx.drawImage(
-        assetManager.images.perkIcons[iconKey],
-        cat.x - iconSize/2 + 8,
-        cat.y - iconSize/2 + 8,
-        iconSize - 16, iconSize - 16
-      );
-    }
-    
-    // 카테고리 이름
-    ctx.fillStyle = isSelected ? '#FFFFFF' : '#c5c6c7';
-    ctx.font = '16px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText(cat.name, cat.x, cat.y + iconSize/2 + 20);
-  });
-  
-  // 선택된 카테고리의 업그레이드 목록 표시
-  if (selectedPerkCategory && selectedPerkType) {
-    drawPerkUpgradeList();
+  // 선택된 특성의 상세 정보 표시
+  if (selectedPerkId) {
+    drawSelectedPerkDetails();
   }
   
   // 뒤로가기 버튼
@@ -4527,159 +4476,292 @@ function drawPerkScreen() {
   drawButton(canvas.width / 2 - 75, backButtonY, 150, 40, '뒤로가기', true);
 }
 
-function drawPerkUpgradeList() {
-  const upgrades = permanentUpgrades.getUpgradesByCategory(selectedPerkCategory, selectedPerkType);
+function drawPerkCategories() {
+  const iconSize = 64;
+  const startY = 120;
   
-  if (upgrades.length === 0) return;
+  // 3개 구역으로 나누어 배치 (제목과 구분선 제거)
+  const sections = [
+    {
+      color: '#00FF7F',
+      x: 150, // 좌측
+      y: startY,
+      spacingY: 100, // 창조 부분 간격 늘림
+      perks: [
+        'creation_magic_luck',      // 행운의 별
+        'creation_magic_gold',      // 황금술  
+        'creation_physical_exp',    // 경험치 성장
+        'creation_physical_pickup'  // 수집 범위
+      ]
+    },
+    {
+      color: '#1E90FF', 
+      x: canvas.width / 2, // 중단
+      y: startY + 32,
+      spacingY: 80, // 의지 부분 기본 간격
+      perks: [
+        'will_magic_regen',    // 재생술
+        'will_magic_dodge',    // 회피율
+        'will_physical_speed', // 신속함
+        'will_physical_health' // 생명력
+      ]
+    },
+    {
+      color: '#FF4500',
+      x: canvas.width - 150, // 우측
+      y: startY - 32,
+      spacingY: 80, // 파괴 부분 간격 줄여서 6개가 모두 들어가도록
+      perks: [
+        'destruction_magic_ranged',     // 마법 숙련
+        'destruction_magic_range',      // 공격범위
+        'destruction_magic_attack2',    // 공격력 증가 II
+        'destruction_physical_attack1', // 공격력 증가 I
+        'destruction_physical_speed',   // 공격속도
+        'destruction_physical_melee'    // 무예 수련
+      ]
+    }
+  ];
   
-  const listStartY = 380;
-  const itemHeight = 50;
-  const listX = 50;
-  const listWidth = canvas.width - 100;
+  sections.forEach(section => {
+    // 특성 아이콘들 세로로 배치 (제목과 구분선 제거)
+    section.perks.forEach((perkId, index) => {
+      const upgrade = permanentUpgrades.upgrades.find(u => u.id === perkId);
+      if (!upgrade) return;
+      
+      const x = section.x;
+      const y = section.y + index * section.spacingY;
+      
+      drawPerkIcon(upgrade, x, y, iconSize);
+    });
+  });
+}
+
+function drawPerkIcon(upgrade, x, y, size) {
+  const isSelected = selectedPerkId === upgrade.id;
+  const canUpgrade = permanentUpgrades.canUpgrade(upgrade.id);
+  const isMaxLevel = upgrade.currentLevel >= upgrade.maxLevel;
   
-  // 스크롤 가능하도록 최대 표시 개수 설정
-  const maxVisibleItems = 5;
-  const visibleUpgrades = upgrades.slice(0, maxVisibleItems);
+  // 아이콘 배경
+  let bgColor;
+  if (isMaxLevel) {
+    bgColor = 'rgba(255, 215, 0, 0.7)'; // 골드색 (최대레벨)
+  } else if (canUpgrade) {
+    bgColor = 'rgba(0, 255, 0, 0.4)'; // 초록색 (구매가능)
+  } else {
+    bgColor = 'rgba(128, 128, 128, 0.4)'; // 회색 (구매불가)
+  }
   
-  // 배경
+  if (isSelected) {
+    bgColor = 'rgba(102, 252, 241, 0.7)'; // 청록색 (선택됨)
+  }
+  
+  ctx.fillStyle = bgColor;
+  ctx.fillRect(x - size/2, y - size/2, size, size);
+  
+  // 아이콘 테두리
+  ctx.strokeStyle = isSelected ? '#66fcf1' : (isMaxLevel ? '#FFD700' : '#45a29e');
+  ctx.lineWidth = isSelected ? 3 : (isMaxLevel ? 2 : 1);
+  ctx.strokeRect(x - size/2, y - size/2, size, size);
+  
+  // 아이콘 이미지
+  if (assetManager.loaded.perkIcons && assetManager.images.perkIcons[upgrade.id]) {
+    ctx.drawImage(
+      assetManager.images.perkIcons[upgrade.id],
+      x - size/2 + 4,
+      y - size/2 + 4,
+      size - 8, size - 8
+    );
+  }
+  
+  // 레벨 표시 (아이콘 우측 하단)
+  ctx.fillStyle = isMaxLevel ? '#FFD700' : '#FFFFFF';
+  ctx.font = 'bold 12px Arial';
+  ctx.textAlign = 'center';
+  
+  // 배경에 검은색 원 추가해서 가독성 향상
   ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-  ctx.fillRect(listX, listStartY, listWidth, visibleUpgrades.length * itemHeight + 20);
+  ctx.beginPath();
+  ctx.arc(x + size/2 - 15, y + size/2 - 5, 12, 0, Math.PI * 2);
+  ctx.fill();
   
-  // 테두리
-  ctx.strokeStyle = '#45a29e';
+  ctx.fillStyle = isMaxLevel ? '#FFD700' : '#FFFFFF';
+  ctx.fillText(`${upgrade.currentLevel}/${upgrade.maxLevel}`, x + size/2 - 15, y + size/2 - 1);
+  
+  // 특성 이름 (아이콘 우측) - 배경 추가로 가독성 향상
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+  ctx.fillRect(x + size/2 + 8, y - 15, 120, 16);
+  
+  ctx.fillStyle = isSelected ? '#FFFFFF' : '#c5c6c7';
+  ctx.font = 'bold 14px Arial';
+  ctx.textAlign = 'left';
+  ctx.fillText(upgrade.name, x + size/2 + 10, y - 5);
+  
+  // 특성 설명 (아이콘 우측 아래) - 배경 추가로 가독성 향상
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+  ctx.fillRect(x + size/2 + 8, y + 5, 150, 14);
+  
+  ctx.fillStyle = '#AAAAAA';
+  ctx.font = '12px Arial';
+  ctx.fillText(upgrade.description, x + size/2 + 10, y + 15);
+  
+  // 비용 표시 (구매 가능한 경우) - 배경 추가로 가독성 향상
+  if (!isMaxLevel) {
+    const cost = permanentUpgrades.getCost(upgrade.id);
+    
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+    ctx.fillRect(x + size/2 + 8, y + 20, 100, 14);
+    
+    ctx.fillStyle = canUpgrade ? '#00FF00' : '#FF0000';
+    ctx.font = 'bold 12px Arial';
+    ctx.fillText(`${cost} 골드`, x + size/2 + 10, y + 30);
+  }
+}
+
+function drawSelectedPerkDetails() {
+  const upgrade = permanentUpgrades.upgrades.find(u => u.id === selectedPerkId);
+  if (!upgrade) return;
+  
+  // 화면 하단에 상세 정보 패널 표시
+  const detailX = 50;
+  const detailY = canvas.height - 140; // 위치를 조금 더 위로
+  const detailWidth = canvas.width - 100;
+  const detailHeight = 80; // 높이 줄임
+  
+  // 상세 정보 배경
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+  ctx.fillRect(detailX, detailY, detailWidth, detailHeight);
+  
+  ctx.strokeStyle = '#66fcf1';
   ctx.lineWidth = 2;
-  ctx.strokeRect(listX, listStartY, listWidth, visibleUpgrades.length * itemHeight + 20);
+  ctx.strokeRect(detailX, detailY, detailWidth, detailHeight);
   
-  visibleUpgrades.forEach((upgrade, index) => {
-    const y = listStartY + 10 + index * itemHeight;
-    const isSelected = index === selectedPerkUpgrade;
+  // 특성 이름 (왼쪽)
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = 'bold 18px Arial';
+  ctx.textAlign = 'left';
+  ctx.fillText(upgrade.name, detailX + 20, detailY + 25);
+  
+  // 설명
+  ctx.fillStyle = '#c5c6c7';
+  ctx.font = '14px Arial';
+  ctx.fillText(upgrade.description, detailX + 20, detailY + 45);
+  
+  // 현재 레벨 (중앙)
+  ctx.fillStyle = upgrade.currentLevel >= upgrade.maxLevel ? '#FFD700' : '#FFFFFF';
+  ctx.font = 'bold 16px Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText(`레벨 ${upgrade.currentLevel}/${upgrade.maxLevel}`, detailX + detailWidth/2, detailY + 30);
+  
+  // 현재 효과
+  const currentEffect = upgrade.effect * upgrade.currentLevel;
+  ctx.fillStyle = '#00FF00';
+  ctx.font = '12px Arial';
+  if (upgrade.id.includes('speed') || upgrade.id.includes('pickup') || upgrade.id.includes('health')) {
+    ctx.fillText(`현재 효과: +${currentEffect}`, detailX + detailWidth/2, detailY + 50);
+  } else {
+    ctx.fillText(`현재 효과: +${(currentEffect * 100).toFixed(1)}%`, detailX + detailWidth/2, detailY + 50);
+  }
+  
+  // 구매 정보 (오른쪽)
+  if (upgrade.currentLevel < upgrade.maxLevel) {
+    const cost = permanentUpgrades.getCost(upgrade.id);
     const canUpgrade = permanentUpgrades.canUpgrade(upgrade.id);
     
-    // 선택된 항목 배경
-    if (isSelected) {
-      ctx.fillStyle = 'rgba(102, 252, 241, 0.3)';
-      ctx.fillRect(listX + 5, y, listWidth - 10, itemHeight - 5);
-    }
+    // 구매 버튼
+    const buttonY = detailY + 15;
+    const buttonWidth = 80;
+    const buttonHeight = 25;
+    const buttonX = detailX + detailWidth - buttonWidth - 20;
     
-    // 업그레이드 이름
-    ctx.fillStyle = canUpgrade ? '#FFFFFF' : '#888888';
-    ctx.font = '16px Arial';
-    ctx.textAlign = 'left';
-    ctx.fillText(upgrade.name, listX + 15, y + 20);
+    ctx.fillStyle = canUpgrade ? '#66fcf1' : '#555555';
+    ctx.fillRect(buttonX, buttonY, buttonWidth, buttonHeight);
     
-    // 레벨 정보
-    ctx.fillStyle = upgrade.currentLevel >= upgrade.maxLevel ? '#FFD700' : '#c5c6c7';
-    ctx.font = '12px Arial';
-    ctx.fillText(`레벨 ${upgrade.currentLevel}/${upgrade.maxLevel}`, listX + 15, y + 35);
+    ctx.strokeStyle = canUpgrade ? '#ffffff' : '#777777';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(buttonX, buttonY, buttonWidth, buttonHeight);
     
-    // 설명
-    ctx.fillStyle = '#c5c6c7';
-    ctx.font = '12px Arial';
-    ctx.fillText(upgrade.description, listX + 150, y + 20);
-    
-    // 비용 또는 최대레벨 표시
-    if (upgrade.currentLevel < upgrade.maxLevel) {
-      const cost = permanentUpgrades.getCost(upgrade.id);
-      
-      // 구매 버튼
-      const buttonX = listX + listWidth - 100;
-      const buttonY = y + 10;
-      const buttonWidth = 60;
-      const buttonHeight = 20;
-      
-      ctx.fillStyle = canUpgrade ? '#66fcf1' : '#555555';
-      ctx.fillRect(buttonX, buttonY, buttonWidth, buttonHeight);
-      
-      ctx.strokeStyle = canUpgrade ? '#ffffff' : '#777777';
-      ctx.lineWidth = 1;
-      ctx.strokeRect(buttonX, buttonY, buttonWidth, buttonHeight);
-      
-      ctx.fillStyle = canUpgrade ? '#000000' : '#AAAAAA';
-      ctx.font = '10px Arial';
-      ctx.textAlign = 'center';
-      ctx.fillText('구매', buttonX + buttonWidth/2, buttonY + 14);
-      
-      // 비용 표시
-      ctx.fillStyle = canUpgrade ? '#00FF00' : '#FF0000';
-      ctx.font = '12px Arial';
-      ctx.textAlign = 'right';
-      ctx.fillText(`${cost} 골드`, buttonX - 10, y + 25);
-    } else {
-      ctx.fillStyle = '#FFD700';
-      ctx.font = '12px Arial';
-      ctx.textAlign = 'right';
-      ctx.fillText('최대 레벨', listX + listWidth - 15, y + 25);
-    }
-  });
-  
-  // 더 많은 업그레이드가 있을 때 표시
-  if (upgrades.length > maxVisibleItems) {
-    ctx.fillStyle = '#c5c6c7';
-    ctx.font = '12px Arial';
+    ctx.fillStyle = canUpgrade ? '#000000' : '#AAAAAA';
+    ctx.font = 'bold 12px Arial';
     ctx.textAlign = 'center';
-    ctx.fillText(`... 외 ${upgrades.length - maxVisibleItems}개`, canvas.width / 2, listStartY + visibleUpgrades.length * itemHeight + 35);
+    ctx.fillText('구매', buttonX + buttonWidth/2, buttonY + 16);
+    
+    // 비용 표시
+    ctx.fillStyle = canUpgrade ? '#00FF00' : '#FF0000';
+    ctx.font = '10px Arial';
+    ctx.fillText(`${cost} 골드`, buttonX + buttonWidth/2, buttonY + 35);
+  } else {
+    ctx.fillStyle = '#FFD700';
+    ctx.font = 'bold 14px Arial';
+    ctx.textAlign = 'right';
+    ctx.fillText('최대 레벨', detailX + detailWidth - 20, detailY + 35);
   }
 }
 
 function handlePerkScreenClick() {
-  // 카테고리 아이콘 클릭 확인
-  const iconSize = 80;
-  const spacing = 120;
-  const startX = canvas.width / 2 - spacing;
-  const startY = 180;
+  const iconSize = 60;
+  const startY = 140;
   
-  const categories = [
-    { category: 'creation', type: 'magic', x: startX - spacing, y: startY },
-    { category: 'will', type: 'magic', x: startX, y: startY },
-    { category: 'destruction', type: 'magic', x: startX + spacing, y: startY },
-    { category: 'creation', type: 'physical', x: startX - spacing, y: startY + spacing },
-    { category: 'will', type: 'physical', x: startX, y: startY + spacing },
-    { category: 'destruction', type: 'physical', x: startX + spacing, y: startY + spacing }
+  const sections = [
+    {
+      x: 150,
+      y: startY,
+      spacingY: 100, // 창조 부분 간격
+      perks: [
+        'creation_magic_luck', 'creation_magic_gold',
+        'creation_physical_exp', 'creation_physical_pickup'
+      ]
+    },
+    {
+      x: canvas.width / 2,
+      y: startY,
+      spacingY: 80, // 의지 부분 간격
+      perks: [
+        'will_magic_regen', 'will_magic_dodge',
+        'will_physical_speed', 'will_physical_health'
+      ]
+    },
+    {
+      x: canvas.width - 150,
+      y: startY,
+      spacingY: 80, // 파괴 부분 간격
+      perks: [
+        'destruction_magic_ranged', 'destruction_magic_range',
+        'destruction_magic_attack2', 'destruction_physical_attack1',
+        'destruction_physical_speed', 'destruction_physical_melee'
+      ]
+    }
   ];
   
-  // 카테고리 아이콘 클릭 확인
-  for (let cat of categories) {
-    if (mouseX >= cat.x - iconSize/2 && mouseX <= cat.x + iconSize/2 &&
-        mouseY >= cat.y - iconSize/2 && mouseY <= cat.y + iconSize/2) {
-      selectedPerkCategory = cat.category;
-      selectedPerkType = cat.type;
-      selectedPerkUpgrade = 0;
-      return;
+  // 특성 아이콘 클릭 확인
+  for (let section of sections) {
+    for (let i = 0; i < section.perks.length; i++) {
+      const perkId = section.perks[i];
+      const x = section.x;
+      const y = section.y + i * section.spacingY;
+      
+      if (mouseX >= x - iconSize/2 && mouseX <= x + iconSize/2 &&
+          mouseY >= y - iconSize/2 && mouseY <= y + iconSize/2) {
+        selectedPerkId = perkId;
+        return;
+      }
     }
   }
   
-  // 업그레이드 목록 클릭 확인
-  if (selectedPerkCategory && selectedPerkType) {
-    const upgrades = permanentUpgrades.getUpgradesByCategory(selectedPerkCategory, selectedPerkType);
-    const maxVisibleItems = 5;
-    const visibleUpgrades = upgrades.slice(0, maxVisibleItems);
-    const listStartY = 380;
-    const itemHeight = 50;
-    const listX = 50;
-    const listWidth = canvas.width - 100;
-    
-    for (let i = 0; i < visibleUpgrades.length; i++) {
-      const upgrade = visibleUpgrades[i];
-      const y = listStartY + 10 + i * itemHeight;
+  // 구매 버튼 클릭 확인
+  if (selectedPerkId) {
+    const upgrade = permanentUpgrades.upgrades.find(u => u.id === selectedPerkId);
+    if (upgrade && upgrade.currentLevel < upgrade.maxLevel) {
+      const detailX = 50;
+      const detailY = canvas.height - 140;
+      const detailWidth = canvas.width - 100;
+      const buttonY = detailY + 15;
+      const buttonWidth = 80;
+      const buttonHeight = 25;
+      const buttonX = detailX + detailWidth - buttonWidth - 20;
       
-      // 구매 버튼 클릭 확인
-      if (upgrade.currentLevel < upgrade.maxLevel) {
-        const buttonX = listX + listWidth - 100;
-        const buttonY = y + 10;
-        const buttonWidth = 60;
-        const buttonHeight = 20;
-        
-        if (mouseX >= buttonX && mouseX <= buttonX + buttonWidth &&
-            mouseY >= buttonY && mouseY <= buttonY + buttonHeight) {
-          permanentUpgrades.purchaseUpgrade(upgrade.id);
-          return;
-        }
-      }
-      
-      // 항목 전체 클릭 시 선택
-      if (mouseX >= listX && mouseX <= listX + listWidth &&
-          mouseY >= y && mouseY <= y + itemHeight - 5) {
-        selectedPerkUpgrade = i;
+      if (mouseX >= buttonX && mouseX <= buttonX + buttonWidth &&
+          mouseY >= buttonY && mouseY <= buttonY + buttonHeight) {
+        permanentUpgrades.purchaseUpgrade(selectedPerkId);
         return;
       }
     }
@@ -5757,9 +5839,7 @@ function handleStartScreenClick() {
       mouseX <= canvas.width / 2 - spacing/2 &&
       mouseY >= buttonY + 60 && mouseY <= buttonY + 60 + buttonHeight) {
     currentGameState = GAME_STATE.UPGRADE;
-    selectedPerkCategory = 'creation';
-    selectedPerkType = 'physical';
-    selectedPerkUpgrade = 0;
+    selectedPerkId = null; // 선택 초기화
     return;
   }
   
@@ -5896,54 +5976,6 @@ function handleLevelUpScreenClick() {
   if (clickedOption !== -1) {
     console.log("Applying level up option:", clickedOption, levelUpOptions[clickedOption]); // 디버깅용
     applyLevelUpChoice(clickedOption);
-  }
-}
-
-// 업그레이드 화면 클릭 핸들러
-function handleUpgradeScreenClick() {
-  const startY = 140;
-  const itemHeight = 80;
-  const maxVisibleItems = 6;
-  const unlockedCount = permanentUpgrades.getUnlockedCount();
-  
-  // 업그레이드 항목 클릭 확인
-  for (let i = 0; i < Math.min(unlockedCount, maxVisibleItems); i++) {
-    const upgradeIndex = i + upgradeScrollOffset;
-    if (upgradeIndex >= unlockedCount) break;
-    
-    const y = startY + i * itemHeight;
-    const upgrade = permanentUpgrades.upgrades[upgradeIndex];
-    
-    // 구매 버튼 클릭 확인
-    if (upgrade.currentLevel < upgrade.maxLevel) {
-      const buttonX = canvas.width - 150;
-      const buttonY = y + 45;
-      const buttonWidth = 80;
-      const buttonHeight = 25;
-      
-      if (mouseX >= buttonX && mouseX <= buttonX + buttonWidth &&
-          mouseY >= buttonY && mouseY <= buttonY + buttonHeight) {
-        if (permanentUpgrades.purchaseUpgrade(upgradeIndex)) {
-          // 구매 성공 시 아무것도 하지 않음 (화면이 자동으로 업데이트됨)
-        }
-        return;
-      }
-    }
-    
-    // 항목 전체 클릭 시 선택
-    if (mouseX >= 50 && mouseX <= canvas.width - 50 &&
-        mouseY >= y && mouseY <= y + itemHeight - 5) {
-      selectedUpgradeIndex = upgradeIndex;
-      return;
-    }
-  }
-  
-  // 뒤로가기 버튼 클릭 확인
-  const backButtonY = canvas.height - 60;
-  if (mouseX >= canvas.width / 2 - 75 && mouseX <= canvas.width / 2 + 75 &&
-      mouseY >= backButtonY && mouseY <= backButtonY + 40) {
-    currentGameState = GAME_STATE.START_SCREEN;
-    return;
   }
 }
 
