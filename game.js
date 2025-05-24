@@ -584,8 +584,8 @@ class AssetManager {
       treasure: null,
       jewels: [],
       // 새로 추가
-      traitIcons: {},
-      traitBackground: null
+      perkIcons: {},
+      perkBackground: null
     };
     
     this.loaded = {
@@ -600,8 +600,8 @@ class AssetManager {
       treasure: false,
       jewels: false,
       // 새로 추가
-      traitIcons: false,
-      traitBackground: false
+      perkIcons: false,
+      perkBackground: false
     };
   }
 
@@ -766,21 +766,21 @@ class AssetManager {
     );
   }
 
-  loadTraitIcons() {
-    const traitTypes = [
+  loadPerkIcons() {
+    const perkTypes = [
       'creation_physical', 'creation_magic',
       'destruction_physical', 'destruction_magic', 
       'will_physical', 'will_magic'
     ];
     
-    this.loadImageSet('traitIcons', traitTypes, './img/traits/{item}_icon.png');
+    this.loadImageSet('perkIcons', perkTypes, './img/perks/{item}_icon.png');
   }
 
-  loadTraitBackground() {
-    this.images.traitBackground = new Image();
-    this.images.traitBackground.src = './img/traits/trait_background.png';
-    this.images.traitBackground.onload = () => {
-      this.loaded.traitBackground = true;
+  loadPerkBackground() {
+    this.images.perkBackground = new Image();
+    this.images.perkBackground.src = './img/perks/perk_background.png';
+    this.images.perkBackground.onload = () => {
+      this.loaded.perkBackground = true;
       console.log('특성 배경 이미지 로드 완료');
     };
   }
@@ -795,8 +795,8 @@ class AssetManager {
     this.loadEnemyImages();
     this.loadMiscImages();
     this.loadJewelImages();
-    this.loadTraitIcons();
-    this.loadTraitBackground();
+    this.loadPerkIcons();
+    this.loadPerkBackground();
     
     // 모든 이미지가 로드되었는지 주기적으로 확인
     const checkAllLoaded = () => {
@@ -4431,17 +4431,17 @@ function drawGameOverScreen() {
 }
 
 // 업그레이드 화면 변수들
-let selectedTraitCategory = 'creation';
-let selectedTraitType = 'physical';
-let selectedTraitUpgrade = 0;
+let selectedPerkCategory = 'creation';
+let selectedPerkType = 'physical';
+let selectedPerkUpgrade = 0;
 
 // 업그레이드 화면 그리기 함수
-function drawTraitScreen() {
+function drawPerkScreen() {
   ctx.fillStyle = 'black';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   
   // 배경 이미지 그리기
-  if (assetManager.loaded.traitBackground && assetManager.images.traitBackground) {
+  if (assetManager.loaded.perkBackground && assetManager.images.perkBackground) {
     // 배경을 화면 전체에 타일링하거나 중앙에 배치
     const bgSize = 256;
     const tilesX = Math.ceil(canvas.width / bgSize) + 1;
@@ -4451,7 +4451,7 @@ function drawTraitScreen() {
     for (let x = 0; x < tilesX; x++) {
       for (let y = 0; y < tilesY; y++) {
         ctx.drawImage(
-          assetManager.images.traitBackground,
+          assetManager.images.perkBackground,
           x * bgSize - (bgSize/2),
           y * bgSize - (bgSize/2),
           bgSize, bgSize
@@ -4488,7 +4488,7 @@ function drawTraitScreen() {
   ];
   
   categories.forEach((cat, index) => {
-    const isSelected = (cat.category === selectedTraitCategory && cat.type === selectedTraitType);
+    const isSelected = (cat.category === selectedPerkCategory && cat.type === selectedPerkType);
     
     // 아이콘 배경
     ctx.fillStyle = isSelected ? 'rgba(102, 252, 241, 0.4)' : 'rgba(69, 162, 158, 0.2)';
@@ -4501,9 +4501,9 @@ function drawTraitScreen() {
     
     // 아이콘 이미지
     const iconKey = `${cat.category}_${cat.type}`;
-    if (assetManager.loaded.traitIcons && assetManager.images.traitIcons[iconKey]) {
+    if (assetManager.loaded.perkIcons && assetManager.images.perkIcons[iconKey]) {
       ctx.drawImage(
-        assetManager.images.traitIcons[iconKey],
+        assetManager.images.perkIcons[iconKey],
         cat.x - iconSize/2 + 8,
         cat.y - iconSize/2 + 8,
         iconSize - 16, iconSize - 16
@@ -4518,8 +4518,8 @@ function drawTraitScreen() {
   });
   
   // 선택된 카테고리의 업그레이드 목록 표시
-  if (selectedTraitCategory && selectedTraitType) {
-    drawTraitUpgradeList();
+  if (selectedPerkCategory && selectedPerkType) {
+    drawPerkUpgradeList();
   }
   
   // 뒤로가기 버튼
@@ -4527,8 +4527,8 @@ function drawTraitScreen() {
   drawButton(canvas.width / 2 - 75, backButtonY, 150, 40, '뒤로가기', true);
 }
 
-function drawTraitUpgradeList() {
-  const upgrades = permanentUpgrades.getUpgradesByCategory(selectedTraitCategory, selectedTraitType);
+function drawPerkUpgradeList() {
+  const upgrades = permanentUpgrades.getUpgradesByCategory(selectedPerkCategory, selectedPerkType);
   
   if (upgrades.length === 0) return;
   
@@ -4552,7 +4552,7 @@ function drawTraitUpgradeList() {
   
   visibleUpgrades.forEach((upgrade, index) => {
     const y = listStartY + 10 + index * itemHeight;
-    const isSelected = index === selectedTraitUpgrade;
+    const isSelected = index === selectedPerkUpgrade;
     const canUpgrade = permanentUpgrades.canUpgrade(upgrade.id);
     
     // 선택된 항목 배경
@@ -4621,7 +4621,7 @@ function drawTraitUpgradeList() {
   }
 }
 
-function handleTraitScreenClick() {
+function handlePerkScreenClick() {
   // 카테고리 아이콘 클릭 확인
   const iconSize = 80;
   const spacing = 120;
@@ -4641,16 +4641,16 @@ function handleTraitScreenClick() {
   for (let cat of categories) {
     if (mouseX >= cat.x - iconSize/2 && mouseX <= cat.x + iconSize/2 &&
         mouseY >= cat.y - iconSize/2 && mouseY <= cat.y + iconSize/2) {
-      selectedTraitCategory = cat.category;
-      selectedTraitType = cat.type;
-      selectedTraitUpgrade = 0;
+      selectedPerkCategory = cat.category;
+      selectedPerkType = cat.type;
+      selectedPerkUpgrade = 0;
       return;
     }
   }
   
   // 업그레이드 목록 클릭 확인
-  if (selectedTraitCategory && selectedTraitType) {
-    const upgrades = permanentUpgrades.getUpgradesByCategory(selectedTraitCategory, selectedTraitType);
+  if (selectedPerkCategory && selectedPerkType) {
+    const upgrades = permanentUpgrades.getUpgradesByCategory(selectedPerkCategory, selectedPerkType);
     const maxVisibleItems = 5;
     const visibleUpgrades = upgrades.slice(0, maxVisibleItems);
     const listStartY = 380;
@@ -4679,7 +4679,7 @@ function handleTraitScreenClick() {
       // 항목 전체 클릭 시 선택
       if (mouseX >= listX && mouseX <= listX + listWidth &&
           mouseY >= y && mouseY <= y + itemHeight - 5) {
-        selectedTraitUpgrade = i;
+        selectedPerkUpgrade = i;
         return;
       }
     }
@@ -5709,7 +5709,7 @@ function handleMouseClick() {
       handleSettingsScreenClick();
       break;
     case GAME_STATE.UPGRADE:
-      handleTraitScreenClick();
+      handlePerkScreenClick();
       break;
     case GAME_STATE.PAUSED:
       handlePauseScreenClick();
@@ -5757,9 +5757,9 @@ function handleStartScreenClick() {
       mouseX <= canvas.width / 2 - spacing/2 &&
       mouseY >= buttonY + 60 && mouseY <= buttonY + 60 + buttonHeight) {
     currentGameState = GAME_STATE.UPGRADE;
-    selectedTraitCategory = 'creation';
-    selectedTraitType = 'physical';
-    selectedTraitUpgrade = 0;
+    selectedPerkCategory = 'creation';
+    selectedPerkType = 'physical';
+    selectedPerkUpgrade = 0;
     return;
   }
   
@@ -6063,7 +6063,7 @@ function gameLoop(timestamp) {
       }
     }
     else if (currentGameState === GAME_STATE.UPGRADE) {
-      drawTraitScreen();
+      drawPerkScreen();
     }
     else if (currentGameState === GAME_STATE.GAME_OVER) {
       drawGameOverScreen();
@@ -6130,4 +6130,3 @@ window.onload = function() {
   resizeCanvas();
   window.addEventListener('resize', resizeCanvas);
 };
-
