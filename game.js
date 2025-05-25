@@ -327,6 +327,333 @@ const permanentUpgrades = {
   }
 };
 
+const ARTIFACT_REGISTRY = [
+  // 기존 아티팩트들
+  {
+    id: 1,
+    name: '이상한 나라의 앨리스 증후군',
+    description: '크기 25% 감소',
+    rarity: 'rare',
+    effects: [
+      { type: 'reducePlayerSize', value: 0.25 }
+    ]
+  },
+  {
+    id: 2,
+    name: '숫돌',
+    description: '공격력 50% 증가',
+    rarity: 'epic',
+    effects: [
+      { type: 'increaseAttackPower', value: 0.5 }
+    ]
+  },
+  {
+    id: 3,
+    name: '전쟁깃발',
+    description: '쿨타임 50% 감소',
+    rarity: 'epic',
+    effects: [
+      { type: 'increaseCooldownReduction', value: 0.5 }
+    ]
+  },
+  {
+    id: 4,
+    name: '헤르메스의 신발',
+    description: '이동속도 50% 증가',
+    rarity: 'epic',
+    effects: [
+      { type: 'increaseMoveSpeed', value: 0.5 }
+    ]
+  },
+  {
+    id: 5,
+    name: '헬렌 세포',
+    description: '초당 체력 2% 회복',
+    rarity: 'legendary',
+    effects: [
+      { type: 'enableHealthRegen', value: 0.02 }
+    ]
+  },
+  {
+    id: 6,
+    name: '성스러운 보주',
+    description: '적 이동속도 50% 감소',
+    rarity: 'epic',
+    effects: [
+      { type: 'reduceEnemySpeed', value: 0.5 }
+    ]
+  },
+  {
+    id: 7,
+    name: '안드로메다 역병',
+    description: '적 체력 25% 감소',
+    rarity: 'epic',
+    effects: [
+      { type: 'reduceEnemyHealth', value: 0.25 }
+    ]
+  },
+
+  // 새로 추가되는 아티팩트들
+  {
+    id: 8,
+    name: '불렛 타임',
+    description: '적 투사체 속도 70% 감소',
+    rarity: 'legendary',
+    effects: [
+      { type: 'reduceEnemyProjectileSpeed', value: 0.7 }
+    ]
+  },
+  {
+    id: 9,
+    name: '망토와 단검',
+    description: '회피율 15% 증가',
+    rarity: 'rare',
+    effects: [
+      { type: 'increaseDodgeRate', value: 0.15 }
+    ]
+  },
+  {
+    id: 10,
+    name: '오늘의 운세 (대길)',
+    description: '행운 25% 증가',
+    rarity: 'epic',
+    effects: [
+      { type: 'increaseLuck', value: 0.25 }
+    ]
+  },
+  {
+    id: 11,
+    name: '네잎클로버',
+    description: '행운 20% 증가',
+    rarity: 'rare',
+    effects: [
+      { type: 'increaseLuck', value: 0.20 }
+    ]
+  },
+  {
+    id: 12,
+    name: '뒤집어진 종이상자',
+    description: '회피율 10% 증가',
+    rarity: 'common',
+    effects: [
+      { type: 'increaseDodgeRate', value: 0.10 }
+    ]
+  },
+  {
+    id: 13,
+    name: '통나무',
+    description: '회피율 8% 증가',
+    rarity: 'common',
+    effects: [
+      { type: 'increaseDodgeRate', value: 0.08 }
+    ]
+  },
+  {
+    id: 14,
+    name: '밀랍칠한 날개',
+    description: '이동속도 30% 증가',
+    rarity: 'rare',
+    effects: [
+      { type: 'increaseMoveSpeed', value: 0.3 }
+    ]
+  },
+  {
+    id: 15,
+    name: 'BFG 크고 멋진 총',
+    description: '공격력 40% 증가',
+    rarity: 'epic',
+    effects: [
+      { type: 'increaseAttackPower', value: 0.4 }
+    ]
+  },
+  {
+    id: 16,
+    name: '학습장치',
+    description: '경험치 획득량 30% 증가',
+    rarity: 'rare',
+    effects: [
+      { type: 'increaseExpMultiplier', value: 0.3 }
+    ]
+  },
+  {
+    id: 17,
+    name: '콧수염',
+    description: '공격력 25% 증가',
+    rarity: 'rare',
+    effects: [
+      { type: 'increaseAttackPower', value: 0.25 }
+    ]
+  },
+  {
+    id: 18,
+    name: '현상수배지',
+    description: '보스에게 공격력 100% 증가',
+    rarity: 'legendary',
+    effects: [
+      { 
+        type: 'increaseBossDamage', 
+        value: 1.0,
+        condition: 'isBoss' // 조건부 효과
+      }
+    ]
+  },
+  {
+    id: 19,
+    name: '망자의 속옷',
+    description: '회피율 12% 증가',
+    rarity: 'rare',
+    effects: [
+      { type: 'increaseDodgeRate', value: 0.12 }
+    ]
+  },
+  {
+    id: 20,
+    name: '브로콜리',
+    description: '최대 체력 50 증가',
+    rarity: 'common',
+    effects: [
+      { type: 'increaseMaxHealth', value: 50 }
+    ]
+  },
+  {
+    id: 21,
+    name: '스파이스 멜란지',
+    description: '최대 체력 30% 감소, 쿨타임 40% 감소',
+    rarity: 'legendary',
+    effects: [
+      { type: 'decreaseMaxHealth', value: 0.3 }, // 부정적 효과
+      { type: 'increaseCooldownReduction', value: 0.4 } // 긍정적 효과
+    ]
+  },
+  {
+    id: 22,
+    name: '페르소나',
+    description: '공격력 30% 증가, 쿨타임 25% 감소',
+    rarity: 'legendary',
+    effects: [
+      { type: 'increaseAttackPower', value: 0.3 },
+      { type: 'increaseCooldownReduction', value: 0.25 }
+    ]
+  }
+];
+
+// 아티팩트 효과 시스템
+const ArtifactEffectManager = {
+  // 플레이어에게 적용된 아티팩트 효과들
+  activeEffects: {
+    enemyProjectileSpeedReduction: 0,
+    bossDamageMultiplier: 0,
+    // 기존 효과들도 여기서 관리할 수 있음
+  },
+
+  // 효과 적용
+  applyEffect(effect) {
+    switch(effect.type) {
+      case 'reducePlayerSize':
+        player.size *= (1 - effect.value);
+        break;
+        
+      case 'increaseAttackPower':
+        player.levelAttackBonus += effect.value;
+        break;
+        
+      case 'increaseCooldownReduction':
+        player.levelCooldownBonus += effect.value;
+        // 모든 무기의 쿨다운 업데이트
+        player.weapons.forEach(weapon => {
+          weapon.updateCooldown(player.getTotalCooldownReduction());
+        });
+        break;
+        
+      case 'increaseMoveSpeed':
+        player.levelMoveSpeedBonus += player.baseMoveSpeed * effect.value;
+        break;
+        
+      case 'enableHealthRegen':
+        player.levelHealthRegenBonus += effect.value;
+        break;
+        
+      case 'reduceEnemySpeed':
+        player.enemySpeedReduction = Math.min(player.enemySpeedReduction + effect.value, 0.9);
+        break;
+        
+      case 'reduceEnemyHealth':
+        player.enemyHealthReduction = Math.min(player.enemyHealthReduction + effect.value, 0.9);
+        break;
+        
+      // 새로운 효과들
+      case 'reduceEnemyProjectileSpeed':
+        this.activeEffects.enemyProjectileSpeedReduction = Math.min(
+          this.activeEffects.enemyProjectileSpeedReduction + effect.value, 0.9
+        );
+        break;
+        
+      case 'increaseDodgeRate':
+        player.levelDodgeRateBonus += effect.value;
+        break;
+        
+      case 'increaseLuck':
+        player.levelLuckBonus += effect.value;
+        break;
+        
+      case 'increaseExpMultiplier':
+        player.levelExpMultiplierBonus += effect.value;
+        break;
+        
+      case 'increaseBossDamage':
+        this.activeEffects.bossDamageMultiplier += effect.value;
+        break;
+        
+      case 'increaseMaxHealth':
+        player.levelMaxHealthBonus += effect.value;
+        const oldMaxHealth = player.maxHealth;
+        player.maxHealth = player.getTotalMaxHealth();
+        player.health += (player.maxHealth - oldMaxHealth); // 체력 회복
+        break;
+        
+      case 'decreaseMaxHealth':
+        const healthReduction = player.getTotalMaxHealth() * effect.value;
+        player.levelMaxHealthBonus -= healthReduction;
+        player.maxHealth = player.getTotalMaxHealth();
+        player.health = Math.min(player.health, player.maxHealth); // 현재 체력 조정
+        break;
+        
+      default:
+        console.warn(`알 수 없는 아티팩트 효과: ${effect.type}`);
+        break;
+    }
+  },
+
+  // 조건부 효과 확인
+  checkCondition(effect, context = {}) {
+    if (!effect.condition) return true;
+    
+    switch(effect.condition) {
+      case 'isBoss':
+        return context.isBoss || false;
+      default:
+        return true;
+    }
+  },
+
+  // 데미지 계산 시 아티팩트 효과 적용
+  getModifiedDamage(baseDamage, target = {}) {
+    let finalDamage = baseDamage;
+    
+    // 보스 대상 데미지 증가
+    if (target.isBoss && this.activeEffects.bossDamageMultiplier > 0) {
+      finalDamage *= (1 + this.activeEffects.bossDamageMultiplier);
+    }
+    
+    return finalDamage;
+  },
+
+  // 적 투사체 속도 조정
+  getModifiedEnemyProjectileSpeed(baseSpeed) {
+    return baseSpeed * (1 - this.activeEffects.enemyProjectileSpeedReduction);
+  }
+};
+
 // Game objects
 const gameObjects = {
   chunks: {}, 
@@ -501,6 +828,17 @@ const userProfileSystem = {
     
     this.currentUser = cleanUsername;
     this.saveCurrentUser();
+    
+    // 새 사용자는 골드 0으로 시작
+    gold = 0;
+    saveGold();
+    
+    // 업그레이드도 초기화
+    permanentUpgrades.upgrades.forEach(upgrade => {
+      upgrade.currentLevel = 0;
+    });
+    permanentUpgrades.saveUpgrades();
+    
     return true;
   },
   
@@ -514,6 +852,13 @@ const userProfileSystem = {
     if (this.users.includes(username)) {
       this.currentUser = username;
       this.saveCurrentUser();
+      
+      // 선택한 사용자의 골드 로드
+      gold = loadGold();
+      
+      // 선택한 사용자의 업그레이드도 로드
+      permanentUpgrades.loadUpgrades();
+      
       return true;
     }
     return false;
@@ -558,7 +903,7 @@ const userProfileSystem = {
 };
 
 // 적 관련 상수
-const MAX_ENEMIES = 100;
+const MAX_ENEMIES = 360;
 const MIN_SPAWN_DISTANCE = 150;
 const MAX_SPAWN_DISTANCE = 450;
 const ENEMY_SPAWN_INTERVAL = 500;
@@ -1113,7 +1458,9 @@ class Bullet {
     // 적과 충돌 체크
     for (let enemy of gameObjects.enemies) {
       if (enemy.state === 'moving' && detectCollision(this, enemy)) {
-        enemy.takeDamage(this.damage);
+        // 아티팩트 효과가 적용된 데미지 계산
+        const finalDamage = ArtifactEffectManager.getModifiedDamage(this.damage, enemy);
+        enemy.takeDamage(finalDamage);
         this.used = true;
       }
     }
@@ -1895,7 +2242,7 @@ class FistWeapon extends MeleeWeapon {
   fire() {
     // 범위 내에서 가장 가까운 적 찾기
     let nearestEnemy = null;
-    let minDistance = this.range; // 공격 범위 특성이 적용된 범위 사용
+    let minDistance = this.range;
     
     for (let enemy of gameObjects.enemies) {
       if (enemy.state !== 'moving') continue;
@@ -1912,8 +2259,13 @@ class FistWeapon extends MeleeWeapon {
     
     // 적이 있으면 공격
     if (nearestEnemy) {
-      // 적에게 데미지 적용 (공격력 특성 적용)
-      nearestEnemy.takeDamage(this.damage * player.getTotalMeleeAttackPower());
+      // 기본 데미지 계산
+      const baseDamage = this.damage * player.getTotalMeleeAttackPower();
+      
+      // 아티팩트 효과가 적용된 최종 데미지
+      const finalDamage = ArtifactEffectManager.getModifiedDamage(baseDamage, nearestEnemy);
+      
+      nearestEnemy.takeDamage(finalDamage);
       
       // 적 방향 계산
       const dx = nearestEnemy.x - player.x;
@@ -3063,8 +3415,10 @@ class BossEnemy extends Enemy {
 // 적이 발사하는 총알 클래스
 class EnemyBullet extends Bullet {
   constructor(x, y, size, speed, angle, damage) {
-    super(x, y, size * 2, speed, angle, damage);
-    this.fromEnemy = true; // 적의 총알 표시
+    // 아티팩트 효과가 적용된 속도 사용
+    const modifiedSpeed = ArtifactEffectManager.getModifiedEnemyProjectileSpeed(speed);
+    super(x, y, size * 2, modifiedSpeed, angle, damage);
+    this.fromEnemy = true;
   }
   
   update() {
@@ -3088,13 +3442,12 @@ class EnemyBullet extends Bullet {
   
   draw(offsetX, offsetY) {
     if (assetManager.loaded.enemies && assetManager.images.enemies.bullet) {
-      const drawSize = this.size * 3; // 크기 조정
+      const drawSize = this.size * 3;
       
       ctx.save();
       ctx.translate(this.x + offsetX, this.y + offsetY);
-      ctx.rotate(this.angle); // 탄환 이동 방향으로 회전
+      ctx.rotate(this.angle);
       
-      // 탄환 이미지 그리기
       ctx.drawImage(
         assetManager.images.enemies.bullet,
         -drawSize / 2,
@@ -3396,7 +3749,7 @@ function generateLevelUpOptions() {
       weaponUpgrades.push({
         type: 'weaponUpgrade',
         weaponType: weapon.type,
-        name: `${weaponName} 업그레이드`,
+        name: `${weaponName}`,
         description: `레벨 ${weapon.level} → ${weapon.level + 1}`,
         weapon: weapon
       });
@@ -3436,18 +3789,8 @@ function getWeaponDisplayName(weaponType) {
 
 // 아티팩트 옵션 생성
 function generateArtifactOptions() {
-  const allArtifacts = [
-    { id: 1, name: '작은 체구', description: '크기 25% 감소', effect: 'reducePlayerSize' },
-    { id: 2, name: '강력한 공격', description: '공격력 50% 증가', effect: 'increaseAttackPower' },
-    { id: 3, name: '빠른 손놀림', description: '쿨타임 50% 감소', effect: 'increaseCooldownReduction' },
-    { id: 4, name: '신속한 발걸음', description: '이동속도 50% 증가', effect: 'increaseMoveSpeed' },
-    { id: 5, name: '생명의 샘', description: '초당 체력 2% 회복', effect: 'enableHealthRegen' },
-    { id: 6, name: '적 둔화', description: '적 이동속도 50% 감소', effect: 'reduceEnemySpeed' },
-    { id: 7, name: '약화된 적', description: '적 체력 25% 감소', effect: 'reduceEnemyHealth' }
-  ];
-  
   // 이미 획득한 아티팩트 제외
-  const availableArtifacts = allArtifacts.filter(artifact => 
+  const availableArtifacts = ARTIFACT_REGISTRY.filter(artifact => 
     !player.acquiredArtifacts.includes(artifact.id));
   
   levelUpOptions = [];
@@ -3465,40 +3808,87 @@ function generateArtifactOptions() {
       });
     }
   } else {
-    // 랜덤하게 아티팩트 선택
-    const shuffled = [...availableArtifacts].sort(() => Math.random() - 0.5);
-    const artifactCount = Math.min(4, availableArtifacts.length);
+    // 희귀도별 가중치 시스템
+    const rarityWeights = {
+      'common': 50,
+      'rare': 25,
+      'epic': 15,
+      'legendary': 10
+    };
     
-    // 선택 가능한 아티팩트 추가
-    for (let i = 0; i < artifactCount; i++) {
-      const artifact = shuffled[i];
+    // 행운에 따른 희귀도 조정
+    const luckBonus = player.getTotalLuck();
+    rarityWeights.rare += luckBonus * 10;
+    rarityWeights.epic += luckBonus * 8;
+    rarityWeights.legendary += luckBonus * 5;
+    
+    // 가중치 기반 아티팩트 선택
+    const selectedArtifacts = selectArtifactsByWeight(availableArtifacts, rarityWeights, 4);
+    
+    // 선택된 아티팩트를 옵션으로 변환
+    selectedArtifacts.forEach(artifact => {
       levelUpOptions.push({
-        type: artifact.effect,
+        type: 'artifact',
         name: artifact.name,
         description: artifact.description,
-        artifactId: artifact.id
+        artifactId: artifact.id,
+        rarity: artifact.rarity,
+        effects: artifact.effects
       });
-    }
+    });
     
     // 부족한 선택지를 경험치 획득 옵션으로 채우기
-    const remainingSlots = 4 - artifactCount;
-    if (remainingSlots > 0) {
-      for (let i = 0; i < remainingSlots; i++) {
-        const xpGain = Math.floor((player.nextLevelExp) * 0.3);
-        levelUpOptions.push({
-          type: 'expGain',
-          name: '경험치 획득',
-          description: `${xpGain} 경험치 획득 (30%)`,
-          value: xpGain,
-          artifactId: 0
-        });
-      }
+    const remainingSlots = 4 - selectedArtifacts.length;
+    for (let i = 0; i < remainingSlots; i++) {
+      const xpGain = Math.floor((player.nextLevelExp) * 0.3);
+      levelUpOptions.push({
+        type: 'expGain',
+        name: '경험치 획득',
+        description: `${xpGain} 경험치 획득 (30%)`,
+        value: xpGain,
+        artifactId: 0
+      });
     }
   }
   
-  hoveredLevelUpOption = -1; // 초기에는 선택된 옵션 없음
+  hoveredLevelUpOption = -1;
   isArtifactSelection = true;
 }
+
+// 가중치 기반 아티팩트 선택 함수
+function selectArtifactsByWeight(artifacts, rarityWeights, count) {
+  const selected = [];
+  const remaining = [...artifacts];
+  
+  for (let i = 0; i < count && remaining.length > 0; i++) {
+    // 총 가중치 계산
+    const totalWeight = remaining.reduce((sum, artifact) => {
+      return sum + (rarityWeights[artifact.rarity] || 1);
+    }, 0);
+    
+    // 랜덤 선택
+    let randomWeight = Math.random() * totalWeight;
+    let selectedIndex = -1;
+    
+    for (let j = 0; j < remaining.length; j++) {
+      const weight = rarityWeights[remaining[j].rarity] || 1;
+      randomWeight -= weight;
+      if (randomWeight <= 0) {
+        selectedIndex = j;
+        break;
+      }
+    }
+    
+    if (selectedIndex !== -1) {
+      selected.push(remaining[selectedIndex]);
+      remaining.splice(selectedIndex, 1);
+    }
+  }
+  
+  return selected;
+}
+
+
 
 // 레벨업 선택 적용
 function applyLevelUpChoice(optionIndex) {
@@ -3519,113 +3909,68 @@ function applyLevelUpChoice(optionIndex) {
     if (weapon && weapon.upgrade()) {
       console.log(`${weapon.type} 무기가 레벨 ${weapon.level}로 업그레이드되었습니다.`);
     }
+  } else if (option.type === 'artifact') {
+    // 새로운 아티팩트 시스템 사용
+    console.log(`아티팩트 획득: ${option.name}`);
+    
+    // 효과 적용
+    option.effects.forEach(effect => {
+      ArtifactEffectManager.applyEffect(effect);
+    });
+    
+    // 획득한 아티팩트 목록에 추가
+    if (option.artifactId && option.artifactId !== 0) {
+      player.acquiredArtifacts.push(option.artifactId);
+    }
+    
+    isArtifactSelection = false;
+  } else if (option.type === 'expGain') {
+    player.exp += option.value;
+    currentGameState = GAME_STATE.PLAYING;
+    totalPausedTime += gameTimeSystem.getTime() - pauseStartTime;
+    checkLevelUp();
+    return;
   } else {
-    if (isArtifactSelection) {
-      // 아티팩트 효과 적용 (기존과 동일)
-      switch(option.type) {
-        case 'reducePlayerSize':
-          player.size *= 0.75;
-          break;
-        case 'increaseAttackPower':
-          player.levelAttackBonus += 0.5; // 50% 증가
-          break;
-        case 'increaseCooldownReduction':
-          player.levelCooldownBonus += 0.3; // 30% 감소
-          // 모든 무기의 쿨다운 업데이트
-          player.weapons.forEach(weapon => {
-            weapon.updateCooldown(player.getTotalCooldownReduction());
-          });
-          break;
-        case 'increaseMoveSpeed':
-          player.levelMoveSpeedBonus += player.baseMoveSpeed * 0.5; // 50% 증가
-          break;
-        case 'enableHealthRegen':
-          player.levelHealthRegenBonus += 0.02; // 2% 회복
-          break;
-        case 'reduceEnemySpeed':
-          player.enemySpeedReduction = 0.5;
-          break;
-        case 'reduceEnemyHealth':
-          player.enemyHealthReduction = 0.25;
-          break;
-        case 'expGain':
-          player.exp += option.value;
-          currentGameState = GAME_STATE.PLAYING;
-          totalPausedTime += gameTimeSystem.getTime() - pauseStartTime;
-          checkLevelUp();
-          return;
-      }
-      
-      if (option.artifactId && option.artifactId !== 0) {
-        player.acquiredArtifacts.push(option.artifactId);
-      }
-      
-      isArtifactSelection = false;
-    } else {
-      // 일반 레벨업 옵션 적용
-      switch(option.type) {
-        case 'attackPower':
-          player.levelAttackBonus += option.value;
-          console.log(`공격력이 ${option.value * 100}% 증가했습니다. 현재: ${Math.round(player.getTotalAttackPower() * 100)}%`);
-          break;
-          
-        case 'maxHealth':
-          player.levelMaxHealthBonus += option.value;
-          const oldMaxHealth = player.maxHealth;
-          player.maxHealth = player.getTotalMaxHealth();
-          player.health += (player.maxHealth - oldMaxHealth); // 체력 회복
-          console.log(`최대 체력이 ${option.value} 증가했습니다. 현재: ${player.maxHealth}`);
-          break;
-          
-        case 'cooldownReduction':
-          player.levelCooldownBonus += option.value;
-          // 모든 무기의 쿨다운 업데이트
-          player.weapons.forEach(weapon => {
-            weapon.updateCooldown(player.getTotalCooldownReduction());
-          });
-          console.log(`쿨타임이 ${option.value * 100}% 감소했습니다. 현재: ${Math.round(player.getTotalCooldownReduction() * 100)}%`);
-          break;
-          
-        case 'moveSpeed':
-          player.levelMoveSpeedBonus += option.value;
-          console.log(`이동속도가 ${option.value} 증가했습니다. 현재: ${player.getTotalMoveSpeed()}`);
-          break;
-          
-        case 'attackRange':
-          player.levelAttackRangeBonus += option.value;
-          // 모든 무기의 범위 업데이트
-          player.weapons.forEach(weapon => {
-            if (weapon.updateRange) {
-              weapon.updateRange();
-            }
-          });
-          console.log(`공격 범위가 ${option.value * 100}% 증가했습니다. 현재: ${Math.round(player.getTotalAttackRange() * 100)}%`);
-          break;
-          
-        case 'pickupRadius':
-          player.levelPickupRadiusBonus += option.value;
-          console.log(`아이템 획득 범위가 ${option.value} 증가했습니다. 현재: ${player.getTotalPickupRadius()}`);
-          break;
-          
-        case 'dodgeRate':
-          player.levelDodgeRateBonus += option.value;
-          console.log(`회피율이 ${option.value * 100}% 증가했습니다. 현재: ${Math.round(player.getTotalDodgeRate() * 100)}%`);
-          break;
-          
-        case 'luck':
-          player.levelLuckBonus += option.value;
-          console.log(`행운이 ${option.value * 100}% 증가했습니다. 현재: ${Math.round(player.getTotalLuck() * 100)}%`);
-          break;
-          
-        case 'expMultiplier':
-          player.levelExpMultiplierBonus += option.value;
-          console.log(`경험치 획득률이 ${option.value * 100}% 증가했습니다. 현재: ${Math.round(player.getTotalExpMultiplier() * 100)}%`);
-          break;
-          
-        default:
-          console.log("알 수 없는 옵션 타입:", option.type);
-          break;
-      }
+    // 일반 레벨업 옵션
+    switch(option.type) {
+      case 'attackPower':
+        player.levelAttackBonus += option.value;
+        break;
+      case 'maxHealth':
+        player.levelMaxHealthBonus += option.value;
+        const oldMaxHealth = player.maxHealth;
+        player.maxHealth = player.getTotalMaxHealth();
+        player.health += (player.maxHealth - oldMaxHealth);
+        break;
+      case 'cooldownReduction':
+        player.levelCooldownBonus += option.value;
+        player.weapons.forEach(weapon => {
+          weapon.updateCooldown(player.getTotalCooldownReduction());
+        });
+        break;
+      case 'moveSpeed':
+        player.levelMoveSpeedBonus += option.value;
+        break;
+      case 'attackRange':
+        player.levelAttackRangeBonus += option.value;
+        player.weapons.forEach(weapon => {
+          if (weapon.updateRange) {
+            weapon.updateRange();
+          }
+        });
+        break;
+      case 'pickupRadius':
+        player.levelPickupRadiusBonus += option.value;
+        break;
+      case 'dodgeRate':
+        player.levelDodgeRateBonus += option.value;
+        break;
+      case 'luck':
+        player.levelLuckBonus += option.value;
+        break;
+      case 'expMultiplier':
+        player.levelExpMultiplierBonus += option.value;
+        break;
     }
   }
   
@@ -4125,9 +4470,9 @@ function drawProfileSelectScreen() {
     ctx.fillStyle = '#FFFF00';
     ctx.fillText(`현재 사용자: ${userProfileSystem.currentUser}`, canvas.width / 2, 170);
     
-    // 골드 표시
+    // 골드 표시 - 현재 gold 변수 값 사용
     ctx.fillStyle = '#66fcf1';
-    ctx.fillText(`보유 골드: ${loadGold()}`, canvas.width / 2, 200);
+    ctx.fillText(`보유 골드: ${gold}`, canvas.width / 2, 200);
   }
   
   // 왼쪽: 사용자 목록 박스
@@ -4266,6 +4611,10 @@ function handleProfileSelectClick() {
   if (userProfileSystem.hasCurrentUser()) {
     if (mouseX >= buttonAreaX && mouseX <= buttonAreaX + buttonWidth &&
         mouseY >= currentButtonY && mouseY <= currentButtonY + buttonHeight) {
+      // 골드와 업그레이드 다시 로드 (확실히 하기 위해)
+      gold = loadGold();
+      permanentUpgrades.loadUpgrades();
+      
       // 사용자가 선택되면 시작 화면으로 전환
       currentGameState = GAME_STATE.START_SCREEN;
       return;
