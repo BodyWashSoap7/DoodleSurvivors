@@ -3864,146 +3864,142 @@ function checkLevelUp() {
 function generateLevelUpOptions() {
   isArtifactSelection = false;
   
-  const allUpgrades = [
+  // 일반 특성 업그레이드 옵션들
+  const statUpgrades = [
     { 
       type: 'attackPower', 
       name: '공격력 증가', 
       value: 0.2, 
       description: '공격력 +20%',
-      flavorText: '공격력이 증가한다.'
+      flavorText: 'dd..'
     },
     { 
       type: 'cooldownReduction', 
       name: '쿨타임 감소', 
       value: 0.1, 
       description: '쿨타임 -10%',
-      flavorText: '쿨타임이 감소한다.'
+      flavorText: 'dd..'
     },
     { 
       type: 'maxHealth', 
       name: '최대 체력 증가', 
       value: 20, 
       description: '최대 체력 +20',
-      flavorText: '최대 체력이 증가한다.'
+      flavorText: 'dd..'
     },
     { 
       type: 'moveSpeed', 
       name: '이동속도 증가', 
       value: 0.3, 
       description: '이동속도 +0.3',
-      flavorText: '이속이 증가한다.'
+      flavorText: 'dd..'
     },
     { 
       type: 'attackRange', 
       name: '공격 범위 증가', 
       value: 0.15, 
       description: '공격 범위 +15%',
-      flavorText: '공격범위가 증가한다.'
+      flavorText: 'dd..'
     },
     { 
       type: 'pickupRadius', 
       name: '아이템 획득 반경', 
       value: 20, 
       description: '아이템 획득 범위 +20',
-      flavorText: '획득반경이 늘어난다.'
+      flavorText: 'dd..'
     },
     { 
       type: 'dodgeRate', 
       name: '회피율 증가', 
       value: 0.05, 
       description: '회피율 +5%',
-      flavorText: '회피율이 증가한다.'
+      flavorText: 'dd..'
     },
     { 
       type: 'luck', 
       name: '행운 증가', 
       value: 0.1, 
       description: '행운 +10%',
-      flavorText: '행운이 증가한다.'
+      flavorText: 'dd..'
     },
     { 
       type: 'expMultiplier', 
       name: '경험치 획득률', 
       value: 0.1, 
       description: '경험치 획득량 +10%',
-      flavorText: '경험치 획득률이 증가한다.'
+      flavorText: 'dd..'
     },
   ];
   
-  // 행운에 따른 4번째 선택지 확률 계산
-  const baseLevelUpOptions = 3;
-  const fourthOptionChance = Math.min(player.luck * 0.5, 0.8); // 최대 80% 확률
-  const shouldShowFourthOption = Math.random() < fourthOptionChance;
-  const optionCount = shouldShowFourthOption ? 4 : 3;
-  
-  // 무기 옵션들 추가
-  const weaponUpgrades = [
+  // 새로운 무기 옵션들
+  const newWeaponOptions = [
     { 
       type: 'weapon', 
       weaponType: 'basic', 
       name: '기본 무기', 
       description: '기본 투사체 공격',
-      flavorText: '기본 공격이다.'
+      flavorText: 'dd..'
     },
     { 
       type: 'weapon', 
       weaponType: 'orbit', 
       name: '회전 구체', 
       description: '플레이어 주변을 회전하며 공격',
-      flavorText: '회전하며 공격한다.'
+      flavorText: 'dd..'
     },
     { 
       type: 'weapon', 
       weaponType: 'flame', 
       name: '화염방사기', 
       description: '넓은 범위의 지속 데미지',
-      flavorText: '불꽃을 발사한다.'
+      flavorText: 'dd..'
     },
     { 
       type: 'weapon', 
       weaponType: 'lightning', 
       name: '번개 사슬', 
       description: '적들 사이를 튀는 번개',
-      flavorText: '번개를 발사한다.'
+      flavorText: 'dd..'
     },
     { 
       type: 'weapon', 
       weaponType: 'fist', 
       name: '주먹', 
       description: '빠른 단일 대상 근접 공격',
-      flavorText: '주먹을 뻗는다.'
+      flavorText: 'dd..'
     },
     { 
       type: 'weapon', 
       weaponType: 'sword', 
       name: '검', 
       description: '부채꼴 범위 근접 공격',
-      flavorText: '검을 휘두른다.'
+      flavorText: 'dd..'
     },
     { 
       type: 'weapon', 
       weaponType: 'spear', 
       name: '창', 
       description: '긴 사거리 관통 공격',
-      flavorText: '창을 찌른다.'
+      flavorText: 'dd..'
     },
   ];
-  
-  // 기존 무기 업그레이드 옵션 추가
+
+  // 기존 무기 업그레이드 옵션들
+  const weaponUpgradeOptions = [];
+  const weaponFlavorTexts = {
+    'basic': 'dd.',
+    'orbit': 'dd.',
+    'flame': 'dd.',
+    'lightning': 'dd.',
+    'fist': 'dd.',
+    'sword': 'dd.',
+    'spear': 'dd.'
+  };
+
   for (let weapon of player.weapons) {
     if (!weapon.isMaxLevel()) {
       const weaponName = getWeaponDisplayName(weapon.type);
-      const weaponFlavorTexts = {
-        'basic': '기본 공격이 강해진다.',
-        'orbit': '회전 공격이 강해진다.',
-        'flame': '불꽃이 강력해진다.',
-        'lightning': '번개가 강력해진다.',
-        'fist': '권법을 연마한다.',
-        'sword': '검술을 연마한다.',
-        'spear': '창술을 연마한다.'
-      };
-      
-      weaponUpgrades.push({
+      weaponUpgradeOptions.push({
         type: 'weaponUpgrade',
         weaponType: weapon.type,
         name: `${weaponName} 업그레이드`,
@@ -4013,21 +4009,96 @@ function generateLevelUpOptions() {
       });
     }
   }
-  
-  // 새로운 무기 옵션 추가
+
+  // 사용 가능한 새 무기들 필터링 (이미 보유하지 않은 무기들)
   const playerWeaponTypes = player.weapons.map(w => w.type);
-  for (let weaponUpgrade of weaponUpgrades) {
-    if (weaponUpgrade.type === 'weapon' && !playerWeaponTypes.includes(weaponUpgrade.weaponType)) {
-      allUpgrades.push(weaponUpgrade);
-    } else if (weaponUpgrade.type === 'weaponUpgrade') {
-      allUpgrades.push(weaponUpgrade);
+  const availableNewWeapons = newWeaponOptions.filter(weapon => 
+    !playerWeaponTypes.includes(weapon.weaponType)
+  );
+
+  // 모든 무기 옵션 합치기 (새 무기 + 무기 업그레이드)
+  const allWeaponOptions = [...availableNewWeapons, ...weaponUpgradeOptions];
+
+  // 행운에 따른 4번째 선택지 확률 계산
+  const baseLevelUpOptions = 3;
+  const fourthOptionChance = Math.min(player.getTotalLuck() * 0.5, 1.0); // 최대 100% 확률
+  const shouldShowFourthOption = Math.random() < fourthOptionChance;
+  const optionCount = shouldShowFourthOption ? 4 : 3;
+
+  // 레벨업 옵션 생성 (확률 기반)
+  levelUpOptions = [];
+  
+  for (let i = 0; i < optionCount; i++) {
+    let selectedOption = null;
+    
+    // 60% 확률로 무기, 40% 확률로 특성
+    if (Math.random() < 0.6 && allWeaponOptions.length > 0) {
+      // 무기 선택 (이미 선택된 무기는 제외)
+      const availableWeapons = allWeaponOptions.filter(weapon => 
+        !levelUpOptions.some(option => 
+          (option.type === 'weapon' && option.weaponType === weapon.weaponType) ||
+          (option.type === 'weaponUpgrade' && option.weaponType === weapon.weaponType)
+        )
+      );
+      
+      if (availableWeapons.length > 0) {
+        selectedOption = availableWeapons[Math.floor(Math.random() * availableWeapons.length)];
+      }
+    }
+    
+    // 무기를 선택하지 못했거나 특성을 선택해야 하는 경우
+    if (!selectedOption) {
+      // 특성 선택 (이미 선택된 특성은 제외)
+      const availableStats = statUpgrades.filter(stat => 
+        !levelUpOptions.some(option => option.type === stat.type)
+      );
+      
+      if (availableStats.length > 0) {
+        selectedOption = availableStats[Math.floor(Math.random() * availableStats.length)];
+      } else if (allWeaponOptions.length > 0) {
+        // 특성이 모두 선택되었으면 무기에서 선택
+        const availableWeapons = allWeaponOptions.filter(weapon => 
+          !levelUpOptions.some(option => 
+            (option.type === 'weapon' && option.weaponType === weapon.weaponType) ||
+            (option.type === 'weaponUpgrade' && option.weaponType === weapon.weaponType)
+          )
+        );
+        
+        if (availableWeapons.length > 0) {
+          selectedOption = availableWeapons[Math.floor(Math.random() * availableWeapons.length)];
+        }
+      }
+    }
+    
+    // 선택된 옵션이 있으면 추가
+    if (selectedOption) {
+      levelUpOptions.push(selectedOption);
+    }
+  }
+
+  // 옵션이 부족한 경우 나머지 슬롯을 채우기
+  while (levelUpOptions.length < optionCount) {
+    // 남은 특성이나 무기 중에서 선택
+    const remainingStats = statUpgrades.filter(stat => 
+      !levelUpOptions.some(option => option.type === stat.type)
+    );
+    const remainingWeapons = allWeaponOptions.filter(weapon => 
+      !levelUpOptions.some(option => 
+        (option.type === 'weapon' && option.weaponType === weapon.weaponType) ||
+        (option.type === 'weaponUpgrade' && option.weaponType === weapon.weaponType)
+      )
+    );
+    
+    const allRemaining = [...remainingStats, ...remainingWeapons];
+    
+    if (allRemaining.length > 0) {
+      const randomOption = allRemaining[Math.floor(Math.random() * allRemaining.length)];
+      levelUpOptions.push(randomOption);
+    } else {
+      break; // 더 이상 선택할 옵션이 없음
     }
   }
   
-  // 랜덤하게 선택지 생성
-  levelUpOptions = [];
-  const shuffled = [...allUpgrades].sort(() => Math.random() - 0.5);
-  levelUpOptions = shuffled.slice(0, optionCount);
   hoveredLevelUpOption = -1;
 }
 
@@ -4052,10 +4123,16 @@ function generateArtifactOptions() {
   // 이미 획득한 아티팩트 제외
   const excludeIds = player.acquiredArtifacts || [];
   
-  // 아티팩트 시스템에서 4개 선택
-  const selectedArtifacts = artifactSystem.selectRandomArtifacts(4, excludeIds);
+  // 행운에 따른 4번째 선택지 확률 계산 (레벨업과 동일한 로직)
+  const baseLevelUpOptions = 3;
+  const fourthOptionChance = Math.min(player.getTotalLuck() * 0.5, 1.0); // 최대 100% 확률
+  const shouldShowFourthOption = Math.random() < fourthOptionChance;
+  const optionCount = shouldShowFourthOption ? 4 : 3;
   
-  // 레벨업 옵션으로 변환
+  // 아티팩트 시스템에서 계산된 개수만큼 선택
+  const selectedArtifacts = artifactSystem.selectRandomArtifacts(optionCount, excludeIds);
+  
+  // 레벨업 옵션으로 변환 (flavorText 포함)
   levelUpOptions = selectedArtifacts.map(artifact => ({
     type: 'artifact',
     artifactId: artifact.id,
