@@ -3209,8 +3209,12 @@ class Jewel extends GameObject {
   }
 
   update() {    
-    // 끌어당기는 범위는 업그레이드 적용, 획득 범위는 고정
-    const magnetRange = player.getTotalPickupRadius();
+    let magnetRange;
+    if (player.magnetActive) {
+      magnetRange = 2000; // 자석 효과 시 대폭 증가된 범위
+    } else {
+      magnetRange = player.getTotalPickupRadius(); // 평소엔 업그레이드 적용 범위
+    }
     const pickupRange = 25; // 고정된 획득 범위
     
     const dx = player.x - this.x;
@@ -3424,6 +3428,7 @@ class ArtifactSystem {
         id: 'four_leaf_clover',
         name: '네잎클로버',
         description: '행운 +15%',
+        flavorText: 'dd',
         rarity: ARTIFACT_RARITY.COMMON,
         iconId: 'four_leaf_clover',
         effects: [
@@ -3434,6 +3439,7 @@ class ArtifactSystem {
         id: 'broccoli',
         name: '브로콜리',
         description: '최대 체력 +30',
+        flavorText: 'dd',
         rarity: ARTIFACT_RARITY.COMMON,
         iconId: 'broccoli',
         effects: [
@@ -3444,6 +3450,7 @@ class ArtifactSystem {
         id: 'log',
         name: '통나무',
         description: '회피율 +8%',
+        flavorText: 'dd',
         rarity: ARTIFACT_RARITY.COMMON,
         iconId: 'log',
         effects: [
@@ -3454,6 +3461,7 @@ class ArtifactSystem {
         id: 'cardboard_box',
         name: '뒤집어진 종이상자',
         description: '회피율 +6%',
+        flavorText: 'dd',
         rarity: ARTIFACT_RARITY.COMMON,
         iconId: 'cardboard_box',
         effects: [
@@ -3464,6 +3472,7 @@ class ArtifactSystem {
         id: 'wax_wings',
         name: '밀랍칠한 날개',
         description: '이동속도 +0.8',
+        flavorText: 'dd',
         rarity: ARTIFACT_RARITY.COMMON,
         iconId: 'wax_wings',
         effects: [
@@ -3476,6 +3485,7 @@ class ArtifactSystem {
         id: 'fortune_today',
         name: '오늘의 운세(대길)',
         description: '행운 +25%',
+        flavorText: 'dd',
         rarity: ARTIFACT_RARITY.UNCOMMON,
         iconId: 'fortune_today',
         effects: [
@@ -3486,6 +3496,7 @@ class ArtifactSystem {
         id: 'dead_underwear',
         name: '망자의 속옷',
         description: '회피율 +12%',
+        flavorText: 'dd',
         rarity: ARTIFACT_RARITY.UNCOMMON,
         iconId: 'dead_underwear',
         effects: [
@@ -3496,6 +3507,7 @@ class ArtifactSystem {
         id: 'learning_device',
         name: '학습장치',
         description: '경험치 획득량 +20%',
+        flavorText: 'dd',
         rarity: ARTIFACT_RARITY.UNCOMMON,
         iconId: 'learning_device',
         effects: [
@@ -3506,6 +3518,7 @@ class ArtifactSystem {
         id: 'mustache',
         name: '콧수염',
         description: '공격력 +25%',
+        flavorText: 'dd',
         rarity: ARTIFACT_RARITY.UNCOMMON,
         iconId: 'mustache',
         effects: [
@@ -3516,6 +3529,7 @@ class ArtifactSystem {
         id: 'strong_attack',
         name: '강력한 공격',
         description: '공격력 +35%',
+        flavorText: 'dd',
         rarity: ARTIFACT_RARITY.UNCOMMON,
         iconId: 'strong_attack',
         effects: [
@@ -3526,6 +3540,7 @@ class ArtifactSystem {
         id: 'quick_hands',
         name: '빠른 손놀림',
         description: '쿨타임 -30%',
+        flavorText: 'dd',
         rarity: ARTIFACT_RARITY.UNCOMMON,
         iconId: 'quick_hands',
         effects: [
@@ -3536,6 +3551,7 @@ class ArtifactSystem {
         id: 'swift_feet',
         name: '신속한 발걸음',
         description: '이동속도 +1.2',
+        flavorText: 'dd',
         rarity: ARTIFACT_RARITY.UNCOMMON,
         iconId: 'swift_feet',
         effects: [
@@ -3548,6 +3564,7 @@ class ArtifactSystem {
         id: 'cloak_and_dagger',
         name: '망토와 단검',
         description: '회피율 +18%',
+        flavorText: 'dd',
         rarity: ARTIFACT_RARITY.RARE,
         iconId: 'cloak_and_dagger',
         effects: [
@@ -3558,6 +3575,7 @@ class ArtifactSystem {
         id: 'bfg',
         name: 'BFG 크고 멋진 총',
         description: '공격력 +60%',
+        flavorText: 'dd',
         rarity: ARTIFACT_RARITY.RARE,
         iconId: 'bfg',
         effects: [
@@ -3568,6 +3586,7 @@ class ArtifactSystem {
         id: 'bullet_time',
         name: '불렛 타임',
         description: '적 투사체 속도 -70%',
+        flavorText: 'dd',
         rarity: ARTIFACT_RARITY.RARE,
         iconId: 'bullet_time',
         effects: [
@@ -3578,6 +3597,7 @@ class ArtifactSystem {
         id: 'wanted_poster',
         name: '현상수배지',
         description: '보스에게 추가 데미지 +100%',
+        flavorText: 'dd',
         rarity: ARTIFACT_RARITY.RARE,
         iconId: 'wanted_poster',
         effects: [
@@ -3588,6 +3608,7 @@ class ArtifactSystem {
         id: 'small_body',
         name: '작은 체구',
         description: '크기 -25%',
+        flavorText: 'dd',
         rarity: ARTIFACT_RARITY.RARE,
         iconId: 'small_body',
         effects: [
@@ -3598,6 +3619,7 @@ class ArtifactSystem {
         id: 'life_fountain',
         name: '생명의 샘',
         description: '초당 체력 2% 회복',
+        flavorText: 'dd',
         rarity: ARTIFACT_RARITY.RARE,
         iconId: 'life_fountain',
         effects: [
@@ -3608,6 +3630,7 @@ class ArtifactSystem {
         id: 'enemy_slowdown',
         name: '적 둔화',
         description: '적 이동속도 -50%',
+        flavorText: 'dd',
         rarity: ARTIFACT_RARITY.RARE,
         iconId: 'enemy_slowdown',
         effects: [
@@ -3618,6 +3641,7 @@ class ArtifactSystem {
         id: 'enemy_weakness',
         name: '약화된 적',
         description: '적 체력 -25%',
+        flavorText: 'dd',
         rarity: ARTIFACT_RARITY.RARE,
         iconId: 'enemy_weakness',
         effects: [
@@ -3630,6 +3654,7 @@ class ArtifactSystem {
         id: 'spice_melange',
         name: '스파이스 멜란지',
         description: '최대 체력 -20, 쿨타임 -40%',
+        flavorText: 'dd',
         rarity: ARTIFACT_RARITY.EPIC,
         iconId: 'spice_melange',
         effects: [
@@ -3643,6 +3668,7 @@ class ArtifactSystem {
         id: 'persona',
         name: '페르소나',
         description: '공격력 +80%, 쿨타임 -35%',
+        flavorText: 'dd',
         rarity: ARTIFACT_RARITY.LEGENDARY,
         iconId: 'persona',
         effects: [
@@ -3673,6 +3699,7 @@ class ArtifactSystem {
           id: 'exp_gain',
           name: '경험치 획득',
           description: `${xpGain} 경험치 획득`,
+          flavorText: '지식과 경험을 얻는다.',
           rarity: ARTIFACT_RARITY.COMMON,
           iconId: 'exp_gain',
           effects: [{ type: 'expGain', value: xpGain }]
@@ -3838,15 +3865,69 @@ function generateLevelUpOptions() {
   isArtifactSelection = false;
   
   const allUpgrades = [
-    { type: 'attackPower', name: '공격력 증가', value: 0.2, description: '공격력 +20%' },
-    { type: 'cooldownReduction', name: '쿨타임 감소', value: 0.1, description: '쿨타임 -10%' },
-    { type: 'maxHealth', name: '최대 체력 증가', value: 20, description: '최대 체력 +20' },
-    { type: 'moveSpeed', name: '이동속도 증가', value: 0.3, description: '이동속도 +0.3' },
-    { type: 'attackRange', name: '공격 범위 증가', value: 0.15, description: '공격 범위 +15%' },
-    { type: 'pickupRadius', name: '아이템 획득 반경', value: 20, description: '아이템 획득 범위 +20' },
-    { type: 'dodgeRate', name: '회피율 증가', value: 0.05, description: '회피율 +5%' },
-    { type: 'luck', name: '행운 증가', value: 0.1, description: '행운 +10%' },
-    { type: 'expMultiplier', name: '경험치 획득률', value: 0.1, description: '경험치 획득량 +10%' },
+    { 
+      type: 'attackPower', 
+      name: '공격력 증가', 
+      value: 0.2, 
+      description: '공격력 +20%',
+      flavorText: '공격력이 증가한다.'
+    },
+    { 
+      type: 'cooldownReduction', 
+      name: '쿨타임 감소', 
+      value: 0.1, 
+      description: '쿨타임 -10%',
+      flavorText: '쿨타임이 감소한다.'
+    },
+    { 
+      type: 'maxHealth', 
+      name: '최대 체력 증가', 
+      value: 20, 
+      description: '최대 체력 +20',
+      flavorText: '최대 체력이 증가한다.'
+    },
+    { 
+      type: 'moveSpeed', 
+      name: '이동속도 증가', 
+      value: 0.3, 
+      description: '이동속도 +0.3',
+      flavorText: '이속이 증가한다.'
+    },
+    { 
+      type: 'attackRange', 
+      name: '공격 범위 증가', 
+      value: 0.15, 
+      description: '공격 범위 +15%',
+      flavorText: '공격범위가 증가한다.'
+    },
+    { 
+      type: 'pickupRadius', 
+      name: '아이템 획득 반경', 
+      value: 20, 
+      description: '아이템 획득 범위 +20',
+      flavorText: '획득반경이 늘어난다.'
+    },
+    { 
+      type: 'dodgeRate', 
+      name: '회피율 증가', 
+      value: 0.05, 
+      description: '회피율 +5%',
+      flavorText: '회피율이 증가한다.'
+    },
+    { 
+      type: 'luck', 
+      name: '행운 증가', 
+      value: 0.1, 
+      description: '행운 +10%',
+      flavorText: '행운이 증가한다.'
+    },
+    { 
+      type: 'expMultiplier', 
+      name: '경험치 획득률', 
+      value: 0.1, 
+      description: '경험치 획득량 +10%',
+      flavorText: '경험치 획득률이 증가한다.'
+    },
   ];
   
   // 행운에 따른 4번째 선택지 확률 계산
@@ -3857,24 +3938,77 @@ function generateLevelUpOptions() {
   
   // 무기 옵션들 추가
   const weaponUpgrades = [
-    { type: 'weapon', weaponType: 'basic', name: '기본 무기', description: '기본 투사체 공격' },
-    { type: 'weapon', weaponType: 'orbit', name: '회전 구체', description: '플레이어 주변을 회전하며 공격' },
-    { type: 'weapon', weaponType: 'flame', name: '화염방사기', description: '넓은 범위의 지속 데미지' },
-    { type: 'weapon', weaponType: 'lightning', name: '번개 사슬', description: '적들 사이를 튀는 번개' },
-    { type: 'weapon', weaponType: 'fist', name: '주먹', description: '빠른 단일 대상 근접 공격' },
-    { type: 'weapon', weaponType: 'sword', name: '검', description: '부채꼴 범위 근접 공격' },
-    { type: 'weapon', weaponType: 'spear', name: '창', description: '긴 사거리 관통 공격' },
+    { 
+      type: 'weapon', 
+      weaponType: 'basic', 
+      name: '기본 무기', 
+      description: '기본 투사체 공격',
+      flavorText: '기본 공격이다.'
+    },
+    { 
+      type: 'weapon', 
+      weaponType: 'orbit', 
+      name: '회전 구체', 
+      description: '플레이어 주변을 회전하며 공격',
+      flavorText: '회전하며 공격한다.'
+    },
+    { 
+      type: 'weapon', 
+      weaponType: 'flame', 
+      name: '화염방사기', 
+      description: '넓은 범위의 지속 데미지',
+      flavorText: '불꽃을 발사한다.'
+    },
+    { 
+      type: 'weapon', 
+      weaponType: 'lightning', 
+      name: '번개 사슬', 
+      description: '적들 사이를 튀는 번개',
+      flavorText: '번개를 발사한다.'
+    },
+    { 
+      type: 'weapon', 
+      weaponType: 'fist', 
+      name: '주먹', 
+      description: '빠른 단일 대상 근접 공격',
+      flavorText: '주먹을 뻗는다.'
+    },
+    { 
+      type: 'weapon', 
+      weaponType: 'sword', 
+      name: '검', 
+      description: '부채꼴 범위 근접 공격',
+      flavorText: '검을 휘두른다.'
+    },
+    { 
+      type: 'weapon', 
+      weaponType: 'spear', 
+      name: '창', 
+      description: '긴 사거리 관통 공격',
+      flavorText: '창을 찌른다.'
+    },
   ];
   
   // 기존 무기 업그레이드 옵션 추가
   for (let weapon of player.weapons) {
     if (!weapon.isMaxLevel()) {
       const weaponName = getWeaponDisplayName(weapon.type);
+      const weaponFlavorTexts = {
+        'basic': '기본 공격이 강해진다.',
+        'orbit': '회전 공격이 강해진다.',
+        'flame': '불꽃이 강력해진다.',
+        'lightning': '번개가 강력해진다.',
+        'fist': '권법을 연마한다.',
+        'sword': '검술을 연마한다.',
+        'spear': '창술을 연마한다.'
+      };
+      
       weaponUpgrades.push({
         type: 'weaponUpgrade',
         weaponType: weapon.type,
         name: `${weaponName} 업그레이드`,
         description: `레벨 ${weapon.level} → ${weapon.level + 1}`,
+        flavorText: weaponFlavorTexts[weapon.type] || '무기가 더욱 강력해진다.',
         weapon: weapon
       });
     }
@@ -3927,6 +4061,7 @@ function generateArtifactOptions() {
     artifactId: artifact.id,
     name: artifact.name,
     description: artifact.description,
+    flavorText: artifact.flavorText,
     rarity: artifact.rarity,
     iconId: artifact.iconId
   }));
@@ -4261,18 +4396,16 @@ function drawLevelUpScreen() {
 }
 
 function drawOptionBox(x, y, width, height, option, isHovered) {
-  // 레어리티에 따른 색상 설정
+  // 레어리티에 따른 색상 설정 (기존 코드와 동일)
   let bgColor, borderColor, textColor;
   
   if (option.rarity) {
-    // 아티팩트인 경우 레어리티 색상 사용
     bgColor = isHovered ? 
       option.rarity.bgColor.replace('0.3', '0.6') : 
       option.rarity.bgColor;
     borderColor = option.rarity.borderColor;
     textColor = isHovered ? '#FFFFFF' : option.rarity.color;
   } else {
-    // 일반 레벨업인 경우 기존 색상
     bgColor = isHovered ? 'rgba(69, 162, 158, 0.8)' : 'rgba(31, 40, 51, 0.8)';
     borderColor = isHovered ? '#66fcf1' : '#45a29e';
     textColor = isHovered ? '#FFFFFF' : '#ffffff';
@@ -4300,7 +4433,7 @@ function drawOptionBox(x, y, width, height, option, isHovered) {
   const iconX = x + (width - iconSize) / 2;
   const iconY = y + (option.rarity ? 50 : 40);
   
-  // 아이콘 그리기
+  // 아이콘 그리기 (기존 코드와 동일)
   if (option.iconId && assetManager.loaded.artifactIcons && 
       assetManager.images.artifactIcons[option.iconId]) {
     ctx.drawImage(
@@ -4308,14 +4441,12 @@ function drawOptionBox(x, y, width, height, option, isHovered) {
       iconX, iconY, iconSize, iconSize
     );
   } else if (option.type === 'weapon' || option.type === 'weaponUpgrade') {
-    // 무기 아이콘 (기존 코드 유지)
     if (assetManager.loaded.weaponIcons && 
         assetManager.images.weaponIcons[option.weaponType]) {
       ctx.drawImage(assetManager.images.weaponIcons[option.weaponType], 
                    iconX, iconY, iconSize, iconSize);
     }
   } else {
-    // 일반 레벨업 아이콘 (기존 코드 유지)
     if (assetManager.loaded.levelUpIcons && 
         assetManager.images.levelUpIcons[option.type]) {
       ctx.drawImage(assetManager.images.levelUpIcons[option.type], 
@@ -4323,38 +4454,64 @@ function drawOptionBox(x, y, width, height, option, isHovered) {
     }
   }
   
-  // 옵션 텍스트
+  // 텍스트 시작 위치
   const textStartY = iconY + iconSize + 30;
   
   // 이름
   ctx.fillStyle = textColor;
-  ctx.font = 'bold 20px Arial';
+  ctx.font = 'bold 18px Arial';
   ctx.textAlign = 'center';
   ctx.fillText(option.name, x + width/2, textStartY);
   
   // 설명
   ctx.fillStyle = isHovered ? textColor : '#c5c6c7';
-  ctx.font = '16px Arial';
+  ctx.font = '14px Arial';
   
-  // 설명이 길면 여러 줄로 나누기
+  // 설명 텍스트 그리기
   const maxLineWidth = width - 20;
+  let currentY = textStartY + 20;
+  
+  // 설명 (효과)
   const words = option.description.split(' ');
   let line = '';
-  let lineY = textStartY + 25;
-  
   for (let i = 0; i < words.length; i++) {
     const testLine = line + words[i] + ' ';
     const metrics = ctx.measureText(testLine);
     
     if (metrics.width > maxLineWidth && i > 0) {
-      ctx.fillText(line, x + width/2, lineY);
+      ctx.fillText(line, x + width/2, currentY);
       line = words[i] + ' ';
-      lineY += 20;
+      currentY += 18;
     } else {
       line = testLine;
     }
   }
-  ctx.fillText(line, x + width/2, lineY);
+  ctx.fillText(line, x + width/2, currentY);
+  currentY += 18;
+  
+  // 플레이버 텍스트 (있는 경우만)
+  if (option.flavorText) {
+    ctx.fillStyle = isHovered ? '#FFD700' : '#D4AF37'; // 금색으로 구분
+    ctx.font = 'italic 12px Arial';
+    
+    // 플레이버 텍스트도 여러 줄로 나누기
+    currentY += 5; // 약간의 간격
+    const flavorWords = option.flavorText.split(' ');
+    line = '';
+    for (let i = 0; i < flavorWords.length; i++) {
+      const testLine = line + flavorWords[i] + ' ';
+      const metrics = ctx.measureText(testLine);
+      
+      if (metrics.width > maxLineWidth && i > 0) {
+        ctx.fillText(line, x + width/2, currentY);
+        line = flavorWords[i] + ' ';
+        currentY += 16;
+      } else {
+        line = testLine;
+      }
+    }
+    ctx.fillText(line, x + width/2, currentY);
+  }
 }
 
 function drawPauseScreen() {
