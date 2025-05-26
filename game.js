@@ -1048,6 +1048,232 @@ class GameObject {
 }
 
 //----------------------
+// 보스전 시스템
+//----------------------
+
+let bossMode = false;
+let bossCage = null;
+let bossesKilled = 0;
+let totalBosses = 3;
+let lastBossDeathPosition = null;
+let bossStartTime = 0;
+
+// Boss 케이지 클래스
+class BossCage {
+  constructor(centerX, centerY) {
+    this.centerX = centerX;
+    this.centerY = centerY;
+    this.size = CHUNK_SIZE * 3; // 3x3 청크 크기
+    this.halfSize = this.size / 2;
+    
+    // 케이지 경계
+    this.minX = centerX - this.halfSize;
+    this.maxX = centerX + this.halfSize;
+    this.minY = centerY - this.halfSize;
+    this.maxY = centerY + this.halfSize;
+  }
+  
+  // 플레이어가 케이지 안에 있는지 확인
+  containsPlayer(player) {
+    return player.x >= this.minX && player.x <= this.maxX &&
+           player.y >= this.minY && player.y <= this.maxY;
+  }
+  
+  // 플레이어를 케이지 안으로 제한
+  constrainPlayer(player) {
+    player.x = Math.max(this.minX + 30, Math.min(this.maxX - 30, player.x));
+    player.y = Math.max(this.minY + 30, Math.min(this.maxY - 30, player.y));
+  }
+  
+  // 케이지 그리기
+  draw(ctx, offsetX, offsetY) {
+    ctx.save();
+    
+    // 케이지 외벽
+    ctx.strokeStyle = '#FF0000';
+    ctx.lineWidth = 5;
+    ctx.shadowColor = '#FF0000';
+    ctx.shadowBlur = 10;
+    
+    ctx.strokeRect(
+      this.minX + offsetX,
+      this.minY + offsetY,
+      this.size,
+      this.size
+    );
+    
+    // 내부 패턴
+    ctx.strokeStyle = '#AA0000';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([10, 5]);
+    
+    ctx.strokeRect(
+      this.minX + offsetX + 10,
+      this.minY + offsetY + 10,
+      this.size - 20,
+      this.size - 20
+    );
+    
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
+}
+
+// 특별 상자 클래스
+class SpecialTreasure extends GameObject {
+  constructor(x, y) {
+    super(x, y, 40);
+    this.collected = false;
+    this.glowAnimation = 0;
+  }
+  
+  update() {
+    this.glowAnimation += 0.05;
+  }
+  
+  draw(offsetX, offsetY) {
+    const drawX = this.x + offsetX;
+    const drawY = this.y + offsetY;
+    
+    // 글로우 효과
+    const glowSize = this.size * 2 + Math.sin(this.glowAnimation) * 10;
+    ctx.save();
+    ctx.shadowColor = '#FFD700';
+    ctx.shadowBlur = 30;
+    ctx.fillStyle = 'rgba(255, 215, 0, 0.3)';
+    ctx.beginPath();
+    ctx.arc(drawX, drawY, glowSize, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    
+    // 상자 그리기
+    if (assetManager.loaded.treasure) {
+      const imgSize = this.size * 2;
+      ctx.drawImage(
+        assetManager.images.treasure,
+        drawX - imgSize/2,
+        drawY - imgSize/2,
+        imgSize,
+        imgSize
+      );
+    } else {
+      ctx.fillStyle = '#FFD700';
+      ctx.fillRect(drawX - this.size/2, drawY - this.size/2, this.size, this.size);
+    }
+  }
+  
+  collect() {
+    if (!this.collected) {
+      this.collected = true;
+      
+      // 자석 효과 활성화
+      player.magnetActive = true;
+      player.magnetDuration = player.magnetMaxDuration;
+      
+      // 레전더리 아티팩트 선택 화면
+      currentGameState = GAME_STATE.LEVEL_UP;
+      pauseStartTime = gameTimeSystem.getTime();
+      previousGameState = GAME_STATE.PLAYING;
+      generateLegendaryArtifactOptions();
+    }
+  }
+}
+
+// 레전더리 아티팩트 선택 함수
+function generateLegendaryArtifactOptions() {
+  isArtifactSelection = true;
+  
+  // 레전더리 아티팩트만 선택
+  const legendaryArtifacts = artifactSystem.artifacts.filter(artifact => 
+    artifact.rarity === ARTIFACT_RARITY.LEGENDARY && 
+    !player.acquiredArtifacts.includes(artifact.id)
+  );
+  
+  // 레전더리가 부족하면 에픽도 포함
+  let availableArtifacts = [...legendaryArtifacts];
+  if (availableArtifacts.length < 3) {
+    const epicArtifacts = artifactSystem.artifacts.filter(artifact => 
+      artifact.rarity === ARTIFACT_RARITY.EPIC && 
+      !player.acquiredArtifacts.includes(artifact.id)
+    );
+    availableArtifacts = [...availableArtifacts, ...epicArtifacts];
+  }
+  
+  // 3개 선택 (부족하면 있는 만큼)
+  const selectedCount = Math.min(3, availableArtifacts.length);
+  const selectedArtifacts = [];
+  
+  for (let i = 0; i < selectedCount; i++) {
+    const randomIndex = Math.floor(Math.random() * availableArtifacts.length);
+    selectedArtifacts.push(availableArtifacts[randomIndex]);
+    availableArtifacts.splice(randomIndex, 1);
+  }
+  
+  // 레벨업 옵션으로 변환
+  levelUpOptions = selectedArtifacts.map(artifact => ({
+    type: 'artifact',
+    artifactId: artifact.id,
+    name: artifact.name,
+    description: artifact.description,
+    flavorText: artifact.flavorText,
+    rarity: artifact.rarity,
+    iconId: artifact.iconId
+  }));
+  
+  hoveredLevelUpOption = -1;
+}
+
+// 보스전 시작 함수
+function startBossMode() {
+  bossMode = true;
+  bossesKilled = 0;
+  bossStartTime = gameTimeSystem.getTime();
+  
+  // 케이지 생성 (플레이어 현재 위치 중심)
+  bossCage = new BossCage(player.x, player.y);
+  
+  // Boss 몬스터 3마리 스폰
+  for (let i = 0; i < totalBosses; i++) {
+    const angle = (Math.PI * 2 * i) / totalBosses;
+    const distance = CHUNK_SIZE;
+    
+    const bossX = player.x + Math.cos(angle) * distance;
+    const bossY = player.y + Math.sin(angle) * distance;
+    
+    const boss = new BossEnemy(bossX, bossY);
+    boss.isBossModeEnemy = true; // 보스전 몬스터 표시
+    gameObjects.enemies.push(boss);
+  }
+  
+  // 기존 적들 제거 (옵션)
+  gameObjects.enemies = gameObjects.enemies.filter(enemy => 
+    enemy.isBossModeEnemy || enemy.state === 'dying'
+  );
+  
+  // 화면 흔들림 효과
+  screenShakeTime = 500;
+  screenShakeIntensity = 10;
+}
+
+// 보스전 종료 함수
+function endBossMode() {
+  // 특별 상자 생성
+  if (lastBossDeathPosition) {
+    const specialTreasure = new SpecialTreasure(
+      lastBossDeathPosition.x,
+      lastBossDeathPosition.y
+    );
+    gameObjects.terrain.push(specialTreasure);
+  }
+  
+  // 케이지 제거 (약간의 지연 후)
+  setTimeout(() => {
+    bossMode = false;
+    bossCage = null;
+  }, 1000);
+}
+
+//----------------------
 // 무기 시스템
 //----------------------
 
@@ -3059,23 +3285,33 @@ class BossEnemy extends Enemy {
     // 부모 클래스의 메서드 실행
     super.startDying();
     
-    // 체력 회복 보석 100% 드롭
-    gameObjects.jewels.push(new Jewel(this.x, this.y, 4));
-    
-    for (let i = 0; i < 3; i++) {
-      if (Math.random() < 0.7) {
-        const jewelType = getWeightedRandomJewelType();
-        gameObjects.jewels.push(new Jewel(
-          this.x + (Math.random() * 30 - 15), 
-          this.y + (Math.random() * 30 - 15),
-          jewelType
-        ));
+    // 보스전 모드에서의 보스인 경우
+    if (this.isBossModeEnemy && bossMode) {
+      bossesKilled++;
+      lastBossDeathPosition = { x: this.x, y: this.y };
+      
+      // 모든 보스를 처치했는지 확인
+      if (bossesKilled >= totalBosses) {
+        endBossMode();
       }
-    }
-    
-    // 보물 상자 드롭 확률 증가
-    if (Math.random() < 0.25) {
-      gameObjects.terrain.push(new Treasure(this.x, this.y));
+    } else {
+      // 기존 로직 (일반 보스 보상)
+      gameObjects.jewels.push(new Jewel(this.x, this.y, 4));
+      
+      for (let i = 0; i < 3; i++) {
+        if (Math.random() < 0.7) {
+          const jewelType = getWeightedRandomJewelType();
+          gameObjects.jewels.push(new Jewel(
+            this.x + (Math.random() * 30 - 15), 
+            this.y + (Math.random() * 30 - 15),
+            jewelType
+          ));
+        }
+      }
+      
+      if (Math.random() < 0.25) {
+        gameObjects.terrain.push(new Treasure(this.x, this.y));
+      }
     }
   }
 }
@@ -5461,6 +5697,19 @@ function drawHUD() {
   ctx.font = '14px Arial';
   ctx.textAlign = 'center';
   drawTextWithStroke(`${player.exp} / ${player.nextLevelExp}`, canvas.width / 2, expBarY + 15, '#ffffff', '#000000', 2);
+
+  // 보스전 정보
+  if (bossMode) {
+    ctx.font = 'bold 28px Arial';
+    ctx.textAlign = 'center';
+    drawTextWithStroke(
+      `BOSS FIGHT - ${totalBosses - bossesKilled} / ${totalBosses}`, 
+      canvas.width / 2, 
+      60, 
+      '#FF0000', 
+      '#000000'
+    );
+  }
 }
 
 function draw() {
@@ -5489,6 +5738,11 @@ function draw() {
 
   // 배경 그리기
   drawBackground(offsetX, offsetY);
+
+  // 보스 케이지 그리기
+  if (bossMode && bossCage) {
+    bossCage.draw(ctx, offsetX, offsetY);
+  }
 
   // 지형 그리기
   gameObjects.terrain.forEach(feature => {
@@ -5875,6 +6129,13 @@ function unloadChunk(chunkKey) {
 
 // 적 스폰 시스템
 function spawnEnemyAroundPlayer() {
+  // 보스전 모드에서는 적 스폰 안함
+  if (bossMode) return;
+  
+  // 최대 적 수 체크
+  if (gameObjects.enemies.length >= MAX_ENEMIES) {
+    return;
+  }
   // 최대 적 수 체크
   if (gameObjects.enemies.length >= MAX_ENEMIES) {
     return;
@@ -5925,28 +6186,23 @@ function spawnEnemyAroundPlayer() {
     // 적 타입 선택
     let selectedType;
     
-    // 보스는 일정 시간/레벨 이후 5% 확률로 등장
-    if (elapsedTime > 180 && player.level >= 10 && Math.random() < 0.05) {
-      selectedType = ENEMY_TYPES.BOSS;
-    } else {
-      // 가중치 기반 선택
-      const totalWeight = Object.values(ENEMY_TYPES)
-        .filter(type => type.spawnWeight > 0)
-        .reduce((sum, type) => sum + type.spawnWeight, 0);
+    // 가중치 기반 선택
+    const totalWeight = Object.values(ENEMY_TYPES)
+      .filter(type => type.spawnWeight > 0)
+      .reduce((sum, type) => sum + type.spawnWeight, 0);
+    
+    let randomWeight = Math.random() * totalWeight;
+    for (const type of Object.values(ENEMY_TYPES)) {
+      if (type.spawnWeight <= 0) continue;
       
-      let randomWeight = Math.random() * totalWeight;
-      for (const type of Object.values(ENEMY_TYPES)) {
-        if (type.spawnWeight <= 0) continue;
-        
-        randomWeight -= type.spawnWeight;
-        if (randomWeight <= 0) {
-          selectedType = type;
-          break;
-        }
+      randomWeight -= type.spawnWeight;
+      if (randomWeight <= 0) {
+        selectedType = type;
+        break;
       }
-      // 기본값
-      if (!selectedType) selectedType = ENEMY_TYPES.NORMAL;
     }
+    // 기본값
+    if (!selectedType) selectedType = ENEMY_TYPES.NORMAL;
     
     // 선택된 타입으로 적 생성
     let enemy;
@@ -6017,7 +6273,6 @@ function countEnemiesInSector(centerAngle, sectorAngle) {
       count++;
     }
   }
-  
   return count;
 }
 
@@ -6162,6 +6417,16 @@ function update() {
   
   // 적 스폰
   spawnEnemyAroundPlayer();
+
+  // 3분(180초) 체크 및 보스전 시작
+  if (!bossMode && elapsedTime % 10 == 9 && gameObjects.enemies.filter(e => e.isBossModeEnemy).length === 0) {
+    startBossMode();
+  }
+  
+  // 보스전 중 플레이어 이동 제한
+  if (bossMode && bossCage) {
+    bossCage.constrainPlayer(player);
+  }
 
   // 공간 분할 그리드 업데이트
   updateEnemySpatialGrid();
