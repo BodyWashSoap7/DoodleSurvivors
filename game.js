@@ -1057,6 +1057,9 @@ let bossesKilled = 0;
 let totalBosses = 3;
 let lastBossDeathPosition = null;
 let bossStartTime = 0;
+let bossWarningActive = false;
+let bossWarningStartTime = 0;
+let bossWarningDuration = 5000; // 5초
 
 // Boss 케이지 클래스
 class BossCage {
@@ -1209,6 +1212,20 @@ function generateLegendaryArtifactOptions() {
     availableArtifacts.splice(randomIndex, 1);
   }
   
+  // 선택된 아티팩트가 3개 미만이면 경험치 옵션으로 채우기
+  while (selectedArtifacts.length < 3) {
+    const xpGain = Math.floor((player.nextLevelExp) * 0.3);
+    selectedArtifacts.push({
+      id: 'exp_gain',
+      name: '경험치 획득',
+      description: `${xpGain} 경험치 획득`,
+      flavorText: '지식과 경험을 얻는다.',
+      rarity: ARTIFACT_RARITY.COMMON,
+      iconId: 'exp_gain',
+      effects: [{ type: 'expGain', value: xpGain }]
+    });
+  }
+  
   // 레벨업 옵션으로 변환
   levelUpOptions = selectedArtifacts.map(artifact => ({
     type: 'artifact',
@@ -1223,8 +1240,10 @@ function generateLegendaryArtifactOptions() {
   hoveredLevelUpOption = -1;
 }
 
-// 보스전 시작 함수
 function startBossMode() {
+  // 경고 종료
+  endBossWarning();
+  
   bossMode = true;
   bossesKilled = 0;
   bossStartTime = gameTimeSystem.getTime();
@@ -1245,7 +1264,7 @@ function startBossMode() {
     gameObjects.enemies.push(boss);
   }
   
-  // 기존 적들 제거 (옵션)
+  // 기존 적들 제거
   gameObjects.enemies = gameObjects.enemies.filter(enemy => 
     enemy.isBossModeEnemy || enemy.state === 'dying'
   );
@@ -1271,6 +1290,21 @@ function endBossMode() {
     bossMode = false;
     bossCage = null;
   }, 1000);
+}
+
+// 보스전 경고 시작 함수
+function startBossWarning() {
+  bossWarningActive = true;
+  bossWarningStartTime = gameTimeSystem.getTime();
+  
+  // 화면 흔들림 효과
+  screenShakeTime = 300;
+  screenShakeIntensity = 3;
+}
+
+// 보스전 경고 종료 함수  
+function endBossWarning() {
+  bossWarningActive = false;
 }
 
 //----------------------
@@ -4621,6 +4655,10 @@ function resetGame() {
   screenShakeTime = 0;
   screenShakeIntensity = 0;
   
+  // 보스전 경고 상태 초기화
+  bossWarningActive = false;
+  bossWarningStartTime = 0;
+  
   // 자석 효과 초기화
   player.magnetActive = false;
   player.magnetDuration = 0;
@@ -5698,6 +5736,60 @@ function drawHUD() {
   ctx.textAlign = 'center';
   drawTextWithStroke(`${player.exp} / ${player.nextLevelExp}`, canvas.width / 2, expBarY + 15, '#ffffff', '#000000', 2);
 
+  // 보스전 경고 메시지
+  if (bossWarningActive) {
+    const elapsedWarningTime = gameTimeSystem.getTime() - bossWarningStartTime;
+    const remainingTime = Math.ceil((bossWarningDuration - elapsedWarningTime) / 1000);
+    
+    if (remainingTime > 0) {
+      // 깜빡이는 효과
+      const blinkSpeed = 0.01;
+      const alpha = (Math.sin(elapsedWarningTime * blinkSpeed) + 1) / 2;
+      
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      
+      // WARNING 텍스트
+      ctx.font = 'bold 48px Arial';
+      ctx.textAlign = 'center';
+      drawTextWithStroke(
+        'WARNING', 
+        canvas.width / 2, 
+        canvas.height / 2 - 80, 
+        '#FF0000', 
+        '#000000', 
+        4
+      );
+      
+      // 보스전 안내 텍스트
+      ctx.font = 'bold 24px Arial';
+      drawTextWithStroke(
+        'BOSS FIGHT INCOMING', 
+        canvas.width / 2, 
+        canvas.height / 2 - 40, 
+        '#FFFF00', 
+        '#000000', 
+        3
+      );
+      
+      // 카운트다운
+      ctx.font = 'bold 32px Arial';
+      drawTextWithStroke(
+        `${remainingTime}`, 
+        canvas.width / 2, 
+        canvas.height / 2, 
+        '#FF0000', 
+        '#FFFFFF', 
+        3
+      );
+      
+      ctx.restore();
+    } else {
+      // 시간이 다 되면 경고 종료
+      endBossWarning();
+    }
+  }
+  
   // 보스전 정보
   if (bossMode) {
     ctx.font = 'bold 28px Arial';
@@ -6417,6 +6509,12 @@ function update() {
   
   // 적 스폰
   spawnEnemyAroundPlayer();
+
+  // 보스전 경고 체크 (보스전 시작 5초 전)
+  if (!bossMode && !bossWarningActive && elapsedTime % 10 == 4 && 
+      gameObjects.enemies.filter(e => e.isBossModeEnemy).length === 0) {
+    startBossWarning();
+  }
 
   // 3분(180초) 체크 및 보스전 시작
   if (!bossMode && elapsedTime % 10 == 9 && gameObjects.enemies.filter(e => e.isBossModeEnemy).length === 0) {
