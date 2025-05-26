@@ -1127,27 +1127,15 @@ class SpecialTreasure extends GameObject {
   constructor(x, y) {
     super(x, y, 40);
     this.collected = false;
-    this.glowAnimation = 0;
+    this.isTreasure = true;
   }
   
   update() {
-    this.glowAnimation += 0.05;
   }
   
   draw(offsetX, offsetY) {
     const drawX = this.x + offsetX;
     const drawY = this.y + offsetY;
-    
-    // 글로우 효과
-    const glowSize = this.size * 2 + Math.sin(this.glowAnimation) * 10;
-    ctx.save();
-    ctx.shadowColor = '#FFD700';
-    ctx.shadowBlur = 30;
-    ctx.fillStyle = 'rgba(255, 215, 0, 0.3)';
-    ctx.beginPath();
-    ctx.arc(drawX, drawY, glowSize, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
     
     // 상자 그리기
     if (assetManager.loaded.treasure) {
@@ -6622,7 +6610,7 @@ function update() {
   // 보물 충돌 체크
   for (let i = gameObjects.terrain.length - 1; i >= 0; i--) {
     const feature = gameObjects.terrain[i];
-    if (feature instanceof Treasure) {
+    if (feature.isTreasure) { // 공통 속성으로 체크
       feature.update();
       if (detectCollision(player, feature) && !feature.collected) {
         feature.collect();
