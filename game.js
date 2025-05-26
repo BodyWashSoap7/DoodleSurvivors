@@ -4890,6 +4890,9 @@ function drawPauseScreen() {
   ctx.fillRect(buttonX, resumeButtonY, buttonWidth, buttonHeight);
   ctx.strokeStyle = '#ffffff';
   ctx.strokeRect(buttonX, resumeButtonY, buttonWidth, buttonHeight);
+  
+  // 버튼 텍스트 폰트 크기 설정
+  ctx.font = '18px Arial'; // 기존보다 작게 설정 (원하는 크기로 조정 가능)
   ctx.fillStyle = isResumeHovered ? '#0b0c10' : '#ffffff';
   ctx.fillText('RESUME', canvas.width / 2, resumeButtonY + buttonHeight/2 + 5);
   
