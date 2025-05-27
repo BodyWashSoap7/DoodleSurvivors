@@ -6576,7 +6576,7 @@ function update() {
   }
 
   // 3분(180초) 체크 및 보스전 시작
-  if (!bossMode && bossWarningActive && elapsedTime % 10 == 0 && elapsedTime != 0 && gameObjects.enemies.filter(e => e.isBossModeEnemy).length === 0) {
+  if (!bossMode && bossWarningActive && elapsedTime % 10 == 0 && elapsedTime !== 0 && gameObjects.enemies.filter(e => e.isBossModeEnemy).length === 0) {
     startBossMode();
   }
   
