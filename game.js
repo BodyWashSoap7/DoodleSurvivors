@@ -1470,7 +1470,7 @@ class WindWeapon extends Weapon {
 class EarthWeapon extends Weapon {
   constructor() {
     super({
-      type: 'Earth',
+      type: 'earth',
       baseCooldown: 50,
       damage: 8
     });
