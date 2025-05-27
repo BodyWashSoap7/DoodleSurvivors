@@ -715,7 +715,7 @@ class AssetManager {
   
   loadLevelUpIcons() {
     this.loadImageSet('levelUpIcons', 
-      ['attackPower', 'maxHealth', 'cooldownReduction', 'moveSpeed', 'pickupRadius', 'expMultiplier'], 
+      ['attackPower', 'maxHealth', 'cooldownReduction', 'moveSpeed', 'pickupRadius', 'expMultiplier', 'dodgeRate', 'luck', 'attackRange'], 
       './img/levelup/{item}_icon.png'
     );
   }
