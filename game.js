@@ -701,7 +701,7 @@ class AssetManager {
 
   loadWeaponImages() {
     this.loadImageSet('weapons', 
-      ['wind', 'orbit', 'flame', 'lightningChain', 'lightningImpact', 'fist'], 
+      ['wind', 'earth', 'flame', 'lightningChain', 'lightningImpact', 'fist'], 
       './img/weapons/{item}.png'
     );
   }
@@ -1467,10 +1467,10 @@ class WindWeapon extends Weapon {
   }
 }
 
-class OrbitWeapon extends Weapon {
+class EarthWeapon extends Weapon {
   constructor() {
     super({
-      type: 'orbit',
+      type: 'Earth',
       baseCooldown: 50,
       damage: 8
     });
@@ -1500,7 +1500,7 @@ class OrbitWeapon extends Weapon {
     // 새 구체 생성
     for (let i = 0; i < this.orbCount; i++) {
       const angle = (Math.PI * 2 * i) / this.orbCount;
-      const orb = new OrbitOrb(
+      const orb = new EarthOrb(
         player.x, 
         player.y,
         angle,
@@ -1515,7 +1515,7 @@ class OrbitWeapon extends Weapon {
   
   removeOldOrbs() {
     // 이전 구체들 제거
-    gameObjects.bullets = gameObjects.bullets.filter(b => !(b instanceof OrbitOrb && b.parent === this));
+    gameObjects.bullets = gameObjects.bullets.filter(b => !(b instanceof EarthOrb && b.parent === this));
   }
   
   update() {
@@ -1539,8 +1539,8 @@ class OrbitWeapon extends Weapon {
   }
 }
 
-// OrbitOrb 클래스
-class OrbitOrb {
+// EarthOrb 클래스
+class EarthOrb {
   constructor(x, y, baseAngle, radius, size, damage, parent) {
     this.x = x;
     this.y = y;
@@ -1592,10 +1592,10 @@ class OrbitOrb {
     ctx.rotate(this.rotationAngle);
         
     // 이미지 그리기
-    if (assetManager.loaded.weapons && assetManager.images.weapons.orbit) {
+    if (assetManager.loaded.weapons && assetManager.images.weapons.earth) {
       ctx.globalAlpha = 1;
       ctx.drawImage(
-        assetManager.images.weapons.orbit,
+        assetManager.images.weapons.earth,
         -drawSize / 2,
         -drawSize / 2,
         drawSize,
@@ -2083,8 +2083,8 @@ const WeaponFactory = {
     switch(type) {
       case 'wind':
         return new WindWeapon();
-      case 'orbit':
-        return new OrbitWeapon();
+      case 'earth':
+        return new EarthWeapon();
       case 'flame':
         return new FlameWeapon();
       case 'lightning':
@@ -4219,7 +4219,7 @@ function generateLevelUpOptions() {
     },
     { 
       type: 'weapon', 
-      weaponType: 'orbit', 
+      weaponType: 'Earth', 
       name: '회전 구체', 
       description: '플레이어 주변을 회전하며 공격',
       flavorText: 'dd..'
@@ -4265,7 +4265,7 @@ function generateLevelUpOptions() {
   const weaponUpgradeOptions = [];
   const weaponFlavorTexts = {
     'wind': 'dd.',
-    'orbit': 'dd.',
+    'earth': 'dd.',
     'flame': 'dd.',
     'lightning': 'dd.',
     'fist': 'dd.',
@@ -4383,7 +4383,7 @@ function generateLevelUpOptions() {
 function getWeaponDisplayName(weaponType) {
   const names = {
     'wind': '기본 무기',
-    'orbit': '회전 구체',
+    'earth': '회전 구체',
     'flame': '화염방사기',
     'lightning': '번개 사슬',
     'fist': '주먹',
