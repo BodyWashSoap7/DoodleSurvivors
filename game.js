@@ -1066,7 +1066,7 @@ class BossCage {
   constructor(centerX, centerY) {
     this.centerX = centerX;
     this.centerY = centerY;
-    this.size = 900; // 3x3 청크 크기
+    this.size = 900;
     this.halfSize = this.size / 2;
     
     // 케이지 경계
@@ -1265,6 +1265,12 @@ function startBossMode() {
 
 // 보스전 종료 함수
 function endBossMode() {
+  // 보스전에 소요된 시간을 일시정지 시간에 추가
+  if (bossStartTime > 0) {
+    const bossElapsedTime = gameTimeSystem.getTime() - bossStartTime + 1000;
+    totalPausedTime += bossElapsedTime;
+  }
+  
   // 특별 상자 생성
   if (lastBossDeathPosition) {
     const specialTreasure = new SpecialTreasure(
@@ -1278,7 +1284,7 @@ function endBossMode() {
   setTimeout(() => {
     bossMode = false;
     bossCage = null;
-  }, 1000);
+  }, 2000);
 }
 
 // 보스전 경고 시작 함수
@@ -6472,8 +6478,8 @@ function updatePlayerAim() {
 
 // 게임 메인 업데이트
 function update() {
-  // 경과 시간 계산
-  if (currentGameState === GAME_STATE.PLAYING) {
+  // 경과 시간 계산 (보스전 중에는 업데이트 안함)
+  if (currentGameState === GAME_STATE.PLAYING && !bossMode) {
     const currentTime = gameTimeSystem.getTime();
     const totalElapsed = currentTime - gameStartTime - totalPausedTime;
     elapsedTime = Math.floor(totalElapsed / 1000);
@@ -6564,13 +6570,13 @@ function update() {
   spawnEnemyAroundPlayer();
 
   // 보스전 경고 체크 (보스전 시작 5초 전)
-  if (!bossMode && !bossWarningActive && elapsedTime % 10 == 4 && 
+  if (!bossMode && !bossWarningActive && elapsedTime % 10 == 5 && 
       gameObjects.enemies.filter(e => e.isBossModeEnemy).length === 0) {
     startBossWarning();
   }
 
   // 3분(180초) 체크 및 보스전 시작
-  if (!bossMode && elapsedTime % 10 == 9 && gameObjects.enemies.filter(e => e.isBossModeEnemy).length === 0) {
+  if (!bossMode && elapsedTime % 10 == 0 && elapsedTime != 0 && gameObjects.enemies.filter(e => e.isBossModeEnemy).length === 0) {
     startBossMode();
   }
   
@@ -7109,9 +7115,11 @@ function gameLoop(timestamp) {
     }
     // 게임 상태별 업데이트
     else if (currentGameState === GAME_STATE.PLAYING) {
-      // 경과 시간 계산 - 게임 시계 기반
-      const currentGameTime = gameTimeSystem.getTime();
-      elapsedTime = Math.floor(currentGameTime / 1000);
+      // 경과 시간 계산 - 게임 시계 기반 (보스전 중에는 업데이트 안함)
+      if (!bossMode) {
+        const currentGameTime = gameTimeSystem.getTime();
+        elapsedTime = Math.floor(currentGameTime / 1000);
+      }
       
       update();
       draw();
