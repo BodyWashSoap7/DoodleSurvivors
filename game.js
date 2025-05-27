@@ -4644,7 +4644,13 @@ function resetGame() {
   screenShakeTime = 0;
   screenShakeIntensity = 0;
   
-  // 보스전 경고 상태 초기화
+  // 보스전 관련 변수 초기화
+  bossMode = false;
+  bossCage = null;
+  bossesKilled = 0;
+  totalBosses = 3;
+  lastBossDeathPosition = null;
+  bossStartTime = 0;
   bossWarningActive = false;
   bossWarningStartTime = 0;
   
