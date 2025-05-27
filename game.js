@@ -1222,7 +1222,8 @@ function generateLegendaryArtifactOptions() {
     description: artifact.description,
     flavorText: artifact.flavorText,
     rarity: artifact.rarity,
-    iconId: artifact.iconId
+    iconId: artifact.iconId,
+    effects: artifact.effects
   }));
   
   hoveredLevelUpOption = -1;
@@ -4411,7 +4412,8 @@ function generateArtifactOptions() {
     description: artifact.description,
     flavorText: artifact.flavorText,
     rarity: artifact.rarity,
-    iconId: artifact.iconId
+    iconId: artifact.iconId,
+    effects: artifact.effects
   }));
   
   hoveredLevelUpOption = -1;
