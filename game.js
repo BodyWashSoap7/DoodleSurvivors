@@ -701,14 +701,14 @@ class AssetManager {
 
   loadWeaponImages() {
     this.loadImageSet('weapons', 
-      ['basic', 'orbit', 'flame', 'lightningChain', 'lightningImpact', 'fist'], 
+      ['wind', 'orbit', 'flame', 'lightningChain', 'lightningImpact', 'fist'], 
       './img/weapons/{item}.png'
     );
   }
 
   loadWeaponIcons() {
     this.loadImageSet('weaponIcons', 
-      ['basic', 'orbit', 'flame', 'lightning', 'fist', 'sword', 'spear'], 
+      ['wind', 'orbit', 'flame', 'lightning', 'fist', 'sword', 'spear'], 
       './img/weapon_icons/{item}_icon.png'
     );
   }
@@ -1242,7 +1242,7 @@ function startBossMode() {
   // Boss 몬스터 3마리 스폰
   for (let i = 0; i < totalBosses; i++) {
     const angle = (Math.PI * 2 * i) / totalBosses;
-    const distance = CHUNK_SIZE;
+    const distance = 250;
     
     const bossX = player.x + Math.cos(angle) * distance;
     const bossY = player.y + Math.sin(angle) * distance;
@@ -1302,7 +1302,7 @@ function endBossWarning() {
 // 무기 클래스
 class Weapon {
   constructor(config = {}) {
-    this.type = config.type || 'basic';
+    this.type = config.type || 'wind';
     this.baseCooldown = config.baseCooldown || 1000;
     this.cooldown = this.baseCooldown;
     this.lastAttackTime = gameTimeSystem.getTime();
@@ -1409,11 +1409,11 @@ class Bullet {
   }
 }
 
-// 기본 무기 클래스
-class BasicWeapon extends Weapon {
+// 공기탄 무기 클래스
+class WindWeapon extends Weapon {
   constructor() {
     super({
-      type: 'basic',
+      type: 'wind',
       baseCooldown: 1000,
       damage: 10
     });
@@ -2074,8 +2074,8 @@ class ChainLightningEffect {
 const WeaponFactory = {
   createWeapon(type) {
     switch(type) {
-      case 'basic':
-        return new BasicWeapon();
+      case 'wind':
+        return new WindWeapon();
       case 'orbit':
         return new OrbitWeapon();
       case 'flame':
@@ -2089,7 +2089,7 @@ const WeaponFactory = {
       case 'spear':
         return new SpearWeapon();
       default:
-        return new BasicWeapon();
+        return new WindWeapon();
     }
   }
 };
@@ -3994,19 +3994,30 @@ class ArtifactSystem {
 
   // 아티팩트 효과 적용
   applyArtifactEffects(artifactId) {
+    // 경험치 획득 아티팩트 특별 처리
+    if (artifactId === 'exp_gain') {
+      const option = levelUpOptions.find(opt => opt.artifactId === 'exp_gain');
+      if (option && option.effects) {
+        option.effects.forEach(effect => {
+          this.applyEffect(effect);
+        });
+      }
+      return true;
+    }
+  
     const artifact = this.artifacts.find(a => a.id === artifactId);
     if (!artifact) return false;
-
+  
     // 플레이어 획득 아티팩트 목록에 추가
     if (!player.acquiredArtifacts.includes(artifactId)) {
       player.acquiredArtifacts.push(artifactId);
     }
-
+  
     // 효과 적용
     artifact.effects.forEach(effect => {
       this.applyEffect(effect);
     });
-
+  
     return true;
   }
 
@@ -4066,6 +4077,7 @@ class ArtifactSystem {
         break;
       case 'expGain':
         player.exp += effect.value;
+        checkLevelUp();
         break;
     }
   }
@@ -4194,9 +4206,9 @@ function generateLevelUpOptions() {
   const newWeaponOptions = [
     { 
       type: 'weapon', 
-      weaponType: 'basic', 
-      name: '기본 무기', 
-      description: '기본 투사체 공격',
+      weaponType: 'wind', 
+      name: '바람 투사체 발사', 
+      description: '바람 투사체 공격',
       flavorText: 'dd..'
     },
     { 
@@ -4246,7 +4258,7 @@ function generateLevelUpOptions() {
   // 기존 무기 업그레이드 옵션들
   const weaponUpgradeOptions = [];
   const weaponFlavorTexts = {
-    'basic': 'dd.',
+    'wind': 'dd.',
     'orbit': 'dd.',
     'flame': 'dd.',
     'lightning': 'dd.',
@@ -4364,7 +4376,7 @@ function generateLevelUpOptions() {
 // 무기 표시 이름 헬퍼 함수
 function getWeaponDisplayName(weaponType) {
   const names = {
-    'basic': '기본 무기',
+    'wind': '기본 무기',
     'orbit': '회전 구체',
     'flame': '화염방사기',
     'lightning': '번개 사슬',
@@ -4599,7 +4611,7 @@ function resetGame() {
   player.levelExpMultiplierBonus = 0;
   
   // 초기 무기 생성 및 영구 업그레이드 적용
-  const initialWeapon = new BasicWeapon();
+  const initialWeapon = new WindWeapon();
   initialWeapon.updateCooldown(player.getTotalCooldownReduction());
   if (initialWeapon.updateRange) {
     initialWeapon.updateRange();
