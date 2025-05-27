@@ -3593,6 +3593,7 @@ class Treasure extends GameObject {
   constructor(x, y) {
     super(x, y, 32);
     this.collected = false;
+    this.isTreasure = true;
   }
 
   update() {
