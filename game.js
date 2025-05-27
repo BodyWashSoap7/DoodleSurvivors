@@ -708,7 +708,7 @@ class AssetManager {
 
   loadWeaponIcons() {
     this.loadImageSet('weaponIcons', 
-      ['wind', 'orbit', 'flame', 'lightning', 'fist', 'sword', 'spear'], 
+      ['wind', 'earth', 'flame', 'lightning', 'fist', 'sword', 'spear'], 
       './img/weapon_icons/{item}_icon.png'
     );
   }
