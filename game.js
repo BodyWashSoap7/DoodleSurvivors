@@ -1066,7 +1066,7 @@ class BossCage {
   constructor(centerX, centerY) {
     this.centerX = centerX;
     this.centerY = centerY;
-    this.size = CHUNK_SIZE * 3; // 3x3 청크 크기
+    this.size = 900; // 3x3 청크 크기
     this.halfSize = this.size / 2;
     
     // 케이지 경계
@@ -4768,7 +4768,7 @@ function drawOptionBox(x, y, width, height, option, isHovered) {
   }
   
   // 아이콘 위치 및 크기
-  const iconSize = 80;
+  const iconSize = 64;
   const iconX = x + (width - iconSize) / 2;
   const iconY = y + (option.rarity ? 50 : 40);
   
