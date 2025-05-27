@@ -1535,7 +1535,7 @@ class EarthWeapon extends Weapon {
   }
   
   fire() {
-    // 오비트 무기에서는 사용되지 않음
+    // 사용되지 않음
   }
 }
 
