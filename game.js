@@ -4219,7 +4219,7 @@ function generateLevelUpOptions() {
     },
     { 
       type: 'weapon', 
-      weaponType: 'Earth', 
+      weaponType: 'earth',
       name: '회전 구체', 
       description: '플레이어 주변을 회전하며 공격',
       flavorText: 'dd..'
