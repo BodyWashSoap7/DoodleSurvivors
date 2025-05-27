@@ -558,7 +558,7 @@ const userProfileSystem = {
 };
 
 // 적 관련 상수
-const MAX_ENEMIES = 100;
+const MAX_ENEMIES = 300;
 const MIN_SPAWN_DISTANCE = 150;
 const MAX_SPAWN_DISTANCE = 450;
 const ENEMY_SPAWN_INTERVAL = 500;
@@ -583,7 +583,7 @@ class AssetManager {
       hitEffect: null,
       treasure: null,
       jewels: [],
-      // 새로 추가
+
       perkIcons: {},
       perkBackground: null
     };
@@ -599,7 +599,7 @@ class AssetManager {
       hitEffect: false,
       treasure: false,
       jewels: false,
-      // 새로 추가
+
       perkIcons: false,
       perkBackground: false
     };
@@ -5905,11 +5905,6 @@ function draw() {
     jewel.draw(offsetX, offsetY);
   });
 
-  // 적 그리기
-  gameObjects.enemies.forEach(enemy => {
-    enemy.draw(offsetX, offsetY);
-  });
-
   // 플레이어 그리기
   if (player.image && player.image.complete) {
     const playerSize = player.size * 2;
@@ -6062,6 +6057,11 @@ function draw() {
   
   // HUD 그리기
   drawHUD();
+
+  // 적 그리기
+  gameObjects.enemies.forEach(enemy => {
+    enemy.draw(offsetX, offsetY);
+  });
 
   // 총알 그리기(draw 함수 마지막에 그려서 가장 우선적으로 보이게 하기)
   gameObjects.bullets.forEach(bullet => {
