@@ -4078,7 +4078,6 @@ class ArtifactSystem {
         break;
       case 'expGain':
         player.exp += effect.value;
-        checkLevelUp();
         break;
     }
   }
@@ -4432,7 +4431,49 @@ function applyLevelUpChoice(optionIndex) {
   console.log("Selected option:", option);
 
   if (option.type === 'artifact') {
-    artifactSystem.applyArtifactEffects(option.artifactId);
+    // 경험치 획득 아티팩트 특별 처리
+    if (option.artifactId === 'exp_gain') {
+      // 경험치 적용
+      if (option.effects) {
+        option.effects.forEach(effect => {
+          if (effect.type === 'expGain') {
+            player.exp += effect.value;
+          }
+        });
+      }
+      
+      // 레벨업 체크 후 상태 결정
+      let leveledUp = false;
+      while (player.exp >= player.nextLevelExp) {
+        // 초과 경험치 계산
+        const excessExp = player.exp - player.nextLevelExp;
+        
+        // 레벨업
+        player.level += 1;
+        leveledUp = true;
+        
+        // 이전 레벨 경험치 저장
+        player.prevLevelExp = player.nextLevelExp;
+        
+        // 다음 레벨 경험치 계산
+        player.nextLevelExp = getXPForNextLevel(player.level);
+        
+        // 초과 경험치 유지
+        player.exp = excessExp;
+      }
+      
+      // 레벨업이 일어났으면 새로운 레벨업 화면 표시
+      if (leveledUp) {
+        isArtifactSelection = false;
+        generateLevelUpOptions();
+        // 게임 상태는 LEVEL_UP으로 유지
+        return;
+      }
+    } else {
+      // 일반 아티팩트 처리
+      artifactSystem.applyArtifactEffects(option.artifactId);
+    }
+    
     currentGameState = GAME_STATE.PLAYING;
     totalPausedTime += gameTimeSystem.getTime() - pauseStartTime;
     gameTimeSystem.resume();
