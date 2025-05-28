@@ -762,6 +762,14 @@ class AssetManager {
       this.loaded.treasure = true;
       console.log('보물 이미지 로드 완료');
     };
+
+    // 특별 보물 이미지
+    this.images.special_treasure = new Image();
+    this.images.special_treasure.src = './img/miscs/special_treasure.png';
+    this.images.special_treasure.onload = () => {
+      this.loaded.special_treasure = true;
+      console.log('보물 이미지 로드 완료');
+    };
     
     // 피격 효과 이미지
     this.images.hitEffect = new Image();
@@ -1138,10 +1146,10 @@ class SpecialTreasure extends GameObject {
     const drawY = this.y + offsetY;
     
     // 상자 그리기
-    if (assetManager.loaded.treasure) {
+    if (assetManager.loaded.special_treasure) {
       const imgSize = this.size * 2;
       ctx.drawImage(
-        assetManager.images.treasure,
+        assetManager.images.special_treasure,
         drawX - imgSize/2,
         drawY - imgSize/2,
         imgSize,
