@@ -768,7 +768,7 @@ class AssetManager {
     this.images.special_treasure.src = './img/miscs/special_treasure.png';
     this.images.special_treasure.onload = () => {
       this.loaded.special_treasure = true;
-      console.log('보물 이미지 로드 완료');
+      console.log('특별 보물 이미지 로드 완료');
     };
     
     // 피격 효과 이미지
