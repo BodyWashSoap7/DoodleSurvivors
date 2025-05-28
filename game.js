@@ -5913,6 +5913,13 @@ function draw() {
     jewel.draw(offsetX, offsetY);
   });
 
+  // 플레이어 총알 그리기 (플레이어 총알만)
+  gameObjects.bullets.forEach(bullet => {
+    if (!bullet.fromEnemy) {
+      bullet.draw(offsetX, offsetY);
+    }
+  });
+
   // 플레이어 그리기
   if (player.image && player.image.complete) {
     const playerSize = player.size * 2;
@@ -6066,14 +6073,16 @@ function draw() {
   // HUD 그리기
   drawHUD();
 
-  // 적 그리기
+  // 적 그리기 (가장 우선적으로 보이도록 나중에 그리기)
   gameObjects.enemies.forEach(enemy => {
     enemy.draw(offsetX, offsetY);
   });
 
-  // 총알 그리기(draw 함수 마지막에 그려서 가장 우선적으로 보이게 하기)
+  // 적 총알 그리기 (가장 우선적으로 보이도록 마지막에 그리기)
   gameObjects.bullets.forEach(bullet => {
-    bullet.draw(offsetX, offsetY);
+    if (bullet.fromEnemy) {
+      bullet.draw(offsetX, offsetY);
+    }
   });
 }
 
