@@ -312,6 +312,12 @@ const permanentUpgrades = {
 
   // 업그레이드 불러오기
   loadUpgrades() {
+    // 먼저 모든 업그레이드를 초기 상태로 리셋
+    this.upgrades.forEach(upgrade => {
+      upgrade.currentLevel = 0;
+    });
+    
+    // 그 다음 현재 사용자의 데이터 로드
     if (userProfileSystem.currentUser) {
       const savedData = localStorage.getItem(`vampireSurvivorUpgrades_${userProfileSystem.currentUser}`);
       if (savedData) {
@@ -514,6 +520,13 @@ const userProfileSystem = {
     if (this.users.includes(username)) {
       this.currentUser = username;
       this.saveCurrentUser();
+      
+      // 새로운 사용자의 골드 로드
+      gold = loadGold();
+      
+      // 새로운 사용자의 업그레이드 로드
+      permanentUpgrades.loadUpgrades();
+      
       return true;
     }
     return false;
