@@ -343,6 +343,7 @@ const gameObjects = {
 };
 
 // Game state
+let startingGold = 0;
 let gold = 0;
 let currentGameState = 8;
 let previousGameState = null;
@@ -526,6 +527,9 @@ const userProfileSystem = {
       
       // 새로운 사용자의 업그레이드 로드
       permanentUpgrades.loadUpgrades();
+
+      // 영구 업그레이드 적용
+      applyPermanentUpgrades();
       
       return true;
     }
@@ -4657,6 +4661,10 @@ function applyPermanentUpgrades() {
 function resetGame() {
   // 영구 업그레이드 적용
   applyPermanentUpgrades();
+
+  // 시작 골드 저장
+  startingGold = loadGold();
+  gold = startingGold;
   
   // 플레이어 위치 및 상태 초기화
   player.x = 0;
@@ -5365,11 +5373,19 @@ function drawGameOverScreen() {
   ctx.font = '48px Arial';
   ctx.textAlign = 'center';
   ctx.fillText('게임 오버', canvas.width / 2, canvas.height / 2 - 50);
+
+  // 이번 판에서 획득한 골드 계산
+  const goldEarned = gold - startingGold;
   
   ctx.fillStyle = '#FFFFFF';
   ctx.font = '24px Arial';
-  ctx.fillText(`최종 골드: ${gold}`, canvas.width / 2, canvas.height / 2);
-  ctx.fillText('클릭하여 다시 시작하세요', canvas.width / 2, canvas.height / 2 + 50);
+  ctx.fillText(`획득한 골드: ${goldEarned}`, canvas.width / 2, canvas.height / 2);
+  
+  // 두 가지 옵션 안내
+  ctx.fillText('클릭하여 다시 시작', canvas.width / 2, canvas.height / 2 + 50);
+  ctx.font = '20px Arial';
+  ctx.fillStyle = '#c5c6c7';
+  ctx.fillText('ESC를 눌러 메인 메뉴로', canvas.width / 2, canvas.height / 2 + 80);
 }
 
 // 업그레이드 화면 그리기 함수
@@ -5784,9 +5800,10 @@ function drawHUD() {
   drawTextWithStroke(formatTime(elapsedTime), canvas.width / 2, 30, '#66fcf1', '#000000');
   
   // 골드 (화면 왼쪽 위)
+  const goldEarned = gold - startingGold;
   ctx.font = '18px Arial';
   ctx.textAlign = 'left';
-  drawTextWithStroke(`Gold: ${gold}`, 20, 30, '#66fcf1', '#000000');
+  drawTextWithStroke(`Gold: ${goldEarned}`, 20, 30, '#66fcf1', '#000000');
   
   // 레벨 (화면 하단)
   ctx.font = '24px Arial';
@@ -6740,6 +6757,10 @@ document.addEventListener('keydown', (e) => {
       hiddenInput.value = '';
       hiddenInput.blur();
       currentGameState = GAME_STATE.PROFILE_SELECT;
+    } else if (currentGameState === GAME_STATE.GAME_OVER) {
+      // 게임 오버 상태에서 ESC 키로 메인 메뉴로
+      saveGold(); // 골드 저장
+      currentGameState = GAME_STATE.START_SCREEN;
     }
     e.preventDefault();
   }
