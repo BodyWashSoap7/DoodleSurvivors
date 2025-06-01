@@ -2339,90 +2339,108 @@ class SwordWeapon extends MeleeWeapon {
 }
 
 // 창 무기 클래스
-class SpearWeapon extends MeleeWeapon {
+class SpearWeapon extends Weapon {
   constructor() {
     super({
       type: 'spear',
-      baseCooldown: 1200, // 느린 공격속도
-      damage: 35,
-      range: 100, // 긴 사거리
-      width: 30, // 창의 폭
-      effectDuration: 500
+      baseCooldown: 2000, // 각 창의 기본 사이클 시간
+      damage: 30
     });
-    this.baseRange = 100; // 기본 범위 저장
-    this.width = 30;
+    this.spearCount = 1; // 시작은 창 1개
+    this.baseRange = 200; // 기본 사거리
+    this.range = this.baseRange;
+    this.spears = []; // 창 투사체들
+    this.spearSpeed = 8; // 창 이동 속도
+    
+    // 첫 번째 창 생성
+    this.createSpears();
   }
-
+  
   // 공격 범위 특성 적용
   updateRange() {
     this.range = this.baseRange * player.getTotalAttackRange();
   }
-
-  findTargetsInRange(attackDirection) {
-    const targets = [];
+  
+  createSpears() {
+    // 기존 창들 제거
+    this.removeOldSpears();
     
-    for (let enemy of gameObjects.enemies) {
-      if (enemy.state !== 'moving') continue;
-      
-      const dx = enemy.x - player.x;
-      const dy = enemy.y - player.y;
-      
-      // 플레이어를 중심으로 한 좌표계로 변환
-      const cos = Math.cos(-attackDirection);
-      const sin = Math.sin(-attackDirection);
-      const rotatedX = dx * cos - dy * sin;
-      const rotatedY = dx * sin + dy * cos;
-      
-      // 직사각형 범위 내에 있는지 확인 (공격 범위 특성이 적용된 범위 사용)
-      if (rotatedX >= 0 && rotatedX <= this.range && 
-          Math.abs(rotatedY) <= this.width / 2) {
-        targets.push(enemy);
-      }
+    // 새로운 창들 생성
+    for (let i = 0; i < this.spearCount; i++) {
+      const spear = new SpearProjectile(
+        player.x, 
+        player.y,
+        this.range,
+        this.spearSpeed,
+        this.damage * player.getTotalMeleeAttackPower(),
+        this,
+        i // 창 인덱스
+      );
+      this.spears.push(spear);
+      gameObjects.bullets.push(spear);
     }
-    
-    return targets;
   }
-
-  fire() {
-    // 마우스 방향으로 공격
-    const dx = mouseWorldX - player.x;
-    const dy = mouseWorldY - player.y;
-    const attackDirection = Math.atan2(dy, dx);
+  
+  removeOldSpears() {
+    // 이전 창들 제거
+    gameObjects.bullets = gameObjects.bullets.filter(b => 
+      !(b instanceof SpearProjectile && b.parent === this));
+    this.spears = [];
+  }
+  
+  update() {
+    // 각 창의 개별 쿨타임 체크 및 발사
+    const currentTime = gameTimeSystem.getTime();
     
-    // 공격 범위 내 적들 찾기
-    const targets = this.findTargetsInRange(attackDirection);
-    
-    // 적들에게 데미지 적용 (공격력 특성 적용)
-    targets.forEach(enemy => {
-      enemy.takeDamage(this.damage * player.getTotalMeleeAttackPower());
+    this.spears.forEach((spear, index) => {
+      if (spear.state === 'ready' && 
+          currentTime - spear.lastLaunchTime >= this.cooldown) {
+        this.launchSpear(spear, index);
+      }
     });
-    
-    // 시각적 효과 생성
-    this.createEffect(attackDirection);
   }
-
-  createEffect(attackDirection) {
-    const effect = new SpearEffect(
-      player.x,
-      player.y,
-      attackDirection,
-      this.range, // 공격 범위 특성이 적용된 범위 사용
-      this.width,
-      this.effectDuration
-    );
-    gameObjects.bullets.push(effect);
+  
+  launchSpear(spear, index) {
+    // 가장 가까운 적 찾기
+    const nearestEnemy = findNearestEnemy();
+    if (nearestEnemy) {
+      // 여러 창이 있을 때 약간씩 다른 방향으로 발사
+      const baseAngle = Math.atan2(nearestEnemy.y - player.y, nearestEnemy.x - player.x);
+      const angleOffset = (index - (this.spearCount - 1) / 2) * 0.2; // 약간의 각도 차이
+      const targetAngle = baseAngle + angleOffset;
+      
+      spear.launch(targetAngle, nearestEnemy);
+    }
   }
-
+  
+  fire() {
+    // 이 메서드는 사용하지 않음 (update에서 개별 처리)
+  }
+  
+  upgrade() {
+    if (this.level < this.maxLevel) {
+      this.level++;
+      this.applyLevelBonus();
+      return true;
+    }
+    return false;
+  }
+  
   applyLevelBonus() {
     super.applyLevelBonus();
-    // 레벨업 시 기본 사거리 증가
+    
+    // 레벨에 따른 개선
     if (this.level % 2 === 0) {
-      this.baseRange += 20;
-      this.updateRange(); // 실제 범위 재계산
+      this.spearCount++; // 짝수 레벨마다 창 개수 증가
+      this.createSpears(); // 창 재생성
     }
-    // 3레벨마다 폭 증가
     if (this.level % 3 === 0) {
-      this.width += 10;
+      this.baseRange += 30; // 3레벨마다 기본 사거리 증가
+      this.updateRange(); // 실제 사거리 재계산
+    }
+    if (this.level >= 4) {
+      this.baseCooldown *= 0.9; // 4레벨부터 쿨다운 감소
+      this.updateCooldown(player.getTotalCooldownReduction());
     }
   }
 }
@@ -2620,39 +2638,161 @@ class SwordEffect extends MeleeEffect {
 }
 
 // 창 공격 이펙트
-class SpearEffect extends MeleeEffect {
-  constructor(x, y, direction, range, width, duration) {
-    super(x, y, direction, duration);
-    this.range = range; // 공격 범위 특성이 적용된 범위
-    this.width = width;
+class SpearProjectile {
+  constructor(x, y, range, speed, damage, parent, index) {
+    this.startX = x;
+    this.startY = y;
+    this.x = x;
+    this.y = y;
+    this.range = range;
+    this.speed = speed;
+    this.damage = damage;
+    this.parent = parent;
+    this.index = index;
+    this.size = 8; // 충돌 크기
+    
+    // 상태 관리
+    this.state = 'ready'; // 'ready', 'flying', 'returning'
+    this.lastLaunchTime = 0;
+    this.targetX = 0;
+    this.targetY = 0;
+    this.angle = 0;
+    this.distanceTraveled = 0;
+    this.used = false;
+    this.hasHitTarget = false;
+    
+    // 회전 애니메이션
+    this.rotationAngle = 0;
+    this.rotationSpeed = 0.3;
   }
-
+  
+  launch(targetAngle, targetEnemy) {
+    this.state = 'flying';
+    this.lastLaunchTime = gameTimeSystem.getTime();
+    this.angle = targetAngle;
+    this.distanceTraveled = 0;
+    this.hasHitTarget = false;
+    
+    // 목표 위치 설정
+    this.targetX = player.x + Math.cos(targetAngle) * this.range;
+    this.targetY = player.y + Math.sin(targetAngle) * this.range;
+    
+    // 시작 위치를 현재 플레이어 위치로 업데이트
+    this.startX = player.x;
+    this.startY = player.y;
+    this.x = player.x;
+    this.y = player.y;
+  }
+  
+  update() {
+    if (this.used) return;
+    
+    // 회전 애니메이션
+    this.rotationAngle += this.rotationSpeed;
+    
+    if (this.state === 'flying') {
+      this.updateFlying();
+    } else if (this.state === 'returning') {
+      this.updateReturning();
+    }
+    // 'ready' 상태일 때는 플레이어 위치에 고정
+    else if (this.state === 'ready') {
+      this.x = player.x;
+      this.y = player.y;
+    }
+  }
+  
+  updateFlying() {
+    // 목표 방향으로 이동
+    const moveX = Math.cos(this.angle) * this.speed;
+    const moveY = Math.sin(this.angle) * this.speed;
+    
+    this.x += moveX;
+    this.y += moveY;
+    this.distanceTraveled += this.speed;
+    
+    // 적과 충돌 체크 (아직 적에게 맞지 않았을 때만)
+    if (!this.hasHitTarget) {
+      for (let enemy of gameObjects.enemies) {
+        if (enemy.state === 'moving' && detectCollision(this, enemy)) {
+          enemy.takeDamage(this.damage);
+          this.hasHitTarget = true;
+          break;
+        }
+      }
+    }
+    
+    // 최대 사거리에 도달하거나 적에게 맞으면 돌아가기 시작
+    if (this.distanceTraveled >= this.range || this.hasHitTarget) {
+      this.state = 'returning';
+    }
+  }
+  
+  updateReturning() {
+    // 플레이어에게 돌아가기
+    const dx = player.x - this.x;
+    const dy = player.y - this.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    
+    if (distance <= this.speed * 2) {
+      // 플레이어에게 도착
+      this.state = 'ready';
+      this.x = player.x;
+      this.y = player.y;
+    } else {
+      // 플레이어 방향으로 이동
+      const moveX = (dx / distance) * this.speed * 1.2; // 돌아올 때는 약간 더 빠르게
+      const moveY = (dy / distance) * this.speed * 1.2;
+      
+      this.x += moveX;
+      this.y += moveY;
+    }
+  }
+  
   draw(offsetX, offsetY) {
-    const progress = this.getProgress();
-    const alpha = 1 - progress;
-    const currentRange = this.range * progress; // 범위에 맞춰 조정
+    // ready 상태일 때는 그리지 않음 (플레이어가 들고 있는 것으로 간주)
+    if (this.state === 'ready') return;
+    
+    const drawX = this.x + offsetX;
+    const drawY = this.y + offsetY;
     
     ctx.save();
-    ctx.globalAlpha = alpha;
-    ctx.fillStyle = '#CD853F';
-    ctx.strokeStyle = '#8B4513';
-    ctx.lineWidth = Math.max(2, this.range / 100); // 범위에 따라 선 두께도 조정
+    ctx.translate(drawX, drawY);
+    ctx.rotate(this.rotationAngle);
     
-    // 직사각형 그리기
-    ctx.translate(this.x + offsetX, this.y + offsetY);
-    ctx.rotate(this.direction);
-    
-    ctx.fillRect(0, -this.width / 2, currentRange, this.width);
-    ctx.strokeRect(0, -this.width / 2, currentRange, this.width);
-    
-    // 창끝 부분 강조 - 크기도 범위에 비례
-    if (progress > 0.3) {
-      ctx.fillStyle = '#FFD700';
-      const tipSize = Math.max(this.width * 0.3, this.range / 20); // 범위에 따라 팁 크기 조정
-      ctx.fillRect(currentRange - tipSize, -tipSize / 2, tipSize, tipSize);
+    // 창 이미지가 있으면 사용, 없으면 기본 도형
+    if (assetManager.loaded.weapons && assetManager.images.weapons.spear) {
+      const imageSize = 64; // 64x64 PNG 이미지
+      ctx.drawImage(
+        assetManager.images.weapons.spear,
+        -imageSize / 2,
+        -imageSize / 2,
+        imageSize,
+        imageSize
+      );
+    } else {
+      // 기본 창 모양 (삼각형 + 막대)
+      ctx.fillStyle = '#CD853F'; // 갈색 (나무 손잡이)
+      ctx.fillRect(-2, -20, 4, 40);
+      
+      ctx.fillStyle = '#C0C0C0'; // 은색 (창끝)
+      ctx.beginPath();
+      ctx.moveTo(0, -20);
+      ctx.lineTo(-4, -12);
+      ctx.lineTo(4, -12);
+      ctx.closePath();
+      ctx.fill();
     }
     
     ctx.restore();
+  }
+  
+  outOfBounds() {
+    // 플레이어로부터 너무 멀리 떨어지면 제거
+    const maxDistance = this.range * 3;
+    const dx = this.x - player.x;
+    const dy = this.y - player.y;
+    return (dx * dx + dy * dy) > (maxDistance * maxDistance);
   }
 }
 
@@ -4333,41 +4473,45 @@ function generateLevelUpOptions() {
   for (let i = 0; i < optionCount; i++) {
     let selectedOption = null;
     
-    // 60% 확률로 무기, 40% 확률로 특성
-    if (Math.random() < 0.6 && allWeaponOptions.length > 0) {
-      // 무기 선택 (이미 선택된 무기는 제외)
-      const availableWeapons = allWeaponOptions.filter(weapon => 
+    // 무기 업그레이드가 있는 경우, 30% 확률로 기존 무기 업그레이드 우선 선택
+    if (weaponUpgradeOptions.length > 0 && Math.random() < 0.3) {
+      // 기존 무기 업그레이드 선택 (이미 선택된 것 제외)
+      const availableUpgrades = weaponUpgradeOptions.filter(upgrade => 
         !levelUpOptions.some(option => 
-          (option.type === 'weapon' && option.weaponType === weapon.weaponType) ||
-          (option.type === 'weaponUpgrade' && option.weaponType === weapon.weaponType)
+          option.type === 'weaponUpgrade' && option.weaponType === upgrade.weaponType
         )
       );
       
-      if (availableWeapons.length > 0) {
-        selectedOption = availableWeapons[Math.floor(Math.random() * availableWeapons.length)];
+      if (availableUpgrades.length > 0) {
+        selectedOption = availableUpgrades[Math.floor(Math.random() * availableUpgrades.length)];
       }
     }
     
-    // 무기를 선택하지 못했거나 특성을 선택해야 하는 경우
+    // 기존 무기 업그레이드를 선택하지 못했거나 70% 확률에 해당하는 경우
     if (!selectedOption) {
-      // 특성 선택 (이미 선택된 특성은 제외)
-      const availableStats = statUpgrades.filter(stat => 
-        !levelUpOptions.some(option => option.type === stat.type)
-      );
-      
-      if (availableStats.length > 0) {
-        selectedOption = availableStats[Math.floor(Math.random() * availableStats.length)];
-      } else if (allWeaponOptions.length > 0) {
-        // 특성이 모두 선택되었으면 무기에서 선택
-        const availableWeapons = allWeaponOptions.filter(weapon => 
+      // 60% 확률로 새 무기, 40% 확률로 특성
+      if (Math.random() < 0.6 && availableNewWeapons.length > 0) {
+        // 새 무기 선택 (이미 선택된 무기는 제외)
+        const availableWeapons = availableNewWeapons.filter(weapon => 
           !levelUpOptions.some(option => 
-            (option.type === 'weapon' && option.weaponType === weapon.weaponType) ||
-            (option.type === 'weaponUpgrade' && option.weaponType === weapon.weaponType)
+            option.type === 'weapon' && option.weaponType === weapon.weaponType
           )
         );
         
         if (availableWeapons.length > 0) {
           selectedOption = availableWeapons[Math.floor(Math.random() * availableWeapons.length)];
+        }
+      }
+      
+      // 새 무기를 선택하지 못했으면 특성 선택
+      if (!selectedOption) {
+        // 특성 선택 (이미 선택된 특성은 제외)
+        const availableStats = statUpgrades.filter(stat => 
+          !levelUpOptions.some(option => option.type === stat.type)
+        );
+        
+        if (availableStats.length > 0) {
+          selectedOption = availableStats[Math.floor(Math.random() * availableStats.length)];
         }
       }
     }
