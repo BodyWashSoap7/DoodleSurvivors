@@ -2252,11 +2252,11 @@ class SwordWeapon extends MeleeWeapon {
       type: 'sword',
       baseCooldown: 800, // 중간 공격속도
       damage: 25,
-      range: 70, // 중간 사거리
+      range: 300, // 중간 사거리
       attackAngle: Math.PI / 3, // 60도 부채꼴
       effectDuration: 400
     });
-    this.baseRange = 70; // 기본 범위 저장
+    this.baseRange = 300; // 기본 범위 저장s
   }
 
   // 공격 범위 특성 적용
@@ -2268,7 +2268,7 @@ class SwordWeapon extends MeleeWeapon {
   fire() {
     // 범위 내에서 가장 가까운 적 찾기
     let nearestEnemy = null;
-    let minDistance = this.range * 1.5; // 부채꼴 공격이므로 조금 더 넓은 범위에서 탐색
+    let minDistance = this.range;
     
     for (let enemy of gameObjects.enemies) {
       if (enemy.state !== 'moving') continue;
@@ -2641,7 +2641,7 @@ class SwordEffect extends MeleeEffect {
     ctx.rotate(this.direction);
     
     // 스프라이트 크기를 범위에 맞춰 조정
-    const scale = this.range / 35; // 기본 크기 대비 스케일 계산
+    const scale = this.range / 300; // 기본 크기 대비 스케일 계산
     const drawWidth = this.frameWidth * scale;
     const drawHeight = this.frameHeight * scale;
     
@@ -4844,6 +4844,7 @@ function resetGame() {
   player.levelExpMultiplierBonus = 0;
   
   player.weapons = [];
+  addWeapon('sword');
 
   // 무적 상태 초기화
   player.invincible = false;
