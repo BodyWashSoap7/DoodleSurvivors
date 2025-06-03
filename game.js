@@ -718,7 +718,7 @@ class AssetManager {
 
   loadWeaponImages() {
     this.loadImageSet('weapons', 
-      ['wind', 'earth', 'flame', 'lightningChain', 'lightningImpact', 'fist', 'spear'], 
+      ['wind', 'earth', 'flame', 'lightningChain', 'lightningImpact', 'fist', 'sword_slash'], 
       './img/weapons/{item}.png'
     );
   }
@@ -2264,6 +2264,45 @@ class SwordWeapon extends MeleeWeapon {
     this.range = this.baseRange * player.getTotalAttackRange();
   }
 
+  // fire 메서드를 오버라이드해서 자동으로 가장 가까운 적 향해 공격
+  fire() {
+    // 범위 내에서 가장 가까운 적 찾기
+    let nearestEnemy = null;
+    let minDistance = this.range * 1.5; // 부채꼴 공격이므로 조금 더 넓은 범위에서 탐색
+    
+    for (let enemy of gameObjects.enemies) {
+      if (enemy.state !== 'moving') continue;
+      
+      const dx = enemy.x - player.x;
+      const dy = enemy.y - player.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      
+      if (distance < minDistance) {
+        minDistance = distance;
+        nearestEnemy = enemy;
+      }
+    }
+    
+    // 적이 있으면 그 방향으로 공격
+    if (nearestEnemy) {
+      // 적 방향 계산
+      const dx = nearestEnemy.x - player.x;
+      const dy = nearestEnemy.y - player.y;
+      const attackDirection = Math.atan2(dy, dx);
+      
+      // 부채꼴 범위 내 모든 적들 찾기
+      const targets = this.findTargetsInRange(attackDirection);
+      
+      // 범위 내 모든 적들에게 데미지 적용 (공격력 특성 적용)
+      targets.forEach(enemy => {
+        enemy.takeDamage(this.damage * player.getTotalMeleeAttackPower());
+      });
+      
+      // 시각적 효과 생성
+      this.createEffect(attackDirection);
+    }
+  }
+
   findTargetsInRange(attackDirection) {
     const targets = [];
     
@@ -2292,24 +2331,6 @@ class SwordWeapon extends MeleeWeapon {
     }
     
     return targets;
-  }
-
-  fire() {
-    // 마우스 방향으로 공격
-    const dx = mouseWorldX - player.x;
-    const dy = mouseWorldY - player.y;
-    const attackDirection = Math.atan2(dy, dx);
-    
-    // 공격 범위 내 적들 찾기
-    const targets = this.findTargetsInRange(attackDirection);
-    
-    // 적들에게 데미지 적용 (공격력 특성 적용)
-    targets.forEach(enemy => {
-      enemy.takeDamage(this.damage * player.getTotalMeleeAttackPower());
-    });
-    
-    // 시각적 효과 생성
-    this.createEffect(attackDirection);
   }
 
   createEffect(attackDirection) {
@@ -2343,72 +2364,104 @@ class SpearWeapon extends Weapon {
   constructor() {
     super({
       type: 'spear',
-      baseCooldown: 1200, // 느린 공격속도
-      damage: 35
+      baseCooldown: 2000, // 각 창의 기본 사이클 시간
+      damage: 30
     });
-    this.projectileSpeed = 10; // 투사체 속도
-    this.projectileRange = 300; // 최대 사거리
-    this.projectileCount = 1; // 동시 발사 수
-    this.projectileSpacing = 30; // 창 사이의 간격
+    this.spearCount = 1; // 시작은 창 1개
+    this.baseRange = 200; // 기본 사거리
+    this.range = this.baseRange;
+    this.spears = []; // 창 투사체들
+    this.spearSpeed = 8; // 창 이동 속도
+    
+    // 첫 번째 창 생성
+    this.createSpears();
+  }
+  
+  // 공격 범위 특성 적용
+  updateRange() {
+    this.range = this.baseRange * player.getTotalAttackRange();
+  }
+  
+  createSpears() {
+    // 기존 창들 제거
+    this.removeOldSpears();
+    
+    // 새로운 창들 생성
+    for (let i = 0; i < this.spearCount; i++) {
+      const spear = new SpearProjectile(
+        player.x, 
+        player.y,
+        this.range,
+        this.spearSpeed,
+        this.damage * player.getTotalMeleeAttackPower(),
+        this,
+        i // 창 인덱스
+      );
+      this.spears.push(spear);
+      gameObjects.bullets.push(spear);
+    }
+  }
+  
+  removeOldSpears() {
+    // 이전 창들 제거
+    gameObjects.bullets = gameObjects.bullets.filter(b => 
+      !(b instanceof SpearProjectile && b.parent === this));
+    this.spears = [];
+  }
+  
+  update() {
+    // 각 창의 개별 쿨타임 체크 및 발사
+    const currentTime = gameTimeSystem.getTime();
+    
+    this.spears.forEach((spear, index) => {
+      if (spear.state === 'ready' && 
+          currentTime - spear.lastLaunchTime >= this.cooldown) {
+        this.launchSpear(spear, index);
+      }
+    });
+  }
+  
+  launchSpear(spear, index) {
+    // 가장 가까운 적 찾기
+    const nearestEnemy = findNearestEnemy();
+    if (nearestEnemy) {
+      // 여러 창이 있을 때 약간씩 다른 방향으로 발사
+      const baseAngle = Math.atan2(nearestEnemy.y - player.y, nearestEnemy.x - player.x);
+      const angleOffset = (index - (this.spearCount - 1) / 2) * 0.2; // 약간의 각도 차이
+      const targetAngle = baseAngle + angleOffset;
+      
+      spear.launch(targetAngle, nearestEnemy);
+    }
   }
   
   fire() {
-    // 마우스 방향으로 창 발사
-    const dx = mouseWorldX - player.x;
-    const dy = mouseWorldY - player.y;
-    const angle = Math.atan2(dy, dx);
-    
-    // 발사 방향과 수직인 방향 계산 (90도 회전)
-    const perpAngle = angle + Math.PI / 2;
-    
-    // 여러 개의 창을 수직 방향으로 배치
-    for (let i = 0; i < this.projectileCount; i++) {
-      // 중앙을 기준으로 위아래로 배치
-      const offset = (i - (this.projectileCount - 1) / 2) * this.projectileSpacing;
-      
-      // 시작 위치 계산 (수직 방향으로 오프셋)
-      const startX = player.x + Math.cos(perpAngle) * offset;
-      const startY = player.y + Math.sin(perpAngle) * offset;
-      
-      const spear = new SpearProjectile(
-        startX,
-        startY,
-        angle, // 모든 창은 같은 방향으로 발사
-        this.projectileSpeed,
-        this.projectileRange,
-        this.damage * player.getTotalMeleeAttackPower()
-      );
-      gameObjects.bullets.push(spear);
+    // 이 메서드는 사용하지 않음 (update에서 개별 처리)
+  }
+  
+  upgrade() {
+    if (this.level < this.maxLevel) {
+      this.level++;
+      this.applyLevelBonus();
+      return true;
     }
+    return false;
   }
   
   applyLevelBonus() {
     super.applyLevelBonus();
     
-    // 레벨업 시 향상
-    if (this.level === 2) {
-      this.projectileCount = 3; // 3개로 증가
-    } else if (this.level === 4) {
-      this.projectileCount = 5; // 5개로 증가
-    } else if (this.level === 6) {
-      this.projectileCount = 7; // 7개로 증가
-    } else if (this.level === 8) {
-      this.projectileCount = 9; // 9개로 증가
+    // 레벨에 따른 개선
+    if (this.level % 2 === 0) {
+      this.spearCount++; // 짝수 레벨마다 창 개수 증가
+      this.createSpears(); // 창 재생성
     }
-    
-    // 기타 향상
     if (this.level % 3 === 0) {
-      this.projectileRange += 50; // 사거리 증가
+      this.baseRange += 30; // 3레벨마다 기본 사거리 증가
+      this.updateRange(); // 실제 사거리 재계산
     }
     if (this.level >= 4) {
-      this.projectileSpeed += 1; // 속도 증가
-    }
-    if (this.level >= 5) {
-      this.baseCooldown *= 0.85; // 쿨다운 감소
+      this.baseCooldown *= 0.9; // 4레벨부터 쿨다운 감소
       this.updateCooldown(player.getTotalCooldownReduction());
-    }
-    if (this.level >= 7) {
-      this.projectileSpacing = 25; // 더 촘촘하게
     }
   }
 }
@@ -2577,200 +2630,66 @@ class SwordEffect extends MeleeEffect {
     super(x, y, direction, duration);
     this.range = range; // 공격 범위 특성이 적용된 범위
     this.angle = angle;
+    
+    // 스프라이트 애니메이션 속성
+    this.currentFrame = 0;
+    this.frameCount = 4;
+    this.frameWidth = 64;
+    this.frameHeight = 64;
+    this.frameTime = 0;
+    this.frameDuration = this.duration / this.frameCount; // 전체 시간을 프레임 수로 나눔
+    this.animationComplete = false;
   }
 
-  draw(offsetX, offsetY) {
-    const progress = this.getProgress();
-    const alpha = 1 - progress;
-    const currentRange = this.range * progress; // 범위에 맞춰 조정
-    
-    ctx.save();
-    ctx.globalAlpha = alpha;
-    ctx.fillStyle = '#87CEEB';
-    ctx.strokeStyle = '#4169E1';
-    ctx.lineWidth = Math.max(2, this.range / 50); // 범위에 따라 선 두께도 조정
-    
-    // 부채꼴 그리기
-    ctx.translate(this.x + offsetX, this.y + offsetY);
-    ctx.rotate(this.direction);
-    
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.arc(0, 0, currentRange, -this.angle / 2, this.angle / 2);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-    
-    ctx.restore();
-  }
-}
-
-// 창 공격 이펙트
-class SpearProjectile {
-  constructor(x, y, angle, speed, maxRange, damage) {
-    this.x = x;
-    this.y = y;
-    this.angle = angle;
-    this.speed = speed;
-    this.maxRange = maxRange;
-    this.damage = damage;
-    this.distanceTraveled = 0;
-    this.used = false;
-    
-    // 관통한 적 추적 (중복 데미지 방지)
-    this.hitEnemies = new Set();
-    
-    // 페이드아웃 관련
-    this.fadeStartDistance = maxRange * 0.8; // 80% 거리에서 페이드 시작
-    this.alpha = 1.0;
-    
-    // 스프라이트 정보
-    this.spriteWidth = 256;
-    this.spriteHeight = 64;
-    
-    // 크기 (hitbox용)
-    this.size = 15; // 충돌 판정용 크기
-  }
-  
   update() {
-    // 이동
-    const moveX = Math.cos(this.angle) * this.speed;
-    const moveY = Math.sin(this.angle) * this.speed;
+    super.update(); // 기본 업데이트 (used 상태 체크)
     
-    this.x += moveX;
-    this.y += moveY;
-    this.distanceTraveled += this.speed;
-    
-    // 페이드아웃 처리
-    if (this.distanceTraveled >= this.fadeStartDistance) {
-      const fadeProgress = (this.distanceTraveled - this.fadeStartDistance) / (this.maxRange - this.fadeStartDistance);
-      this.alpha = Math.max(0, 1 - fadeProgress);
-    }
-    
-    // 최대 거리 도달 시 제거
-    if (this.distanceTraveled >= this.maxRange) {
-      this.used = true;
-      return;
-    }
-    
-    // 적과의 충돌 체크 (관통)
-    for (let enemy of gameObjects.enemies) {
-      if (enemy.state === 'moving' && !this.hitEnemies.has(enemy)) {
-        // 창의 길이를 고려한 충돌 체크
-        if (this.checkCollisionWithEnemy(enemy)) {
-          enemy.takeDamage(this.damage);
-          this.hitEnemies.add(enemy); // 이미 맞은 적으로 기록
+    if (!this.animationComplete) {
+      // 프레임 업데이트
+      this.frameTime += 16; // 약 60fps 기준
+      
+      if (this.frameTime >= this.frameDuration) {
+        this.frameTime = 0;
+        this.currentFrame++;
+        
+        // 애니메이션 완료 확인
+        if (this.currentFrame >= this.frameCount) {
+          this.animationComplete = true;
+          this.used = true;
         }
       }
     }
   }
-  
-  checkCollisionWithEnemy(enemy) {
-    // 창의 중심점과 적 사이의 거리
-    const dx = enemy.x - this.x;
-    const dy = enemy.y - this.y;
-    const distance = Math.sqrt(dx * dx + dy * dy);
-    
-    // 기본 원형 충돌 체크
-    if (distance < this.size + enemy.size) {
-      return true;
-    }
-    
-    // 창의 길이를 고려한 선분 충돌 체크
-    // 창의 끝점 계산
-    const spearLength = 60; // 창의 실제 길이
-    const endX = this.x + Math.cos(this.angle) * spearLength;
-    const endY = this.y + Math.sin(this.angle) * spearLength;
-    
-    // 점과 선분 사이의 최단 거리 계산
-    const lineDistance = this.pointToLineDistance(enemy.x, enemy.y, this.x, this.y, endX, endY);
-    
-    return lineDistance < enemy.size;
-  }
-  
-  pointToLineDistance(px, py, x1, y1, x2, y2) {
-    const A = px - x1;
-    const B = py - y1;
-    const C = x2 - x1;
-    const D = y2 - y1;
-    
-    const dot = A * C + B * D;
-    const lenSq = C * C + D * D;
-    let param = -1;
-    
-    if (lenSq !== 0) {
-      param = dot / lenSq;
-    }
-    
-    let xx, yy;
-    
-    if (param < 0) {
-      xx = x1;
-      yy = y1;
-    } else if (param > 1) {
-      xx = x2;
-      yy = y2;
-    } else {
-      xx = x1 + param * C;
-      yy = y1 + param * D;
-    }
-    
-    const dx = px - xx;
-    const dy = py - yy;
-    
-    return Math.sqrt(dx * dx + dy * dy);
-  }
-  
+
   draw(offsetX, offsetY) {
-    if (assetManager.loaded.weapons && assetManager.images.weapons.spear) {
-      ctx.save();
-      
-      // 투명도 적용
-      ctx.globalAlpha = this.alpha;
-      
-      // 창 위치로 이동 및 회전
-      ctx.translate(this.x + offsetX, this.y + offsetY);
-      ctx.rotate(this.angle);
-      
-      // 창 이미지 그리기 (중심 정렬)
-      const drawWidth = this.spriteWidth * 0.5; // 크기 조정
-      const drawHeight = this.spriteHeight * 0.5;
-      
-      ctx.drawImage(
-        assetManager.images.weapons.spear,
-        -drawWidth * 0.3, // 창끝이 앞쪽에 오도록 조정
-        -drawHeight / 2,
-        drawWidth,
-        drawHeight
-      );
-      
-      ctx.restore();
-    } else {
-      // 폴백: 이미지가 없을 경우 선으로 표시
-      ctx.save();
-      ctx.globalAlpha = this.alpha;
-      ctx.strokeStyle = '#CD853F';
-      ctx.lineWidth = 3;
-      
-      ctx.beginPath();
-      ctx.moveTo(this.x + offsetX, this.y + offsetY);
-      const endX = this.x + Math.cos(this.angle) * 60;
-      const endY = this.y + Math.sin(this.angle) * 60;
-      ctx.lineTo(endX + offsetX, endY + offsetY);
-      ctx.stroke();
-      
-      // 창끝
-      ctx.fillStyle = '#FFD700';
-      ctx.beginPath();
-      ctx.arc(endX + offsetX, endY + offsetY, 5, 0, Math.PI * 2);
-      ctx.fill();
-      
-      ctx.restore();
-    }
-  }
-  
-  outOfBounds() {
-    return this.used;
+    const progress = this.getProgress();
+    const alpha = 1 - progress * 0.5; // 서서히 투명해짐
+    
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    
+    // 플레이어 위치로 이동 후 방향에 맞게 회전
+    ctx.translate(this.x + offsetX, this.y + offsetY);
+    ctx.rotate(this.direction);
+    
+    // 스프라이트 크기를 범위에 맞춰 조정
+    const scale = this.range / 35; // 기본 크기 대비 스케일 계산
+    const drawWidth = this.frameWidth * scale;
+    const drawHeight = this.frameHeight * scale;
+    
+    // 스프라이트 시트에서 현재 프레임 그리기
+    const frameX = this.currentFrame * this.frameWidth;
+    
+    // 부채꼴 중앙에 맞춰 그리기
+    ctx.drawImage(
+      assetManager.images.weapons.sword_slash,
+      frameX, 0, // 소스 위치
+      this.frameWidth, this.frameHeight, // 소스 크기
+      0, -drawHeight / 2, // 그리기 위치 (중앙 정렬)
+      drawWidth, drawHeight // 그리기 크기
+    );
+    
+    ctx.restore();
   }
 }
 
@@ -4810,7 +4729,6 @@ function resetGame() {
   player.levelGoldMultiplierBonus = 0;
   player.levelExpMultiplierBonus = 0;
   
-  // 무기 없이 시작
   player.weapons = [];
 
   // 무적 상태 초기화
