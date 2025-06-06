@@ -582,6 +582,12 @@ const ENEMY_SPAWN_INTERVAL = 500;
 const ENEMY_SPATIAL_GRID_SIZE = 100;
 let enemySpatialGrid = {};
 
+// 웨이브 스폰 시스템 변수
+let currentWave = 0;
+let waveSpawnCount = 0;
+let isSpawningWave = false;
+let baseMaxEnemies = 300;
+
 // 공통 애니메이션 관련 상수
 const TARGET_FPS = 120;
 const FRAME_INTERVAL = 1000 / TARGET_FPS;
@@ -6019,6 +6025,18 @@ function drawHUD() {
   ctx.textAlign = 'center';
   drawTextWithStroke(`${player.exp} / ${player.nextLevelExp}`, canvas.width / 2, expBarY + 15, '#ffffff', '#000000', 2);
 
+  // 웨이브 정보 표시 (화면 오른쪽 위)
+  if (currentWave > 0) {
+    ctx.font = '18px Arial';
+    ctx.textAlign = 'right';
+    drawTextWithStroke(`Wave: ${currentWave}`, canvas.width - 20, 30, '#ff0000', '#000000');
+  }
+  
+  // 현재 적 수 표시 (디버깅용)
+  ctx.font = '16px Arial';
+  ctx.textAlign = 'right';
+  drawTextWithStroke(`Enemies: ${gameObjects.enemies.length}`, canvas.width - 20, 50, '#ffffff', '#000000');
+
   // 보스전 경고 메시지
   if (bossWarningActive) {
     const elapsedWarningTime = gameTimeSystem.getTime() - bossWarningStartTime;
@@ -6516,122 +6534,201 @@ function spawnEnemyAroundPlayer() {
   // 보스전 모드에서는 적 스폰 안함
   if (bossMode) return;
   
-  // 최대 적 수 체크
-  if (gameObjects.enemies.length >= MAX_ENEMIES) {
+  // 동적 최대 적 수 계산 (시간에 따라 증가)
+  const dynamicMaxEnemies = Math.min(baseMaxEnemies + Math.floor(elapsedTime / 30) * 50, 1000);
+  
+  // 현재 적 수가 최대치에 도달했으면 스폰 안함
+  if (gameObjects.enemies.length >= dynamicMaxEnemies) {
     return;
   }
-  // 최대 적 수 체크
-  if (gameObjects.enemies.length >= MAX_ENEMIES) {
-    return;
+  
+  const currentTime = gameTimeSystem.getTime();
+  
+  // 웨이브 시스템 - 30초마다 대규모 웨이브
+  if (elapsedTime > 0 && elapsedTime % 30 === 0 && currentWave < Math.floor(elapsedTime / 30)) {
+    currentWave = Math.floor(elapsedTime / 30);
+    isSpawningWave = true;
+    waveSpawnCount = 0;
+    
+    // 화면 흔들림 효과로 웨이브 시작 알림
+    screenShakeTime = 300;
+    screenShakeIntensity = 5;
   }
-
-  // 경과 시간에 따른 스폰 간격 조정 (시간이 지날수록 빨라짐)
-  let currentSpawnInterval = ENEMY_SPAWN_INTERVAL;
+  
+  // 웨이브 스폰 처리
+  if (isSpawningWave) {
+    const waveSize = Math.min(20 + currentWave * 10, 100); // 웨이브당 적 수
+    const spawnsPerFrame = Math.min(5 + Math.floor(currentWave / 2), 15); // 프레임당 스폰 수
+    
+    for (let i = 0; i < spawnsPerFrame && waveSpawnCount < waveSize; i++) {
+      if (gameObjects.enemies.length >= dynamicMaxEnemies) break;
+      
+      // 360도 전방향에서 스폰
+      const angle = Math.random() * Math.PI * 2;
+      const distance = MIN_SPAWN_DISTANCE + Math.random() * (MAX_SPAWN_DISTANCE - MIN_SPAWN_DISTANCE);
+      const spawnX = player.x + Math.cos(angle) * distance;
+      const spawnY = player.y + Math.sin(angle) * distance;
+      
+      spawnEnemyAtPosition(spawnX, spawnY, true); // 웨이브 스폰 표시
+      waveSpawnCount++;
+    }
+    
+    if (waveSpawnCount >= waveSize) {
+      isSpawningWave = false;
+    }
+    
+    return; // 웨이브 중에는 일반 스폰 안함
+  }
+  
+  // 일반 스폰 - 시간에 따라 간격과 수량 조정
+  let spawnInterval = ENEMY_SPAWN_INTERVAL;
+  let spawnCount = 1;
+  
   if (elapsedTime > 60) {
-    currentSpawnInterval = Math.max(200, ENEMY_SPAWN_INTERVAL - (elapsedTime - 60) / 10);
+    // 1분 후: 스폰 간격 감소, 동시 스폰 증가
+    spawnInterval = Math.max(100, ENEMY_SPAWN_INTERVAL - (elapsedTime - 60) * 5);
+    spawnCount = Math.min(1 + Math.floor((elapsedTime - 60) / 30), 5);
+  }
+  
+  if (elapsedTime > 120) {
+    // 2분 후: 더욱 공격적
+    spawnInterval = Math.max(50, spawnInterval);
+    spawnCount = Math.min(3 + Math.floor((elapsedTime - 120) / 20), 10);
+  }
+  
+  if (elapsedTime > 180) {
+    // 3분 후: 극한 난이도
+    spawnInterval = 30;
+    spawnCount = Math.min(5 + Math.floor((elapsedTime - 180) / 15), 20);
   }
   
   // 스폰 간격 체크
-  const currentTime = gameTimeSystem.getTime();
-  if (currentTime - lastEnemySpawnTime < ENEMY_SPAWN_INTERVAL) {
+  if (currentTime - lastEnemySpawnTime < spawnInterval) {
     return;
   }
   
-  // 360도를 8개 섹터로 나누기
-  const sectors = 8;
-  const sectorAngle = (Math.PI * 2) / sectors;
-  let possibleAngles = [];
-  
-  // 각 섹터별 적 수 확인
-  for (let i = 0; i < sectors; i++) {
-    const angle = i * sectorAngle;
-    const enemyCount = countEnemiesInSector(angle, sectorAngle);
+  // 여러 마리 동시 스폰
+  let spawned = 0;
+  for (let i = 0; i < spawnCount; i++) {
+    if (gameObjects.enemies.length >= dynamicMaxEnemies) break;
     
-    // 섹터에 적이 적으면 가능한 각도로 추가
-    if (enemyCount < 5) { // 섹터당 최대 5마리
-      possibleAngles.push(angle + Math.random() * sectorAngle);
+    // 각 적마다 랜덤 위치
+    const angle = Math.random() * Math.PI * 2;
+    const distance = MIN_SPAWN_DISTANCE + Math.random() * (MAX_SPAWN_DISTANCE - MIN_SPAWN_DISTANCE);
+    const spawnX = player.x + Math.cos(angle) * distance;
+    const spawnY = player.y + Math.sin(angle) * distance;
+    
+    if (spawnEnemyAtPosition(spawnX, spawnY, false)) {
+      spawned++;
     }
   }
   
-  // 가능한 각도가 없으면 스폰하지 않음
-  if (possibleAngles.length === 0) {
-    return;
-  }
-  
-  // 랜덤 각도 선택
-  const spawnAngle = possibleAngles[Math.floor(Math.random() * possibleAngles.length)];
-  const spawnDistance = MIN_SPAWN_DISTANCE + Math.random() * (MAX_SPAWN_DISTANCE - MIN_SPAWN_DISTANCE);
-  
-  const spawnX = player.x + Math.cos(spawnAngle) * spawnDistance;
-  const spawnY = player.y + Math.sin(spawnAngle) * spawnDistance;
-  
-  // 스폰 위치 유효성 확인
-  if (isValidSpawnPosition(spawnX, spawnY)) {
-    // 적 타입 선택
-    let selectedType;
-    
-    // 가중치 기반 선택
-    const totalWeight = Object.values(ENEMY_TYPES)
-      .filter(type => type.spawnWeight > 0)
-      .reduce((sum, type) => sum + type.spawnWeight, 0);
-    
-    let randomWeight = Math.random() * totalWeight;
-    for (const type of Object.values(ENEMY_TYPES)) {
-      if (type.spawnWeight <= 0) continue;
-      
-      randomWeight -= type.spawnWeight;
-      if (randomWeight <= 0) {
-        selectedType = type;
-        break;
-      }
-    }
-    // 기본값
-    if (!selectedType) selectedType = ENEMY_TYPES.NORMAL;
-    
-    // 선택된 타입으로 적 생성
-    let enemy;
-    
-    // 보스 타입인 경우
-    if (selectedType.isBoss) {
-      enemy = new BossEnemy(spawnX, spawnY);
-    } 
-    // 일반 적 타입
-    else {
-      // 아티팩트 효과 적용
-      const enemySpeed = (selectedType.speedBase + Math.random() * selectedType.speedVariance) 
-                         * (1 - player.enemySpeedReduction);
-      const enemyHealth = Math.floor((selectedType.healthBase + Math.floor((player.level - 1) * selectedType.healthPerLevel)) 
-                         * (1 - player.enemyHealthReduction));
-      const enemyAttack = selectedType.attackBase + Math.floor((player.level - 1) * selectedType.attackPerLevel);
-      
-      enemy = new Enemy(spawnX, spawnY, selectedType.size, enemySpeed, enemyHealth, enemyAttack);
-      
-      // 추가 속성 설정
-      enemy.type = selectedType.name;
-      enemy.expValue = selectedType.expValue;
-      enemy.goldValue = selectedType.goldValue;
-
-      // SHOOTER 타입 속성 추가
-      if (selectedType.canShoot) {
-        enemy.canShoot = true;
-        enemy.shootCooldown = selectedType.shootCooldown;
-      }
-      
-      // 적 타입별 스프라이트 설정
-      if (selectedType.name === "Fast") {
-        enemy.spriteIndex = 1;      // 스프라이트 시트에서의 인덱스
-      } else if (selectedType.name === "Tank") {
-        enemy.spriteIndex = 2;
-      } else if (selectedType.name === "Shooter") {
-        enemy.spriteIndex = 3;
-      } else {
-        enemy.spriteIndex = 0;
-      }
-    }
-    
-    gameObjects.enemies.push(enemy);
+  if (spawned > 0) {
     lastEnemySpawnTime = currentTime;
   }
+}
+
+// 특정 위치에 적 스폰하는 헬퍼 함수
+function spawnEnemyAtPosition(x, y, isWaveSpawn) {
+  // 스폰 위치 유효성 확인
+  if (!isValidSpawnPosition(x, y)) {
+    return false;
+  }
+  
+  // 적 타입 선택 - 시간에 따라 강한 적 비율 증가
+  let enemyType = selectEnemyTypeByTime();
+  
+  // 선택된 타입으로 적 생성
+  let enemy;
+  
+  if (enemyType.isBoss) {
+    enemy = new BossEnemy(x, y);
+  } else {
+    // 시간에 따른 스탯 보정
+    const timeMultiplier = 1 + (elapsedTime / 300); // 5분마다 2배
+    
+    const enemySpeed = (enemyType.speedBase + Math.random() * enemyType.speedVariance) 
+                       * (1 - player.enemySpeedReduction)
+                       * (isWaveSpawn ? 1.2 : 1); // 웨이브 적은 20% 빠름
+    
+    const enemyHealth = Math.floor((enemyType.healthBase + Math.floor((player.level - 1) * enemyType.healthPerLevel)) 
+                       * (1 - player.enemyHealthReduction)
+                       * timeMultiplier);
+    
+    const enemyAttack = (enemyType.attackBase + Math.floor((player.level - 1) * enemyType.attackPerLevel))
+                       * timeMultiplier;
+    
+    enemy = new Enemy(x, y, enemyType.size, enemySpeed, enemyHealth, enemyAttack);
+    
+    // 추가 속성 설정
+    enemy.type = enemyType.name;
+    enemy.expValue = Math.floor(enemyType.expValue * (isWaveSpawn ? 1.5 : 1));
+    enemy.goldValue = Math.floor(enemyType.goldValue * (isWaveSpawn ? 1.5 : 1));
+    
+    if (enemyType.canShoot) {
+      enemy.canShoot = true;
+      enemy.shootCooldown = enemyType.shootCooldown;
+    }
+  }
+  
+  gameObjects.enemies.push(enemy);
+  return true;
+}
+
+// 시간에 따른 적 타입 선택
+function selectEnemyTypeByTime() {
+  // 시간에 따라 가중치 동적 조정
+  const weights = { ...ENEMY_TYPES };
+  
+  if (elapsedTime < 30) {
+    // 초반: 주로 일반 적
+    weights.NORMAL.spawnWeight = 80;
+    weights.FAST.spawnWeight = 15;
+    weights.TANK.spawnWeight = 5;
+    weights.SHOOTER.spawnWeight = 0;
+  } else if (elapsedTime < 60) {
+    // 30초-1분: 슈터 등장
+    weights.NORMAL.spawnWeight = 60;
+    weights.FAST.spawnWeight = 20;
+    weights.TANK.spawnWeight = 10;
+    weights.SHOOTER.spawnWeight = 10;
+  } else if (elapsedTime < 120) {
+    // 1-2분: 균형잡힌 분포
+    weights.NORMAL.spawnWeight = 40;
+    weights.FAST.spawnWeight = 25;
+    weights.TANK.spawnWeight = 20;
+    weights.SHOOTER.spawnWeight = 15;
+  } else if (elapsedTime < 180) {
+    // 2-3분: 어려운 적 증가
+    weights.NORMAL.spawnWeight = 30;
+    weights.FAST.spawnWeight = 30;
+    weights.TANK.spawnWeight = 25;
+    weights.SHOOTER.spawnWeight = 15;
+  } else {
+    // 3분 이후: 극한 난이도
+    weights.NORMAL.spawnWeight = 20;
+    weights.FAST.spawnWeight = 35;
+    weights.TANK.spawnWeight = 30;
+    weights.SHOOTER.spawnWeight = 15;
+  }
+  
+  // 가중치 기반 선택
+  const totalWeight = Object.values(weights)
+    .filter(type => type.spawnWeight > 0)
+    .reduce((sum, type) => sum + type.spawnWeight, 0);
+  
+  let randomWeight = Math.random() * totalWeight;
+  
+  for (const type of Object.values(weights)) {
+    if (type.spawnWeight <= 0) continue;
+    
+    randomWeight -= type.spawnWeight;
+    if (randomWeight <= 0) {
+      return type;
+    }
+  }
+  
+  return ENEMY_TYPES.NORMAL; // 기본값
 }
 
 
@@ -6803,13 +6900,13 @@ function update() {
   spawnEnemyAroundPlayer();
 
   // 보스전 경고 체크 (보스전 시작 5초 전)
-  if (!bossMode && !bossWarningActive && elapsedTime % 10 == 5 && 
+  if (!bossMode && !bossWarningActive && elapsedTime % 180 == 175 && 
       gameObjects.enemies.filter(e => e.isBossModeEnemy).length === 0) {
     startBossWarning();
   }
 
   // 3분(180초) 체크 및 보스전 시작
-  if (!bossMode && bossWarningActive && elapsedTime % 10 == 0 && elapsedTime !== 0 && gameObjects.enemies.filter(e => e.isBossModeEnemy).length === 0) {
+  if (!bossMode && bossWarningActive && elapsedTime % 180 == 0 && elapsedTime !== 0 && gameObjects.enemies.filter(e => e.isBossModeEnemy).length === 0) {
     startBossMode();
   }
   
