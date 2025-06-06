@@ -1404,11 +1404,18 @@ class Bullet {
     this.baseDamage = damage;
     this.damage = damage * player.getTotalRangedAttackPower();
     this.used = false;
+    
+    // 회전 애니메이션을 위한 속성 추가
+    this.rotation = 0;
+    this.rotationSpeed = 0.2; // 회전 속도
   }
 
   update() {
     this.x += Math.cos(this.angle) * this.speed;
     this.y += Math.sin(this.angle) * this.speed;
+    
+    // 회전 애니메이션 업데이트
+    this.rotation += this.rotationSpeed;
 
     // 적과 충돌 체크
     for (let enemy of gameObjects.enemies) {
@@ -1420,24 +1427,31 @@ class Bullet {
   }
 
   draw(offsetX, offsetY) {
-    if (assetManager.loaded.weapons && assetManager.images.weapons.bullet) {
-      const drawSize = this.size * 2;
+    if (assetManager.loaded.weapons && assetManager.images.weapons.wind) {
+      const scale = 0.8; // 크기 조절 (0.8 = 80% 크기)
+      const drawSize = 64 * scale;
+      
       ctx.save();
+      
+      // 투사체 위치로 이동
       ctx.translate(this.x + offsetX, this.y + offsetY);
+      
+      // 투사체 회전 (선택사항: 비행 방향으로 회전)
       ctx.rotate(this.angle);
+      
+      // 추가 회전 애니메이션 (선택사항)
+      // ctx.rotate(this.rotation);
+      
+      // 이미지 그리기 (중앙 정렬)
       ctx.drawImage(
-        assetManager.images.weapons.bullet,
+        assetManager.images.weapons.wind,
         -drawSize / 2,
         -drawSize / 2,
         drawSize,
         drawSize
       );
+      
       ctx.restore();
-    } else {
-      ctx.fillStyle = 'yellow';
-      ctx.beginPath();
-      ctx.arc(this.x + offsetX, this.y + offsetY, this.size, 0, Math.PI * 2);
-      ctx.fill();
     }
   }
 
@@ -2670,7 +2684,7 @@ class SwordEffect extends MeleeEffect {
     ctx.rotate(this.currentSwingAngle);
     
     // 이펙트 크기
-    const drawSize = this.range / (1 + 0.2);
+    const drawSize = this.range / 1.3;
     
     // 검 이미지 그리기 (64*64 단일 이미지)
     // 검끝이 앞쪽으로 오도록 위치 조정
