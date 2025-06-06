@@ -175,4 +175,5 @@ BFG 크고 멋진 총: 공격력 증가
 화염 + 대지 = 용암지대
 
 기공탄(바람 주먹) 로켓펀치(불 주먹)
-이별이슬프다는건 여정이아름다웠다는 뜻
+
+https://github.com/BodyWashSoap7/DoodleSurvivors/compare/62fcf91...5af7881
