@@ -2252,11 +2252,11 @@ class SwordWeapon extends MeleeWeapon {
       type: 'sword',
       baseCooldown: 800, // 중간 공격속도
       damage: 25,
-      range: 300, // 중간 사거리
+      range: 150, // 중간 사거리
       attackAngle: Math.PI / 3, // 60도 부채꼴
       effectDuration: 400
     });
-    this.baseRange = 300; // 기본 범위 저장s
+    this.baseRange = 150; // 기본 범위 저장
   }
 
   // 공격 범위 특성 적용
@@ -2599,13 +2599,16 @@ class SwordEffect extends MeleeEffect {
     this.range = range; // 공격 범위 특성이 적용된 범위
     this.angle = angle;
     
-    // 스프라이트 애니메이션 속성
-    this.currentFrame = 0;
-    this.frameCount = 4;
-    this.frameWidth = 64;
-    this.frameHeight = 64;
-    this.frameTime = 0;
-    this.frameDuration = this.duration / this.frameCount; // 전체 시간을 프레임 수로 나눔
+    // 휘두르기 애니메이션 속성
+    this.swingStartAngle = direction - angle / 2; // 시작 각도
+    this.swingEndAngle = direction + angle / 2;   // 끝 각도
+    this.currentSwingAngle = this.swingStartAngle; // 현재 휘두르는 각도
+    this.swingProgress = 0; // 휘두르기 진행도 (0~1)
+    
+    // 투명도 애니메이션
+    this.maxAlpha = 0.9;
+    this.currentAlpha = 0.3;
+    
     this.animationComplete = false;
   }
 
@@ -2613,49 +2616,82 @@ class SwordEffect extends MeleeEffect {
     super.update(); // 기본 업데이트 (used 상태 체크)
     
     if (!this.animationComplete) {
-      // 프레임 업데이트
-      this.frameTime += 16; // 약 60fps 기준
+      // 휘두르기 진행도 업데이트 (더 빠르게)
+      this.swingProgress += 0.08; // 기존보다 빠른 속도
       
-      if (this.frameTime >= this.frameDuration) {
-        this.frameTime = 0;
-        this.currentFrame++;
-        
-        // 애니메이션 완료 확인
-        if (this.currentFrame >= this.frameCount) {
-          this.animationComplete = true;
-          this.used = true;
-        }
+      if (this.swingProgress >= 1.0) {
+        this.swingProgress = 1.0;
+        this.animationComplete = true;
+        this.used = true;
+      }
+      
+      // 이징 함수 적용 (빠르게 시작해서 천천히 끝남)
+      const easedProgress = 1 - Math.pow(1 - this.swingProgress, 3);
+      
+      // 각도 보간 (휘두르는 동작)
+      this.currentSwingAngle = this.swingStartAngle + 
+        (this.swingEndAngle - this.swingStartAngle) * easedProgress;
+      
+      // 투명도 애니메이션
+      if (this.swingProgress < 0.2) {
+        // 처음 20%: 빠르게 나타남
+        this.currentAlpha = 0.3 + (this.maxAlpha - 0.3) * (this.swingProgress / 0.2);
+      } else if (this.swingProgress < 0.8) {
+        // 중간 60%: 최대 투명도 유지
+        this.currentAlpha = this.maxAlpha;
+      } else {
+        // 마지막 20%: 빠르게 사라짐
+        const fadeProgress = (this.swingProgress - 0.8) / 0.2;
+        this.currentAlpha = this.maxAlpha * (1 - fadeProgress);
       }
     }
   }
 
   draw(offsetX, offsetY) {
-    const progress = this.getProgress();
-    const alpha = 1 - progress * 0.5; // 서서히 투명해짐
+    if (!assetManager.loaded.weapons || !assetManager.images.weapons.sword) {
+      return;
+    }
     
     ctx.save();
-    ctx.globalAlpha = alpha;
     
-    // 플레이어 위치로 이동 후 방향에 맞게 회전
+    // 투명도 설정
+    ctx.globalAlpha = this.currentAlpha;
+    
+    // 플레이어 위치로 이동
     ctx.translate(this.x + offsetX, this.y + offsetY);
-    ctx.rotate(this.direction);
     
-    // 스프라이트 크기를 범위에 맞춰 조정
-    const scale = this.range / 300; // 기본 크기 대비 스케일 계산
-    const drawWidth = this.frameWidth * scale;
-    const drawHeight = this.frameHeight * scale;
+    // 현재 휘두르는 각도로 회전
+    ctx.rotate(this.currentSwingAngle);
     
-    // 스프라이트 시트에서 현재 프레임 그리기
-    const frameX = this.currentFrame * this.frameWidth;
+    // 이펙트 크기
+    const drawSize = this.range / (1 + 0.2);
     
-    // 부채꼴 중앙에 맞춰 그리기
+    // 검 이미지 그리기 (64*64 단일 이미지)
+    // 검끝이 앞쪽으로 오도록 위치 조정
     ctx.drawImage(
       assetManager.images.weapons.sword,
-      frameX, 0, // 소스 위치
-      this.frameWidth, this.frameHeight, // 소스 크기
-      0, -drawHeight / 2, // 그리기 위치 (중앙 정렬)
-      drawWidth, drawHeight // 그리기 크기
+      0, 0, // 단일 이미지이므로 0,0에서 시작
+      64, 64, // 소스 크기 (64*64)
+      drawSize * 0.2, -drawSize / 2, // 그리기 위치 (검끝이 앞쪽으로)
+      drawSize, drawSize // 그리기 크기
     );
+    
+    // 잔상 효과 (선택사항)
+    if (this.swingProgress > 0.1 && this.swingProgress < 0.9) {
+      ctx.globalAlpha = this.currentAlpha * 0.3;
+      
+      // 이전 위치의 잔상
+      const trailAngle = this.currentSwingAngle - 0.3;
+      ctx.rotate(trailAngle - this.currentSwingAngle);
+      
+      ctx.drawImage(
+        assetManager.images.weapons.sword,
+        0, 0,
+        64, 64,
+        drawSize * 0.2, -drawSize / 2,
+        drawSize * 0.8, drawSize * 0.8
+      );
+    }
     
     ctx.restore();
   }
