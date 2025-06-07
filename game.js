@@ -10,7 +10,7 @@ let CANVAS_HEIGHT = BASE_HEIGHT;
 const CHUNK_SIZE = 500; // Size of each chunk in pixels
 
 // 게임 시간 시스템
-const gameTimeSystem = {f
+const gameTimeSystem = {
   realStartTime: 0,          // 실제 게임 시작 시간
   gameTime: 0,               // 현재 게임 시간
   lastUpdateTime: 0,         // 마지막 업데이트 시간
