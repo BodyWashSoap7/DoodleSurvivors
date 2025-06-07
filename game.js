@@ -1382,8 +1382,8 @@ class Weapon {
   
   // 레벨별 보너스 적용 (하위 클래스에서 오버라이드)
   applyLevelBonus() {
-    // 기본: 데미지 10% 증가
-    this.damage *= 1.1;
+    // 기본: 데미지 10% 증가 (적용 보류)
+    this.damage *= 1.0;
   }
   
   // 무기가 최대 레벨인지 확인
@@ -1535,7 +1535,7 @@ class WindWeapon extends Weapon {
       );
       
       // 약간의 랜덤 각도 추가 (정확도 약간 감소)
-      const randomSpread = (Math.random() - 0.5) * 0.1; // ±약 3도
+      const randomSpread = (Math.random() - 0.5) * 0.15; // ±약 5도
       const finalAngle = angle + randomSpread;
       
       gameObjects.bullets.push(
@@ -3399,6 +3399,10 @@ class Enemy {
   startDying() {
     this.state = 'dying';
     this.stateStartTime = gameTimeSystem.getTime();
+
+    // 사망 이펙트 생성
+    const deathEffect = new DeathEffect(this.x, this.y, this.size, this.type);
+    gameObjects.bullets.push(deathEffect); // bullets 배열에 추가 (같은 업데이트/드로우 루프 사용)
     
     // 경험치 및 골드 획득
     const expValue = this.expValue || 3;
@@ -3703,6 +3707,270 @@ class EnemyBullet extends Bullet {
       
       ctx.restore();
     }
+  }
+}
+
+// 사망 이펙트 클래스
+class DeathEffect {
+  constructor(x, y, enemySize, enemyType) {
+    this.x = x;
+    this.y = y;
+    this.enemySize = enemySize;
+    this.enemyType = enemyType;
+    this.used = false;
+    
+    // 애니메이션 속성
+    this.startTime = gameTimeSystem.getTime();
+    this.duration = 500; // 0.5초 지속
+    this.maxSize = enemySize * 4; // 최대 크기
+    this.currentSize = 0;
+    
+    // 링 효과
+    this.ringSize = 0;
+    this.maxRingSize = enemySize * 5;
+    
+    // 파티클 효과
+    this.particles = [];
+    this.createParticles();
+    
+    // 색상 효과 (적 타입별로 다른 색상)
+    this.getEffectColor();
+    
+    // 펄스 효과
+    this.pulseTime = 0;
+  }
+  
+  createParticles() {
+    const particleCount = Math.min(12 + Math.floor(this.enemySize / 4), 20);
+    
+    for (let i = 0; i < particleCount; i++) {
+      const angle = (Math.PI * 2 * i) / particleCount + Math.random() * 0.8;
+      const speed = 3 + Math.random() * 4;
+      const size = 3 + Math.random() * 4;
+      
+      this.particles.push({
+        x: this.x,
+        y: this.y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        size: size,
+        maxSize: size,
+        life: 1.0,
+        decay: 0.015 + Math.random() * 0.015,
+        angle: angle
+      });
+    }
+  }
+  
+  getEffectColor() {
+    switch(this.enemyType) {
+      case 'Boss':
+        this.primaryColor = '#FF4500'; // 주황색
+        this.secondaryColor = '#FFD700'; // 금색
+        this.accentColor = '#FF8C00'; // 진한 주황색
+        break;
+      case 'Fast':
+        this.primaryColor = '#00FFFF'; // 청록색
+        this.secondaryColor = '#FFFFFF'; // 흰색
+        this.accentColor = '#87CEEB'; // 하늘색
+        break;
+      case 'Tank':
+        this.primaryColor = '#FF0000'; // 빨간색
+        this.secondaryColor = '#FF6666'; // 연한 빨간색
+        this.accentColor = '#DC143C'; // 진한 빨간색
+        break;
+      case 'Shooter':
+        this.primaryColor = '#FF00FF'; // 자홍색
+        this.secondaryColor = '#FFAAFF'; // 연한 자홍색
+        this.accentColor = '#DA70D6'; // 난초색
+        break;
+      default: // Normal
+        this.primaryColor = '#FFFF00'; // 노란색
+        this.secondaryColor = '#FFAA00'; // 주황색
+        this.accentColor = '#FFA500'; // 진한 주황색
+        break;
+    }
+  }
+  
+  update() {
+    const currentTime = gameTimeSystem.getTime();
+    const elapsed = currentTime - this.startTime;
+    const progress = Math.min(elapsed / this.duration, 1);
+    
+    // 펄스 시간 업데이트
+    this.pulseTime += 0.3;
+    
+    // 메인 폭발 크기 애니메이션 (빠르게 커졌다가 천천히 작아짐)
+    if (progress < 0.2) {
+      this.currentSize = this.maxSize * (progress / 0.2);
+    } else if (progress < 0.6) {
+      this.currentSize = this.maxSize;
+    } else {
+      this.currentSize = this.maxSize * (1 - ((progress - 0.6) / 0.4));
+    }
+    
+    // 링 효과 애니메이션
+    if (progress < 0.8) {
+      this.ringSize = this.maxRingSize * (progress / 0.8);
+    } else {
+      this.ringSize = this.maxRingSize;
+    }
+    
+    // 파티클 업데이트
+    for (let i = this.particles.length - 1; i >= 0; i--) {
+      const particle = this.particles[i];
+      particle.x += particle.vx;
+      particle.y += particle.vy;
+      particle.life -= particle.decay;
+      particle.vx *= 0.96; // 감속
+      particle.vy *= 0.96;
+      
+      // 파티클 크기 애니메이션
+      if (particle.life > 0.7) {
+        particle.size = particle.maxSize * ((1 - particle.life) / 0.3);
+      } else {
+        particle.size = particle.maxSize * (particle.life / 0.7);
+      }
+      
+      if (particle.life <= 0) {
+        this.particles.splice(i, 1);
+      }
+    }
+    
+    // 효과 종료
+    if (progress >= 1) {
+      this.used = true;
+    }
+  }
+  
+  draw(offsetX, offsetY) {
+    const drawX = this.x + offsetX;
+    const drawY = this.y + offsetY;
+    const currentTime = gameTimeSystem.getTime();
+    const elapsed = currentTime - this.startTime;
+    const progress = Math.min(elapsed / this.duration, 1);
+    
+    ctx.save();
+    
+    // 투명도 계산
+    let alpha;
+    if (progress < 0.1) {
+      alpha = progress / 0.1; // 빠르게 나타남
+    } else if (progress < 0.7) {
+      alpha = 1.0; // 유지
+    } else {
+      alpha = 1 - ((progress - 0.7) / 0.3); // 천천히 사라짐
+    }
+    
+    // 외부 링 효과
+    if (this.ringSize > 0) {
+      ctx.globalAlpha = alpha * 0.4;
+      ctx.strokeStyle = this.accentColor;
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.arc(drawX, drawY, this.ringSize, 0, Math.PI * 2);
+      ctx.stroke();
+      
+      // 내부 링
+      ctx.globalAlpha = alpha * 0.6;
+      ctx.strokeStyle = this.secondaryColor;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(drawX, drawY, this.ringSize * 0.7, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    
+    // 메인 폭발 효과 (다층 그라디언트)
+    if (this.currentSize > 0) {
+      // 외부 글로우
+      ctx.globalAlpha = alpha * 0.3;
+      const outerGradient = ctx.createRadialGradient(
+        drawX, drawY, 0,
+        drawX, drawY, this.currentSize
+      );
+      outerGradient.addColorStop(0, this.primaryColor);
+      outerGradient.addColorStop(0.4, this.secondaryColor);
+      outerGradient.addColorStop(1, 'transparent');
+      
+      ctx.fillStyle = outerGradient;
+      ctx.beginPath();
+      ctx.arc(drawX, drawY, this.currentSize, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // 중간 층
+      ctx.globalAlpha = alpha * 0.7;
+      const midGradient = ctx.createRadialGradient(
+        drawX, drawY, 0,
+        drawX, drawY, this.currentSize * 0.6
+      );
+      midGradient.addColorStop(0, this.secondaryColor);
+      midGradient.addColorStop(0.6, this.primaryColor);
+      midGradient.addColorStop(1, 'transparent');
+      
+      ctx.fillStyle = midGradient;
+      ctx.beginPath();
+      ctx.arc(drawX, drawY, this.currentSize * 0.6, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // 중심 밝은 점 (펄스 효과)
+      const pulseScale = 1 + Math.sin(this.pulseTime) * 0.3;
+      ctx.globalAlpha = alpha * 0.9;
+      const centerGradient = ctx.createRadialGradient(
+        drawX, drawY, 0,
+        drawX, drawY, this.currentSize * 0.3 * pulseScale
+      );
+      centerGradient.addColorStop(0, '#FFFFFF');
+      centerGradient.addColorStop(0.5, this.secondaryColor);
+      centerGradient.addColorStop(1, 'transparent');
+      
+      ctx.fillStyle = centerGradient;
+      ctx.beginPath();
+      ctx.arc(drawX, drawY, this.currentSize * 0.3 * pulseScale, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    
+    // 파티클 그리기
+    this.particles.forEach(particle => {
+      const particleAlpha = particle.life * alpha;
+      ctx.globalAlpha = particleAlpha;
+      
+      // 파티클 그라디언트
+      const particleGradient = ctx.createRadialGradient(
+        particle.x + offsetX, particle.y + offsetY, 0,
+        particle.x + offsetX, particle.y + offsetY, particle.size
+      );
+      particleGradient.addColorStop(0, this.primaryColor);
+      particleGradient.addColorStop(0.7, this.secondaryColor);
+      particleGradient.addColorStop(1, 'transparent');
+      
+      ctx.fillStyle = particleGradient;
+      ctx.beginPath();
+      ctx.arc(
+        particle.x + offsetX, 
+        particle.y + offsetY, 
+        particle.size, 
+        0, Math.PI * 2
+      );
+      ctx.fill();
+      
+      // 파티클 중심 밝은 점
+      ctx.globalAlpha = particleAlpha * 0.8;
+      ctx.fillStyle = '#FFFFFF';
+      ctx.beginPath();
+      ctx.arc(
+        particle.x + offsetX, 
+        particle.y + offsetY, 
+        particle.size * 0.3, 
+        0, Math.PI * 2
+      );
+      ctx.fill();
+    });
+    
+    ctx.restore();
+  }
+  
+  outOfBounds() {
+    return this.used;
   }
 }
 
