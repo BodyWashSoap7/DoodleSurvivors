@@ -582,11 +582,7 @@ const ENEMY_SPAWN_INTERVAL = 500;
 const ENEMY_SPATIAL_GRID_SIZE = 100;
 let enemySpatialGrid = {};
 
-// 웨이브 스폰 시스템 변수
-let currentWave = 0;
-let waveSpawnCount = 0;
-let isSpawningWave = false;
-let baseMaxEnemies = 300;
+
 
 // 공통 애니메이션 관련 상수
 const TARGET_FPS = 120;
@@ -1316,6 +1312,13 @@ function endBossMode() {
     bossMode = false;
     bossCage = null;
   }, 2000);
+
+  // 스폰 시스템 상태 리셋
+  spawnState.bossWarningActive = false;
+  spawnState.currentPhase = 'normal';
+  spawnState.waveStartTime = elapsedTime;
+  spawnState.currentWaveIndex = 0;
+  spawnState.enemiesThisWave = 0;
 }
 
 // 보스전 경고 시작 함수
@@ -3400,6 +3403,14 @@ class Enemy {
     this.state = 'dying';
     this.stateStartTime = gameTimeSystem.getTime();
 
+    // 웨이브 시스템 업데이트
+    if (spawnState.currentPhase === 'normal') {
+      // 일반 적이 죽었을 때만 카운트 (보스 제외)
+      if (!this.isBoss) {
+        spawnState.enemiesThisWave = Math.max(0, spawnState.enemiesThisWave - 1);
+      }
+    }
+
     // 사망 이펙트 생성
     const deathEffect = new DeathEffect(this.x, this.y, this.size, this.type);
     gameObjects.bullets.push(deathEffect); // bullets 배열에 추가 (같은 업데이트/드로우 루프 사용)
@@ -5272,6 +5283,16 @@ function resetGame() {
   bossWarningActive = false;
   bossWarningStartTime = 0;
   
+  // 스폰 시스템 상태 리셋
+  spawnState.nextBossTime = 180;
+  spawnState.bossWarningActive = false;
+  spawnState.currentPhase = 'normal';
+  spawnState.waveStartTime = 0;
+  spawnState.currentWaveIndex = 0;
+  spawnState.spawnTimer = 0;
+  spawnState.difficultyLevel = 1;
+  spawnState.enemiesThisWave = 0;
+  
   // 자석 효과 초기화
   player.magnetActive = false;
   player.magnetDuration = 0;
@@ -6361,17 +6382,29 @@ function drawHUD() {
   ctx.textAlign = 'center';
   drawTextWithStroke(`${player.exp} / ${player.nextLevelExp}`, canvas.width / 2, expBarY + 15, '#ffffff', '#000000', 2);
 
-  // 웨이브 정보 표시 (화면 오른쪽 위)
-  if (currentWave > 0) {
-    ctx.font = '18px Arial';
-    ctx.textAlign = 'right';
-    drawTextWithStroke(`Wave: ${currentWave}`, canvas.width - 20, 30, '#ff0000', '#000000');
-  }
-  
   // 현재 적 수 표시 (디버깅용)
   ctx.font = '16px Arial';
   ctx.textAlign = 'right';
   drawTextWithStroke(`Enemies: ${gameObjects.enemies.length}`, canvas.width - 20, 50, '#ffffff', '#000000');
+
+  // 스폰 시스템 정보
+  if (!bossMode && !spawnState.bossWarningActive) {
+    const timeUntilBoss = Math.max(0, spawnState.nextBossTime - elapsedTime);
+    const minutes = Math.floor(timeUntilBoss / 60);
+    const seconds = Math.floor(timeUntilBoss % 60);
+    
+    ctx.font = '16px Arial';
+    ctx.textAlign = 'left';
+    drawTextWithStroke(
+      `다음 보스: ${minutes}:${seconds.toString().padStart(2, '0')}`, 
+      20, 60, '#ffaa00', '#000000'
+    );
+    
+    drawTextWithStroke(
+      `웨이브 ${spawnState.currentWaveIndex + 1} (x${spawnState.difficultyLevel.toFixed(1)})`, 
+      20, 80, '#ffffff', '#000000'
+    );
+  }
 
   // 보스전 경고 메시지
   if (bossWarningActive) {
@@ -6865,103 +6898,229 @@ function unloadChunk(chunkKey) {
   }
 }
 
-// 적 스폰 시스템
-function spawnEnemyAroundPlayer() {
-  // 보스전 모드에서는 적 스폰 안함
-  if (bossMode) return;
+// 통합 스폰 시스템 설정
+const SPAWN_CONFIG = {
+  // 3분 보스전 사이클 설정
+  bossCycle: {
+    interval: 180, // 3분 (180초)
+    warningTime: 5, // 5초 전 경고
+    enabled: true
+  },
   
-  // 동적 최대 적 수 계산 (시간에 따라 증가)
-  const dynamicMaxEnemies = Math.min(baseMaxEnemies + Math.floor(elapsedTime / 30) * 50, 1000);
+  // 웨이브 설정 (보스전 사이의 일반 웨이브들)
+  normalWaves: {
+    duration: 30, // 각 웨이브 30초 지속
+    escalation: true, // 시간에 따른 난이도 증가
+    baseSpawnRate: 60,
+    minSpawnRate: 20
+  }
+};
+
+// 통합 스폰 상태 관리
+let spawnState = {
+  // 보스전 관련
+  nextBossTime: 180, // 다음 보스전 시간
+  bossWarningActive: false,
+  bossMode: false,
   
-  // 현재 적 수가 최대치에 도달했으면 스폰 안함
-  if (gameObjects.enemies.length >= dynamicMaxEnemies) {
+  // 일반 웨이브 관련
+  currentPhase: 'normal', // 'normal', 'boss_warning', 'boss_fight'
+  waveStartTime: 0,
+  currentWaveIndex: 0,
+  spawnTimer: 0,
+  
+  // 난이도 조절
+  difficultyLevel: 1,
+  enemiesThisWave: 0,
+  maxEnemiesPerWave: 50
+};
+
+// 메인 스폰 업데이트 함수
+function updateSpawnSystem() {
+  // 보스전 모드면 기존 로직 사용
+  if (bossMode) {
+    return; // 보스전 중에는 추가 스폰 없음
+  }
+  
+  // 보스전 타이밍 체크
+  checkBossFightTiming();
+  
+  // 현재 페이즈에 따른 스폰 처리
+  switch (spawnState.currentPhase) {
+    case 'normal':
+      updateNormalWaveSpawning();
+      break;
+    case 'boss_warning':
+      // 경고 중에는 스폰 중단
+      break;
+    case 'boss_fight':
+      // 보스전 중에는 기존 보스전 로직 사용
+      break;
+  }
+}
+
+// 보스전 타이밍 체크
+function checkBossFightTiming() {
+  const timeUntilBoss = spawnState.nextBossTime - elapsedTime;
+  
+  // 보스전 경고 시작
+  if (!spawnState.bossWarningActive && timeUntilBoss <= 5 && timeUntilBoss > 0) {
+    startBossWarning();
+    spawnState.bossWarningActive = true;
+    spawnState.currentPhase = 'boss_warning';
+    
+    // 기존 적들을 빠르게 정리
+    clearRemainingEnemies();
+  }
+  
+  // 보스전 시작
+  if (!bossMode && elapsedTime >= spawnState.nextBossTime) {
+    startBossMode();
+    spawnState.currentPhase = 'boss_fight';
+    spawnState.nextBossTime += SPAWN_CONFIG.bossCycle.interval; // 다음 보스전 시간 설정
+  }
+}
+
+// 일반 웨이브 스폰
+function updateNormalWaveSpawning() {
+  // 현재 웨이브의 남은 시간 계산
+  const waveElapsed = elapsedTime - spawnState.waveStartTime;
+  const timeUntilBoss = spawnState.nextBossTime - elapsedTime;
+  
+  // 보스전 임박 시 스폰 중단 (10초 전부터)
+  if (timeUntilBoss <= 10) {
     return;
   }
   
-  const currentTime = gameTimeSystem.getTime();
-  
-  // 웨이브 시스템 - 30초마다 대규모 웨이브
-  if (elapsedTime > 0 && elapsedTime % 30 === 0 && currentWave < Math.floor(elapsedTime / 30)) {
-    currentWave = Math.floor(elapsedTime / 30);
-    isSpawningWave = true;
-    waveSpawnCount = 0;
-    
-    // 화면 흔들림 효과로 웨이브 시작 알림
-    screenShakeTime = 300;
-    screenShakeIntensity = 5;
+  // 웨이브 전환 체크 (30초마다)
+  if (waveElapsed >= SPAWN_CONFIG.normalWaves.duration) {
+    transitionToNextWave();
   }
   
-  // 웨이브 스폰 처리
-  if (isSpawningWave) {
-    const waveSize = Math.min(20 + currentWave * 10, 100); // 웨이브당 적 수
-    const spawnsPerFrame = Math.min(5 + Math.floor(currentWave / 2), 15); // 프레임당 스폰 수
+  // 적 스폰 실행
+  executeWaveSpawning();
+}
+
+// 다음 웨이브로 전환
+function transitionToNextWave() {
+  spawnState.currentWaveIndex++;
+  spawnState.waveStartTime = elapsedTime;
+  spawnState.enemiesThisWave = 0;
+  
+  // 난이도 증가 (3분마다 리셋되어 적당한 수준 유지)
+  const cycleProgress = (elapsedTime % 180) / 180;
+  spawnState.difficultyLevel = 1 + cycleProgress * 2; // 1~3배 난이도
+  
+  console.log(`웨이브 ${spawnState.currentWaveIndex} 시작 (난이도: ${spawnState.difficultyLevel.toFixed(1)})`);
+}
+
+// 웨이브 스폰 실행
+function executeWaveSpawning() {
+  spawnState.spawnTimer++;
+  
+  // 동적 스폰 간격 (시간이 지날수록 빨라짐)
+  const baseRate = SPAWN_CONFIG.normalWaves.baseSpawnRate;
+  const minRate = SPAWN_CONFIG.normalWaves.minSpawnRate;
+  const currentRate = Math.max(minRate, baseRate - (spawnState.difficultyLevel - 1) * 15);
+  
+  if (spawnState.spawnTimer >= currentRate) {
+    spawnState.spawnTimer = 0;
     
-    for (let i = 0; i < spawnsPerFrame && waveSpawnCount < waveSize; i++) {
-      if (gameObjects.enemies.length >= dynamicMaxEnemies) break;
-      
-      // 360도 전방향에서 스폰
-      const angle = Math.random() * Math.PI * 2;
-      const distance = MIN_SPAWN_DISTANCE + Math.random() * (MAX_SPAWN_DISTANCE - MIN_SPAWN_DISTANCE);
-      const spawnX = player.x + Math.cos(angle) * distance;
-      const spawnY = player.y + Math.sin(angle) * distance;
-      
-      spawnEnemyAtPosition(spawnX, spawnY, true); // 웨이브 스폰 표시
-      waveSpawnCount++;
+    // 최대 적 수 제한
+    if (gameObjects.enemies.length < spawnState.maxEnemiesPerWave * spawnState.difficultyLevel) {
+      spawnWaveEnemies();
     }
-    
-    if (waveSpawnCount >= waveSize) {
-      isSpawningWave = false;
+  }
+}
+
+// 웨이브 적 스폰
+function spawnWaveEnemies() {
+  const spawnGroup = selectSpawnGroupByDifficulty();
+  
+  for (let i = 0; i < spawnGroup.count; i++) {
+    const spawnPos = getRandomSpawnPosition();
+    if (spawnPos && spawnEnemyAtPosition(spawnPos.x, spawnPos.y, spawnGroup.type, spawnGroup.scale)) {
+      spawnState.enemiesThisWave++;
     }
-    
-    return; // 웨이브 중에는 일반 스폰 안함
   }
+}
+
+// 난이도에 따른 스폰 그룹 선택
+function selectSpawnGroupByDifficulty() {
+  const timeUntilBoss = spawnState.nextBossTime - elapsedTime;
+  const difficulty = spawnState.difficultyLevel;
   
-  // 일반 스폰 - 시간에 따라 간격과 수량 조정
-  let spawnInterval = ENEMY_SPAWN_INTERVAL;
-  let spawnCount = 1;
+  // 보스전 임박 시 더 강한 적들
+  const urgencyBonus = timeUntilBoss < 60 ? 0.5 : 0;
+  const finalDifficulty = difficulty + urgencyBonus;
   
-  if (elapsedTime > 60) {
-    // 1분 후: 스폰 간격 감소, 동시 스폰 증가
-    spawnInterval = Math.max(100, ENEMY_SPAWN_INTERVAL - (elapsedTime - 60) * 5);
-    spawnCount = Math.min(1 + Math.floor((elapsedTime - 60) / 30), 5);
+  // 난이도별 스폰 패턴
+  if (finalDifficulty < 1.5) {
+    // 초급 (주로 일반 적)
+    const patterns = [
+      { type: 'NORMAL', count: 2, weight: 70, scale: 1.0 },
+      { type: 'FAST', count: 1, weight: 30, scale: 1.0 }
+    ];
+    return selectRandomSpawnGroup(patterns);
+  } else if (finalDifficulty < 2.5) {
+    // 중급 (다양한 적 혼합)
+    const patterns = [
+      { type: 'NORMAL', count: 3, weight: 50, scale: 1.1 },
+      { type: 'FAST', count: 2, weight: 30, scale: 1.0 },
+      { type: 'TANK', count: 1, weight: 20, scale: 1.0 }
+    ];
+    return selectRandomSpawnGroup(patterns);
+  } else {
+    // 고급 (강한 적들)
+    const patterns = [
+      { type: 'NORMAL', count: 2, weight: 30, scale: 1.2 },
+      { type: 'FAST', count: 3, weight: 35, scale: 1.1 },
+      { type: 'TANK', count: 1, weight: 20, scale: 1.0 },
+      { type: 'SHOOTER', count: 2, weight: 15, scale: 1.0 }
+    ];
+    return selectRandomSpawnGroup(patterns);
   }
+}
+
+// 기존 적들 빠르게 정리 (보스전 전)
+function clearRemainingEnemies() {
+  // 기존 적들의 체력을 크게 감소시켜 빠르게 정리
+  gameObjects.enemies.forEach(enemy => {
+    if (!enemy.isBoss && enemy.state === 'moving') {
+      enemy.health = Math.min(enemy.health, enemy.maxHealth * 0.1);
+    }
+  });
+}
+
+// 랜덤 스폰 위치 생성
+function getRandomSpawnPosition() {
+  const attempts = 10;
   
-  if (elapsedTime > 120) {
-    // 2분 후: 더욱 공격적
-    spawnInterval = Math.max(50, spawnInterval);
-    spawnCount = Math.min(3 + Math.floor((elapsedTime - 120) / 20), 10);
-  }
-  
-  if (elapsedTime > 180) {
-    // 3분 후: 극한 난이도
-    spawnInterval = 30;
-    spawnCount = Math.min(5 + Math.floor((elapsedTime - 180) / 15), 20);
-  }
-  
-  // 스폰 간격 체크
-  if (currentTime - lastEnemySpawnTime < spawnInterval) {
-    return;
-  }
-  
-  // 여러 마리 동시 스폰
-  let spawned = 0;
-  for (let i = 0; i < spawnCount; i++) {
-    if (gameObjects.enemies.length >= dynamicMaxEnemies) break;
-    
-    // 각 적마다 랜덤 위치
+  for (let i = 0; i < attempts; i++) {
     const angle = Math.random() * Math.PI * 2;
     const distance = MIN_SPAWN_DISTANCE + Math.random() * (MAX_SPAWN_DISTANCE - MIN_SPAWN_DISTANCE);
-    const spawnX = player.x + Math.cos(angle) * distance;
-    const spawnY = player.y + Math.sin(angle) * distance;
     
-    if (spawnEnemyAtPosition(spawnX, spawnY, false)) {
-      spawned++;
+    const x = player.x + Math.cos(angle) * distance;
+    const y = player.y + Math.sin(angle) * distance;
+    
+    if (isValidSpawnPosition(x, y)) {
+      return { x, y };
     }
   }
   
-  if (spawned > 0) {
-    lastEnemySpawnTime = currentTime;
-  }
+  return null;
+}
+
+// 보스전 종료 후 정리
+function onBossFightEnd() {
+  // 기존 endBossMode 함수에 추가
+  spawnState.bossWarningActive = false;
+  spawnState.currentPhase = 'normal';
+  spawnState.waveStartTime = elapsedTime;
+  spawnState.currentWaveIndex = 0;
+  spawnState.enemiesThisWave = 0;
+  
+  console.log("보스전 종료, 일반 웨이브 재개");
 }
 
 // 특정 위치에 적 스폰하는 헬퍼 함수
@@ -7233,7 +7392,7 @@ function update() {
   }
   
   // 적 스폰
-  spawnEnemyAroundPlayer();
+  updateSpawnSystem();
 
   // 보스전 경고 체크 (보스전 시작 5초 전)
   if (!bossMode && !bossWarningActive && elapsedTime % 180 == 175 && 
