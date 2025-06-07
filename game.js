@@ -1471,43 +1471,97 @@ class WindWeapon extends Weapon {
     });
     this.projectileCount = 1;
     this.baseProjectileSpeed = 7; // 기본 투사체 속도 (고정)
+    
+    // 연속 발사 관련 속성
+    this.burstFiring = false; // 연속 발사 중인지 여부
+    this.burstCount = 0; // 현재 연속 발사에서 몇 발 쐈는지
+    this.burstInterval = 120; // 연속 발사 간격 (ms) - 빠른 연사
+    this.lastBurstTime = 0; // 마지막 연속 발사 시간
+    this.burstTarget = null; // 연속 발사 대상 (방향 고정용)
+  }
+  
+  update() {
+    const now = gameTimeSystem.getTime();
+    
+    // 연속 발사 중이 아닐 때 일반 쿨다운 체크
+    if (!this.burstFiring && now - this.lastAttackTime >= this.cooldown) {
+      this.fire();
+      this.lastAttackTime = now;
+    }
+    
+    // 연속 발사 처리
+    if (this.burstFiring) {
+      if (now - this.lastBurstTime >= this.burstInterval) {
+        this.fireSingleBurst();
+        this.lastBurstTime = now;
+        this.burstCount++;
+        
+        // 연속 발사 완료 체크
+        if (this.burstCount >= this.projectileCount) {
+          this.burstFiring = false;
+          this.burstCount = 0;
+          this.burstTarget = null;
+        }
+      }
+    }
   }
   
   fire() {
-    // 가장 가까운 적을 향해 발사
+    // 가장 가까운 적을 향해 연속 발사 시작
     const nearestEnemy = findNearestEnemy();
     if (nearestEnemy) {
-      // 레벨에 따라 여러 발 발사
-      const angleSpread = Math.PI / 6; // 30도 확산
-      const baseAngle = Math.atan2(nearestEnemy.y - player.y, nearestEnemy.x - player.x);
+      this.burstTarget = {
+        x: nearestEnemy.x,
+        y: nearestEnemy.y
+      };
       
-      for (let i = 0; i < this.projectileCount; i++) {
-        let angle = baseAngle;
-        if (this.projectileCount > 1) {
-          angle += (i - (this.projectileCount - 1) / 2) * (angleSpread / Math.max(1, this.projectileCount - 1));
-        }
-        
-        gameObjects.bullets.push(
-          new Bullet(
-            player.x, player.y, 5, this.baseProjectileSpeed,
-            angle,
-            this.damage * player.getTotalRangedAttackPower() // 공격력 특성 적용
-          )
-        );
+      // 첫 번째 발사
+      this.fireSingleBurst();
+      this.burstCount = 1;
+      this.lastBurstTime = gameTimeSystem.getTime();
+      
+      // 여러 발을 쏠 경우 연속 발사 모드 시작
+      if (this.projectileCount > 1) {
+        this.burstFiring = true;
       }
+    }
+  }
+  
+  fireSingleBurst() {
+    if (this.burstTarget) {
+      const angle = Math.atan2(
+        this.burstTarget.y - player.y, 
+        this.burstTarget.x - player.x
+      );
+      
+      // 약간의 랜덤 각도 추가 (정확도 약간 감소)
+      const randomSpread = (Math.random() - 0.5) * 0.1; // ±약 3도
+      const finalAngle = angle + randomSpread;
+      
+      gameObjects.bullets.push(
+        new Bullet(
+          player.x, player.y, 5, this.baseProjectileSpeed,
+          finalAngle,
+          this.damage * player.getTotalRangedAttackPower() // 공격력 특성 적용
+        )
+      );
     }
   }
   
   applyLevelBonus() {
     super.applyLevelBonus();
-    // 3레벨마다 투사체 개수 증가
-    if (this.level % 3 === 0) {
+    // 3레벨마다 투사체 개수 증가 (연속 발사 수 증가)
+    if (this.level % 1 === 0) {
       this.projectileCount++;
     }
     // 짝수 레벨마다 쿨다운 감소
     if (this.level % 2 === 0) {
       this.baseCooldown *= 0.9;
       this.updateCooldown(player.getTotalCooldownReduction()); // 쿨타임 감소 특성 적용
+    }
+    // 레벨이 올라갈수록 연속 발사 속도도 약간 빨라짐
+    if (this.level >= 4) {
+      this.burstInterval = Math.max(80, this.burstInterval - 10); // 최소 80ms까지
     }
   }
 }
@@ -4618,10 +4672,10 @@ function generateLevelUpOptions() {
 // 무기 표시 이름 헬퍼 함수
 function getWeaponDisplayName(weaponType) {
   const names = {
-    'wind': '바람 투사체 발사',
-    'earth': '회전 구체',
-    'flame': '화염방사기',
-    'lightning': '번개 사슬',
+    'wind': '바람',
+    'earth': '대지',
+    'flame': '화염',
+    'lightning': '번개',
     'fist': '주먹',
     'sword': '검',
     'spear': '창'
@@ -4900,7 +4954,7 @@ function resetGame() {
   player.levelExpMultiplierBonus = 0;
   
   player.weapons = [];
-  addWeapon('sword');
+  addWeapon('wind');
 
   // 무적 상태 초기화
   player.invincible = false;
@@ -6424,10 +6478,10 @@ function getXPForNextLevel(currentLevel) {
   }
   
   // 특별 케이스
-  if (currentLevel === 9) {
-    xp += 5000; // 레벨 10 도달용 추가 경험치
+  if (currentLevel === 14) {
+    xp += 1000; // 레벨 15 도달용 추가 경험치
   } else if (currentLevel === 29) {
-    xp += 20000; // 레벨 30 도달용 추가 경험치
+    xp += 5000; // 레벨 30 도달용 추가 경험치
   }
   
   return xp;
