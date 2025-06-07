@@ -10,7 +10,7 @@ let CANVAS_HEIGHT = BASE_HEIGHT;
 const CHUNK_SIZE = 500; // Size of each chunk in pixels
 
 // 게임 시간 시스템
-const gameTimeSystem = {
+const gameTimeSystem = {f
   realStartTime: 0,          // 실제 게임 시작 시간
   gameTime: 0,               // 현재 게임 시간
   lastUpdateTime: 0,         // 마지막 업데이트 시간
@@ -7080,6 +7080,21 @@ function selectSpawnGroupByDifficulty() {
     ];
     return selectRandomSpawnGroup(patterns);
   }
+}
+
+// 가중치 기반 스폰 그룹 선택
+function selectRandomSpawnGroup(spawnGroups) {
+  const totalWeight = spawnGroups.reduce((sum, group) => sum + group.weight, 0);
+  let random = Math.random() * totalWeight;
+  
+  for (const group of spawnGroups) {
+    random -= group.weight;
+    if (random <= 0) {
+      return group;
+    }
+  }
+  
+  return spawnGroups[0]; // 기본값
 }
 
 // 기존 적들 빠르게 정리 (보스전 전)
