@@ -6695,15 +6695,6 @@ function draw() {
       ctx.beginPath();
       ctx.arc(mouseX, mouseY, 5, 0, Math.PI * 2);
       ctx.fill();
-      
-      // 월드 좌표에서 마우스 위치 표시
-      const offsetX = canvas.width / 2 - player.x;
-      const offsetY = canvas.height / 2 - player.y;
-      
-      ctx.fillStyle = 'blue';
-      ctx.beginPath();
-      ctx.arc(mouseWorldX + offsetX, mouseWorldY + offsetY, 8, 0, Math.PI * 2);
-      ctx.fill();
   }
 }
 
