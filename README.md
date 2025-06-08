@@ -176,4 +176,4 @@ BFG 크고 멋진 총: 공격력 증가
 
 기공탄(바람 주먹) 로켓펀치(불 주먹)
 
-https://github.com/BodyWashSoap7/DoodleSurvivors/compare/62fcf91...5af7881
+https://github.com/BodyWashSoap7/DoodleSurvivors/compare/62fcf91...df42e07
