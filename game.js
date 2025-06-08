@@ -581,7 +581,7 @@ const MAX_SPAWN_DISTANCE = 450;
 const ENEMY_SPAWN_INTERVAL = 500;
 const ENEMY_SPATIAL_GRID_SIZE = 100;
 let enemySpatialGrid = {};
-
+let totalKills = 0;
 
 
 // 공통 애니메이션 관련 상수
@@ -3399,6 +3399,7 @@ class Enemy {
   startDying() {
     this.state = 'dying';
     this.stateStartTime = gameTimeSystem.getTime();
+    totalKills++;
 
     // 웨이브 시스템 업데이트
     if (spawnState.currentPhase === 'normal') {
@@ -5289,6 +5290,9 @@ function resetGame() {
   spawnState.spawnTimer = 0;
   spawnState.difficultyLevel = 1;
   spawnState.enemiesThisWave = 0;
+
+  // 킬 카운트 초기화
+  totalKills = 0;
   
   // 자석 효과 초기화
   player.magnetActive = false;
@@ -6379,10 +6383,10 @@ function drawHUD() {
   ctx.textAlign = 'center';
   drawTextWithStroke(`${player.exp} / ${player.nextLevelExp}`, canvas.width / 2, expBarY + 15, '#ffffff', '#000000', 2);
 
-  // 현재 적 수 표시 (디버깅용)
+  // 총 처치 수 표시
   ctx.font = '16px Arial';
   ctx.textAlign = 'right';
-  drawTextWithStroke(`Enemies: ${gameObjects.enemies.length}`, canvas.width - 20, 50, '#ffffff', '#000000');
+  drawTextWithStroke(`Kills: ${totalKills}`, canvas.width - 20, 50, '#ffffff', '#000000');
 
   // 스폰 시스템 정보
   if (!bossMode && !spawnState.bossWarningActive) {
