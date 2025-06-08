@@ -3167,9 +3167,6 @@ class Enemy {
         this.attackStrength / 2
       )
     );
-    
-    this.isHit = true;
-    this.hitTime = gameTimeSystem.getTime();
   }
 
   // 통합된 그리기 메서드
