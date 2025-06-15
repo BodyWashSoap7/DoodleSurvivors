@@ -905,6 +905,22 @@ const player = {
   levelGoldMultiplierBonus: 0,
   levelExpMultiplierBonus: 0,
 
+  // 능력치 레벨 시스템 추가
+  statLevels: {
+    attackPower: 0,
+    cooldownReduction: 0,
+    maxHealth: 0,
+    moveSpeed: 0,
+    attackRange: 0,
+    pickupRadius: 0,
+    dodgeRate: 0,
+    luck: 0,
+    expMultiplier: 0
+  },
+  
+  // 능력치 최대 레벨
+  maxStatLevel: 5,
+  
   // 애니메이션 관련 속성들
   animationState: 'idle',
   currentFrame: 0,
@@ -1351,7 +1367,7 @@ class Weapon {
     
     // 레벨 시스템 추가
     this.level = 1;
-    this.maxLevel = 8; // 최대 레벨
+    this.maxLevel = 10; // 최대 레벨
     
     // 무기별 추가 속성들
     Object.assign(this, config.properties || {});
@@ -1553,18 +1569,40 @@ class WindWeapon extends Weapon {
   
   applyLevelBonus() {
     super.applyLevelBonus();
-    // 3레벨마다 투사체 개수 증가 (연속 발사 수 증가)
-    if (this.level % 1 === 0) {
-      this.projectileCount++;
-    }
-    // 짝수 레벨마다 쿨다운 감소
-    if (this.level % 2 === 0) {
-      this.baseCooldown *= 0.9;
-      this.updateCooldown(player.getTotalCooldownReduction()); // 쿨타임 감소 특성 적용
-    }
-    // 레벨이 올라갈수록 연속 발사 속도도 약간 빨라짐
-    if (this.level >= 4) {
-      this.burstInterval = Math.max(80, this.burstInterval - 10); // 최소 80ms까지
+    
+    // 10레벨 시스템에 맞춘 균형잡힌 강화
+    switch(this.level) {
+      case 2:
+        this.projectileCount = 2; // 2발
+        break;
+      case 3:
+        this.baseCooldown *= 0.9; // 쿨타임 감소
+        break;
+      case 4:
+        this.projectileCount = 3; // 3발
+        break;
+      case 5:
+        this.damage += 5; // 데미지 증가
+        break;
+      case 6:
+        this.projectileCount = 4; // 4발
+        this.baseCooldown *= 0.85; // 쿨타임 추가 감소
+        break;
+      case 7:
+        this.burstInterval = 100; // 연사 속도 증가
+        break;
+      case 8:
+        this.projectileCount = 5; // 5발
+        this.damage += 5; // 데미지 추가 증가
+        break;
+      case 9:
+        this.baseCooldown *= 0.8; // 쿨타임 추가 감소
+        break;
+      case 10:
+        this.projectileCount = 6; // 6발 (최대)
+        this.burstInterval = 80; // 최대 연사 속도
+        this.damage += 10; // 최종 데미지 보너스
+        break;
     }
   }
 }
@@ -1628,8 +1666,7 @@ class EarthWeapon extends Weapon {
   upgrade() {
     if (this.level < this.maxLevel) {
       this.level++;
-      this.damage += 3;
-      this.orbCount += 1;
+      this.applyLevelBonus();
       this.createOrbs(); // 구체 재생성
       return true;
     }
@@ -1638,6 +1675,49 @@ class EarthWeapon extends Weapon {
   
   fire() {
     // 사용되지 않음
+  }
+
+  applyLevelBonus() {
+    // 10레벨 시스템에 맞춘 균형잡힌 강화
+    switch(this.level) {
+      case 2:
+        this.orbCount = 2; // 2개
+        this.damage += 2;
+        break;
+      case 3:
+        this.orbitSpeed = 0.035; // 회전 속도 증가
+        break;
+      case 4:
+        this.orbCount = 3; // 3개
+        this.damage += 3;
+        break;
+      case 5:
+        this.baseOrbSize = 10; // 구체 크기 증가
+        this.updateRange();
+        break;
+      case 6:
+        this.orbCount = 4; // 4개
+        this.damage += 3;
+        this.damageCooldown = 80; // 데미지 간격 감소
+        break;
+      case 7:
+        this.orbitSpeed = 0.04; // 회전 속도 추가 증가
+        break;
+      case 8:
+        this.orbCount = 5; // 5개
+        this.damage += 4;
+        break;
+      case 9:
+        this.baseOrbSize = 12; // 구체 크기 추가 증가
+        this.updateRange();
+        break;
+      case 10:
+        this.orbCount = 6; // 6개 (최대)
+        this.damage += 5; // 최종 데미지 보너스
+        this.damageCooldown = 60; // 최소 데미지 간격
+        this.orbitSpeed = 0.045; // 최대 회전 속도
+        break;
+    }
   }
 }
 
@@ -1787,21 +1867,44 @@ class FlameWeapon extends Weapon {
   applyLevelBonus() {
     super.applyLevelBonus();
     
-    // 레벨에 따른 개선
-    if (this.level % 2 === 0) {
-      this.baseRange += 30; // 기본 범위 증가
-      this.updateRange(); // 실제 범위 재계산
+    // 10레벨 시스템에 맞춘 균형잡힌 강화
+    switch(this.level) {
+      case 2:
+        this.baseRange += 25; // 범위 증가
+        break;
+      case 3:
+        this.flameAngle += Math.PI / 12; // 각도 증가 (75도)
+        break;
+      case 4:
+        this.damage += 5; // 데미지 증가
+        this.duration += 300; // 지속시간 증가
+        break;
+      case 5:
+        this.baseRange += 30; // 범위 추가 증가
+        break;
+      case 6:
+        this.flameAngle += Math.PI / 12; // 각도 추가 증가 (90도)
+        this.baseCooldown *= 0.85; // 쿨타임 감소
+        break;
+      case 7:
+        this.damage += 7; // 데미지 추가 증가
+        break;
+      case 8:
+        this.baseRange += 35; // 범위 추가 증가
+        this.duration += 500; // 지속시간 추가 증가
+        break;
+      case 9:
+        this.flameAngle += Math.PI / 12; // 각도 추가 증가 (105도)
+        break;
+      case 10:
+        this.damage += 10; // 최종 데미지 보너스
+        this.baseCooldown *= 0.7; // 최종 쿨타임 감소
+        this.duration += 700; // 최종 지속시간 (5초)
+        break;
     }
-    if (this.level % 3 === 0) {
-      this.flameAngle += Math.PI / 12; // 3레벨마다 각도 증가 (15도씩)
-    }
-    if (this.level >= 5) {
-      this.duration += 500; // 5레벨부터 지속시간 증가
-    }
-    if (this.level >= 6) {
-      this.baseCooldown *= 0.8; // 6레벨부터 쿨다운 감소
-      this.updateCooldown(player.getTotalCooldownReduction()); // 쿨타임 감소 특성 적용
-    }
+    
+    this.updateRange();
+    this.updateCooldown(player.getTotalCooldownReduction());
   }
 }
 
@@ -1997,22 +2100,44 @@ class LightningWeapon extends Weapon {
   applyLevelBonus() {
     super.applyLevelBonus();
     
-    // 레벨에 따른 개선
-    if (this.level % 2 === 0) {
-      this.chainCount++; // 짝수 레벨마다 체인 개수 증가
+    // 10레벨 시스템에 맞춘 균형잡힌 강화
+    switch(this.level) {
+      case 2:
+        this.chainCount = 4; // 체인 +1
+        break;
+      case 3:
+        this.baseChainRange += 20; // 체인 범위 증가
+        break;
+      case 4:
+        this.damage += 5; // 데미지 증가
+        this.baseCooldown *= 0.9; // 쿨타임 감소
+        break;
+      case 5:
+        this.chainCount = 5; // 체인 +1
+        break;
+      case 6:
+        this.baseMaxTargetDistance += 50; // 최대 사거리 증가
+        break;
+      case 7:
+        this.chainCount = 6; // 체인 +1
+        this.damage += 7; // 데미지 추가 증가
+        break;
+      case 8:
+        this.baseChainRange += 30; // 체인 범위 추가 증가
+        this.baseCooldown *= 0.85; // 쿨타임 추가 감소
+        break;
+      case 9:
+        this.chainCount = 7; // 체인 +1
+        break;
+      case 10:
+        this.chainCount = 8; // 최대 체인
+        this.damage += 10; // 최종 데미지 보너스
+        this.baseMaxTargetDistance += 100; // 최종 사거리 증가
+        break;
     }
-    if (this.level % 3 === 0) {
-      this.baseChainRange += 30; // 3레벨마다 기본 체인 범위 증가
-      this.updateRange(); // 실제 범위 재계산
-    }
-    if (this.level >= 4) {
-      this.baseMaxTargetDistance += 50; // 4레벨부터 기본 최대 거리 증가
-      this.updateRange(); // 실제 거리 재계산
-    }
-    if (this.level >= 6) {
-      this.baseCooldown *= 0.85; // 6레벨부터 쿨다운 감소
-      this.updateCooldown(player.getTotalCooldownReduction()); // 쿨타임 감소 특성 적용
-    }
+    
+    this.updateRange();
+    this.updateCooldown(player.getTotalCooldownReduction());
   }
 }
 
@@ -2309,16 +2434,43 @@ class FistWeapon extends MeleeWeapon {
 
   applyLevelBonus() {
     super.applyLevelBonus();
-    // 레벨업 시 공격속도 증가 (쿨타임 감소 특성과 별개)
-    if (this.level % 2 === 0) {
-      this.baseCooldown *= 0.9;
-      this.updateCooldown(player.getTotalCooldownReduction()); // 쿨타임 감소 특성도 적용
+    
+    // 10레벨 시스템에 맞춘 균형잡힌 강화
+    switch(this.level) {
+      case 2:
+        this.baseCooldown *= 0.9; // 공속 증가
+        break;
+      case 3:
+        this.baseRange += 10; // 범위 증가
+        break;
+      case 4:
+        this.damage += 5; // 데미지 증가
+        break;
+      case 5:
+        this.baseCooldown *= 0.85; // 공속 추가 증가
+        break;
+      case 6:
+        this.baseRange += 15; // 범위 추가 증가
+        this.damage += 5; // 데미지 추가 증가
+        break;
+      case 7:
+        this.baseCooldown *= 0.8; // 공속 추가 증가
+        break;
+      case 8:
+        this.baseRange += 20; // 범위 추가 증가
+        break;
+      case 9:
+        this.damage += 8; // 데미지 추가 증가
+        break;
+      case 10:
+        this.baseCooldown *= 0.7; // 최종 공속 (280ms)
+        this.damage += 10; // 최종 데미지 보너스
+        this.baseRange += 25; // 최종 범위 (155)
+        break;
     }
-    // 3레벨마다 기본 범위 증가
-    if (this.level % 3 === 0) {
-      this.baseRange += 15;
-      this.updateRange(); // 실제 범위 재계산
-    }
+    
+    this.updateRange();
+    this.updateCooldown(player.getTotalCooldownReduction());
   }
 }
 
@@ -2424,15 +2576,46 @@ class SwordWeapon extends MeleeWeapon {
 
   applyLevelBonus() {
     super.applyLevelBonus();
-    // 레벨업 시 기본 범위 증가
-    if (this.level % 2 === 0) {
-      this.baseRange += 15;
-      this.updateRange(); // 실제 범위 재계산
+    
+    // 10레벨 시스템에 맞춘 균형잡힌 강화
+    switch(this.level) {
+      case 2:
+        this.baseRange += 15; // 범위 증가
+        break;
+      case 3:
+        this.attackAngle += Math.PI / 18; // 각도 증가 (70도)
+        break;
+      case 4:
+        this.damage += 8; // 데미지 증가
+        this.baseCooldown *= 0.9; // 쿨타임 감소
+        break;
+      case 5:
+        this.baseRange += 20; // 범위 추가 증가
+        break;
+      case 6:
+        this.attackAngle += Math.PI / 18; // 각도 추가 증가 (80도)
+        this.damage += 10; // 데미지 추가 증가
+        break;
+      case 7:
+        this.baseCooldown *= 0.85; // 쿨타임 추가 감소
+        break;
+      case 8:
+        this.baseRange += 25; // 범위 추가 증가
+        this.attackAngle += Math.PI / 18; // 각도 추가 증가 (90도)
+        break;
+      case 9:
+        this.damage += 12; // 데미지 추가 증가
+        break;
+      case 10:
+        this.attackAngle = Math.PI / 2; // 최종 각도 (90도)
+        this.damage += 15; // 최종 데미지 보너스
+        this.baseRange += 30; // 최종 범위 (240)
+        this.baseCooldown *= 0.8; // 최종 쿨타임
+        break;
     }
-    // 3레벨마다 각도 증가
-    if (this.level % 3 === 0) {
-      this.attackAngle += Math.PI / 12; // 15도씩 증가
-    }
+    
+    this.updateRange();
+    this.updateCooldown(player.getTotalCooldownReduction());
   }
 }
 
@@ -2483,31 +2666,46 @@ class SpearWeapon extends Weapon {
   applyLevelBonus() {
     super.applyLevelBonus();
     
-    // 레벨업 시 향상
-    if (this.level === 2) {
-      this.projectileCount = 3; // 3개로 증가
-    } else if (this.level === 4) {
-      this.projectileCount = 5; // 5개로 증가
-    } else if (this.level === 6) {
-      this.projectileCount = 7; // 7개로 증가
-    } else if (this.level === 8) {
-      this.projectileCount = 9; // 9개로 증가
+    // 10레벨 시스템에 맞춘 균형잡힌 강화
+    switch(this.level) {
+      case 2:
+        this.projectileCount = 2; // 2개
+        break;
+      case 3:
+        this.projectileRange += 40; // 사거리 증가
+        break;
+      case 4:
+        this.projectileCount = 3; // 3개
+        this.damage += 10; // 데미지 증가
+        break;
+      case 5:
+        this.projectileSpeed += 1; // 속도 증가
+        this.baseCooldown *= 0.9; // 쿨타임 감소
+        break;
+      case 6:
+        this.projectileCount = 4; // 4개
+        break;
+      case 7:
+        this.projectileRange += 50; // 사거리 추가 증가
+        this.damage += 12; // 데미지 추가 증가
+        break;
+      case 8:
+        this.projectileCount = 5; // 5개
+        this.projectileSpeed += 1; // 속도 추가 증가
+        break;
+      case 9:
+        this.baseCooldown *= 0.85; // 쿨타임 추가 감소
+        this.projectileSpacing = 25; // 더 촘촘하게
+        break;
+      case 10:
+        this.projectileCount = 6; // 6개 (최대)
+        this.damage += 20; // 최종 데미지 보너스
+        this.projectileRange += 70; // 최종 사거리 (460)
+        this.projectileSpeed += 2; // 최종 속도 (13)
+        break;
     }
     
-    // 기타 향상
-    if (this.level % 3 === 0) {
-      this.projectileRange += 50; // 사거리 증가
-    }
-    if (this.level >= 4) {
-      this.projectileSpeed += 1; // 속도 증가
-    }
-    if (this.level >= 5) {
-      this.baseCooldown *= 0.85; // 쿨다운 감소
-      this.updateCooldown(player.getTotalCooldownReduction());
-    }
-    if (this.level >= 7) {
-      this.projectileSpacing = 25; // 더 촘촘하게
-    }
+    this.updateCooldown(player.getTotalCooldownReduction());
   }
 }
 
@@ -4709,66 +4907,84 @@ function generateLevelUpOptions() {
     { 
       type: 'attackPower', 
       name: '공격력 증가', 
-      value: 0.2, 
-      description: '공격력 +20%',
-      flavorText: 'dd..'
+      baseValue: 0.1, // 레벨당 10% 증가
+      description: function(currentLevel) {
+        return `공격력 +${(this.baseValue * 100).toFixed(0)}%`;
+      },
+      flavorText: '공격력 증가'
     },
     { 
       type: 'cooldownReduction', 
       name: '쿨타임 감소', 
-      value: 0.1, 
-      description: '쿨타임 -10%',
-      flavorText: 'dd..'
+      baseValue: 0.05, // 레벨당 5% 감소
+      description: function(currentLevel) {
+        return `쿨타임 -${(this.baseValue * 100).toFixed(0)}%`;
+      },
+      flavorText: '쿨타임 감소'
     },
     { 
       type: 'maxHealth', 
       name: '최대 체력 증가', 
-      value: 20, 
-      description: '최대 체력 +20',
-      flavorText: 'dd..'
+      baseValue: 15, // 레벨당 15 증가
+      description: function(currentLevel) {
+        return `최대 체력 +${this.baseValue}`;
+      },
+      flavorText: '최대 체력 증가'
     },
     { 
       type: 'moveSpeed', 
       name: '이동속도 증가', 
-      value: 0.3, 
-      description: '이동속도 +0.3',
-      flavorText: 'dd..'
+      baseValue: 0.2, // 레벨당 0.2 증가
+      description: function(currentLevel) {
+        return `이동속도 +${this.baseValue}`;
+      },
+      flavorText: '이동속도 증가'
     },
     { 
       type: 'attackRange', 
       name: '공격 범위 증가', 
-      value: 0.15, 
-      description: '공격 범위 +15%',
-      flavorText: 'dd..'
+      baseValue: 0.1, // 레벨당 10% 증가
+      description: function(currentLevel) {
+        return `공격 범위 +${(this.baseValue * 100).toFixed(0)}%`;
+      },
+      flavorText: '공격 범위 증가'
     },
     { 
       type: 'pickupRadius', 
-      name: '아이템 획득 반경', 
-      value: 20, 
-      description: '아이템 획득 범위 +20',
-      flavorText: 'dd..'
+      name: '아이템 획득 반경 증가', 
+      baseValue: 15, // 레벨당 15 증가
+      description: function(currentLevel) {
+        return `아이템 획득 범위 +${this.baseValue}`;
+      },
+      flavorText: '아이템 획득 반경 증가'
     },
     { 
       type: 'dodgeRate', 
       name: '회피율 증가', 
-      value: 0.05, 
-      description: '회피율 +5%',
-      flavorText: 'dd..'
+      baseValue: 0.03, // 레벨당 3% 증가
+      description: function(currentLevel) {
+        return `회피율 +${(this.baseValue * 100).toFixed(0)}%`;
+      },
+      flavorText: '회피율 증가'
     },
     { 
       type: 'luck', 
       name: '행운 증가', 
-      value: 0.1, 
-      description: '행운 +10%',
-      flavorText: 'dd..'
+      baseValue: 0.05, // 레벨당 5% 증가
+      description: function(currentLevel) {
+        return `행운 +${(this.baseValue * 100).toFixed(0)}%`;
+      },
+      flavorText: '행운 증가'
     },
     { 
       type: 'expMultiplier', 
-      name: '경험치 획득률', 
-      value: 0.1, 
-      description: '경험치 획득량 +10%',
-      flavorText: 'dd..'
-    },
+      name: '경험치 획득률 증가', 
+      baseValue: 0.05, // 레벨당 5% 증가
+      description: function(currentLevel) {
+        return `경험치 획득량 +${(this.baseValue * 100).toFixed(0)}%`;
+      },
+      flavorText: '경험치 획득률 증가'
+    }
   ];
   
   // 새로운 무기 옵션들
@@ -4842,10 +5058,14 @@ function generateLevelUpOptions() {
       weaponUpgradeOptions.push({
         type: 'weaponUpgrade',
         weaponType: weapon.type,
-        name: `${weaponName} 업그레이드`,
+        name: weaponName, // 레벨 텍스트 제거
+        levelText: `Lv.${weapon.level + 1}`, // 레벨 텍스트를 별도로 저장
         description: `레벨 ${weapon.level} → ${weapon.level + 1}`,
         flavorText: weaponFlavorTexts[weapon.type] || '무기가 더욱 강력해진다.',
-        weapon: weapon
+        weapon: weapon,
+        currentLevel: weapon.level, // 현재 레벨 추가
+        nextLevel: weapon.level + 1, // 다음 레벨 추가
+        maxLevel: weapon.maxLevel // 최대 레벨 추가
       });
     }
   }
@@ -4854,6 +5074,11 @@ function generateLevelUpOptions() {
   const playerWeaponTypes = player.weapons.map(w => w.type);
   const availableNewWeapons = newWeaponOptions.filter(weapon => 
     !playerWeaponTypes.includes(weapon.weaponType)
+  );
+
+  // 최대 레벨에 도달하지 않은 능력치만 필터링
+  const availableStats = statUpgrades.filter(stat => 
+    player.statLevels[stat.type] < player.maxStatLevel
   );
 
   // 모든 무기 옵션 합치기 (새 무기 + 무기 업그레이드)
@@ -4902,14 +5127,26 @@ function generateLevelUpOptions() {
       }
       
       // 새 무기를 선택하지 못했으면 특성 선택
-      if (!selectedOption) {
+      if (!selectedOption && availableStats.length > 0) {
         // 특성 선택 (이미 선택된 특성은 제외)
-        const availableStats = statUpgrades.filter(stat => 
+        const availableStatOptions = availableStats.filter(stat => 
           !levelUpOptions.some(option => option.type === stat.type)
         );
         
-        if (availableStats.length > 0) {
-          selectedOption = availableStats[Math.floor(Math.random() * availableStats.length)];
+        if (availableStatOptions.length > 0) {
+          const randomStat = availableStatOptions[Math.floor(Math.random() * availableStatOptions.length)];
+          const currentLevel = player.statLevels[randomStat.type];
+          
+          selectedOption = {
+            type: randomStat.type,
+            name: randomStat.name,
+            levelText: `Lv.${currentLevel + 1}`,
+            value: randomStat.baseValue,
+            description: randomStat.description(currentLevel),
+            flavorText: randomStat.flavorText,
+            currentLevel: currentLevel,
+            nextLevel: currentLevel + 1
+          };
         }
       }
     }
@@ -4922,10 +5159,12 @@ function generateLevelUpOptions() {
 
   // 옵션이 부족한 경우 나머지 슬롯을 채우기
   while (levelUpOptions.length < optionCount) {
-    // 남은 특성이나 무기 중에서 선택
-    const remainingStats = statUpgrades.filter(stat => 
+    // 남은 특성 옵션
+    const remainingStats = availableStats.filter(stat => 
       !levelUpOptions.some(option => option.type === stat.type)
     );
+    
+    // 남은 무기 옵션
     const remainingWeapons = allWeaponOptions.filter(weapon => 
       !levelUpOptions.some(option => 
         (option.type === 'weapon' && option.weaponType === weapon.weaponType) ||
@@ -4933,7 +5172,18 @@ function generateLevelUpOptions() {
       )
     );
     
-    const allRemaining = [...remainingStats, ...remainingWeapons];
+    const allRemaining = [...remainingStats.map(stat => {
+      const currentLevel = player.statLevels[stat.type];
+      return {
+        type: stat.type,
+        name: `${stat.name} Lv.${currentLevel + 1}`,
+        value: stat.baseValue,
+        description: stat.description(currentLevel),
+        flavorText: stat.flavorText,
+        currentLevel: currentLevel,
+        nextLevel: currentLevel + 1
+      };
+    }), ...remainingWeapons];
     
     if (allRemaining.length > 0) {
       const randomOption = allRemaining[Math.floor(Math.random() * allRemaining.length)];
@@ -5051,19 +5301,19 @@ function applyLevelUpChoice(optionIndex) {
     totalPausedTime += gameTimeSystem.getTime() - pauseStartTime;
     gameTimeSystem.resume();
     return;
-  }
-
-  if (option.type === 'weapon') {
+  } else if (option.type === 'weapon') {
     addWeapon(option.weaponType);
   } else if (option.type === 'weaponUpgrade') {
     const weapon = option.weapon;
     if (weapon && weapon.upgrade()) {
+      console.log(`${option.weaponType} upgraded to level ${weapon.level}`);
     }
   } else {
     // 일반 레벨업 옵션 적용
     switch(option.type) {
       case 'attackPower':
         player.levelAttackBonus += option.value;
+        player.statLevels.attackPower++;
         break;
         
       case 'maxHealth':
@@ -5071,6 +5321,7 @@ function applyLevelUpChoice(optionIndex) {
         const oldMaxHealth = player.maxHealth;
         player.maxHealth = player.getTotalMaxHealth();
         player.health += (player.maxHealth - oldMaxHealth); // 체력 회복
+        player.statLevels.maxHealth++;
         break;
         
       case 'cooldownReduction':
@@ -5079,10 +5330,12 @@ function applyLevelUpChoice(optionIndex) {
         player.weapons.forEach(weapon => {
           weapon.updateCooldown(player.getTotalCooldownReduction());
         });
+        player.statLevels.cooldownReduction++;
         break;
         
       case 'moveSpeed':
         player.levelMoveSpeedBonus += option.value;
+        player.statLevels.moveSpeed++;
         break;
         
       case 'attackRange':
@@ -5093,22 +5346,27 @@ function applyLevelUpChoice(optionIndex) {
             weapon.updateRange();
           }
         });
+        player.statLevels.attackRange++;
         break;
         
       case 'pickupRadius':
         player.levelPickupRadiusBonus += option.value;
+        player.statLevels.pickupRadius++;
         break;
         
       case 'dodgeRate':
         player.levelDodgeRateBonus += option.value;
+        player.statLevels.dodgeRate++;
         break;
         
       case 'luck':
         player.levelLuckBonus += option.value;
+        player.statLevels.luck++;
         break;
         
       case 'expMultiplier':
         player.levelExpMultiplierBonus += option.value;
+        player.statLevels.expMultiplier++;
         break;
         
       default:
@@ -5229,9 +5487,14 @@ function resetGame() {
   player.levelHealthRegenBonus = 0;
   player.levelGoldMultiplierBonus = 0;
   player.levelExpMultiplierBonus = 0;
-  
+
   player.weapons = [];
   addWeapon('wind');
+
+  // 능력치 레벨 초기화
+  for (let stat in player.statLevels) {
+    player.statLevels[stat] = 0;
+  }
 
   // 무적 상태 초기화
   player.invincible = false;
@@ -5382,18 +5645,25 @@ function drawLevelUpScreen() {
 }
 
 function drawOptionBox(x, y, width, height, option, isHovered) {
-  // 레어리티에 따른 색상 설정 (기존 코드와 동일)
+  // 레어리티에 따른 색상 설정
   let bgColor, borderColor, textColor;
   
   if (option.rarity) {
+    // 아티팩트인 경우
     bgColor = isHovered ? 
       option.rarity.bgColor.replace('0.3', '0.6') : 
       option.rarity.bgColor;
     borderColor = option.rarity.borderColor;
     textColor = isHovered ? '#FFFFFF' : option.rarity.color;
-  } else {
-    bgColor = isHovered ? 'rgba(69, 162, 158, 0.8)' : 'rgba(31, 40, 51, 0.8)';
+  } else if (option.type === 'weapon' || option.type === 'weaponUpgrade') {
+    // 새 무기인 경우 - 청록색 계열
+    bgColor = isHovered ? 'rgba(69, 162, 158, 0.5)' : 'rgba(31, 40, 51, 0.5)';
     borderColor = isHovered ? '#66fcf1' : '#45a29e';
+    textColor = isHovered ? '#FFFFFF' : '#ffffff';
+  } else {
+    // 일반 능력치 옵션인 경우 - 로얄 블루 계열
+    bgColor = isHovered ? 'rgba(5, 160, 255, 0.5)' : 'rgba(65, 105, 225, 0.5)';
+    borderColor = isHovered ? '#B2FFFF' : '#1E90FF';
     textColor = isHovered ? '#FFFFFF' : '#ffffff';
   }
   
@@ -5405,34 +5675,79 @@ function drawOptionBox(x, y, width, height, option, isHovered) {
   ctx.strokeStyle = borderColor;
   ctx.lineWidth = isHovered ? 3 : 2;
   ctx.strokeRect(x, y, width, height);
+
+  // 특별 효과 추가 (새 무기, 무기 업그레이드, 아티팩트인 경우)
+  if (option.type === 'weapon' || option.type === 'weaponUpgrade' || option.rarity || 
+      (option.currentLevel !== undefined && option.type !== 'weaponUpgrade')) {
+    // 내부 글로우 효과
+    ctx.save();
+    
+    // 아티팩트의 경우 레어리티에 따라 글로우 강도 조절
+    let glowAlpha = 0.3;
+    let glowColor = borderColor;
+    
+    if (option.rarity) {
+      // 레어리티별 글로우 강도
+      switch(option.rarity) {
+        case ARTIFACT_RARITY.LEGENDARY:
+          glowAlpha = 0.5;
+          break;
+        case ARTIFACT_RARITY.EPIC:
+          glowAlpha = 0.4;
+          break;
+        case ARTIFACT_RARITY.RARE:
+          glowAlpha = 0.35;
+          break;
+        case ARTIFACT_RARITY.UNCOMMON:
+          glowAlpha = 0.3;
+          break;
+        default: // COMMON
+          glowAlpha = 0.25;
+          break;
+      }
+    }
+    
+    ctx.globalAlpha = glowAlpha;
+    const gradient = ctx.createLinearGradient(x, y, x + width, y + height);
+    gradient.addColorStop(0, glowColor);
+    gradient.addColorStop(0.5, 'transparent');
+    gradient.addColorStop(1, glowColor);
+    ctx.fillStyle = gradient;
+    ctx.fillRect(x + 2, y + 2, width - 4, height - 4);
+    ctx.restore();
+  }
   
-  // 레어리티 표시 (상단)
+  // 레어리티 표시 (아티팩트인 경우 상단에 표시)
+  let iconY = y + 40; // 기본 아이콘 Y 위치
   if (option.rarity) {
     ctx.fillStyle = option.rarity.color;
     ctx.font = '14px Arial';
     ctx.textAlign = 'center';
     ctx.fillText(option.rarity.name, x + width/2, y + 20);
+    iconY = y + 50; // 레어리티가 있으면 아이콘 위치를 아래로
   }
   
   // 아이콘 위치 및 크기
   const iconSize = 64;
   const iconX = x + (width - iconSize) / 2;
-  const iconY = y + (option.rarity ? 50 : 40);
   
-  // 아이콘 그리기 (기존 코드와 동일)
+  // 아이콘 그리기
   if (option.iconId && assetManager.loaded.artifactIcons && 
       assetManager.images.artifactIcons[option.iconId]) {
+    // 아티팩트 아이콘
     ctx.drawImage(
       assetManager.images.artifactIcons[option.iconId], 
       iconX, iconY, iconSize, iconSize
     );
   } else if (option.type === 'weapon' || option.type === 'weaponUpgrade') {
+    // 무기 아이콘
     if (assetManager.loaded.weaponIcons && 
         assetManager.images.weaponIcons[option.weaponType]) {
       ctx.drawImage(assetManager.images.weaponIcons[option.weaponType], 
                    iconX, iconY, iconSize, iconSize);
     }
   } else {
+    // 능력치 아이콘
     if (assetManager.loaded.levelUpIcons && 
         assetManager.images.levelUpIcons[option.type]) {
       ctx.drawImage(assetManager.images.levelUpIcons[option.type], 
@@ -5443,60 +5758,151 @@ function drawOptionBox(x, y, width, height, option, isHovered) {
   // 텍스트 시작 위치
   const textStartY = iconY + iconSize + 30;
   
-  // 이름
+  // 이름 그리기
   ctx.fillStyle = textColor;
   ctx.font = 'bold 18px Arial';
   ctx.textAlign = 'center';
-  ctx.fillText(option.name, x + width/2, textStartY);
   
-  // 설명
-  ctx.fillStyle = isHovered ? textColor : '#c5c6c7';
-  ctx.font = '14px Arial';
-  
-  // 설명 텍스트 그리기
-  const maxLineWidth = width - 20;
-  let currentY = textStartY + 20;
-  
-  // 설명 (효과)
-  const words = option.description.split(' ');
-  let line = '';
-  for (let i = 0; i < words.length; i++) {
-    const testLine = line + words[i] + ' ';
-    const metrics = ctx.measureText(testLine);
+  // 레벨이 있는 옵션인 경우 (능력치 또는 무기 업그레이드)
+  if (option.currentLevel !== undefined && option.nextLevel !== undefined) {
+    // 이름 (레벨 제외)
+    ctx.fillText(option.name, x + width/2, textStartY);
     
-    if (metrics.width > maxLineWidth && i > 0) {
-      ctx.fillText(line, x + width/2, currentY);
-      line = words[i] + ' ';
-      currentY += 18;
-    } else {
-      line = testLine;
-    }
-  }
-  ctx.fillText(line, x + width/2, currentY);
-  currentY += 18;
-  
-  // 플레이버 텍스트 (있는 경우만)
-  if (option.flavorText) {
-    ctx.fillStyle = isHovered ? '#FFD700' : '#D4AF37'; // 금색으로 구분
-    ctx.font = 'italic 12px Arial';
+    // 레벨 텍스트를 다음 줄에 표시
+    ctx.fillStyle = isHovered ? '#66fcf1' : '#45a29e';
+    ctx.font = 'bold 16px Arial';
+    ctx.fillText(option.levelText || `Lv.${option.nextLevel}`, x + width/2, textStartY + 20);
     
-    // 플레이버 텍스트도 여러 줄로 나누기
-    currentY += 5; // 약간의 간격
-    const flavorWords = option.flavorText.split(' ');
-    line = '';
-    for (let i = 0; i < flavorWords.length; i++) {
-      const testLine = line + flavorWords[i] + ' ';
+    // 레벨 진행 바 그리기
+    const barWidth = width - 40;
+    const barHeight = 8;
+    const barX = x + 20;
+    const barY = textStartY + 35;
+    
+    // 배경 바
+    ctx.fillStyle = 'rgba(100, 100, 100, 0.5)';
+    ctx.fillRect(barX, barY, barWidth, barHeight);
+    
+    // 진행도 바
+    const maxLevel = option.maxLevel || player.maxStatLevel; // 무기는 maxLevel, 능력치는 player.maxStatLevel
+    const progress = option.currentLevel / maxLevel;
+    ctx.fillStyle = isHovered ? '#66fcf1' : '#45a29e';
+    ctx.fillRect(barX, barY, barWidth * progress, barHeight);
+    
+    // 진행 바 테두리
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(barX, barY, barWidth, barHeight);
+    
+    // 레벨 텍스트 (X/Y)
+    ctx.fillStyle = isHovered ? textColor : '#c5c6c7';
+    ctx.font = '12px Arial';
+    ctx.fillText(`${option.currentLevel} / ${maxLevel}`, x + width/2, barY + 20);
+    
+    // 설명 텍스트
+    ctx.fillStyle = isHovered ? textColor : '#c5c6c7';
+    ctx.font = '14px Arial';
+    
+    // 설명 위치 조정
+    let currentY = barY + 40;
+    
+    // 설명 (효과) - 줄바꿈 처리
+    const maxLineWidth = width - 20;
+    const words = option.description.split(' ');
+    let line = '';
+    
+    for (let i = 0; i < words.length; i++) {
+      const testLine = line + words[i] + ' ';
       const metrics = ctx.measureText(testLine);
       
       if (metrics.width > maxLineWidth && i > 0) {
         ctx.fillText(line, x + width/2, currentY);
-        line = flavorWords[i] + ' ';
-        currentY += 16;
+        line = words[i] + ' ';
+        currentY += 18;
       } else {
         line = testLine;
       }
     }
     ctx.fillText(line, x + width/2, currentY);
+    currentY += 18;
+    
+    // 플레이버 텍스트
+    if (option.flavorText) {
+      ctx.fillStyle = isHovered ? '#FFD700' : '#D4AF37';
+      ctx.font = 'italic 12px Arial';
+      
+      currentY += 5;
+      const flavorWords = option.flavorText.split(' ');
+      line = '';
+      
+      for (let i = 0; i < flavorWords.length; i++) {
+        const testLine = line + flavorWords[i] + ' ';
+        const metrics = ctx.measureText(testLine);
+        
+        if (metrics.width > maxLineWidth && i > 0) {
+          ctx.fillText(line, x + width/2, currentY);
+          line = flavorWords[i] + ' ';
+          currentY += 16;
+        } else {
+          line = testLine;
+        }
+      }
+      ctx.fillText(line, x + width/2, currentY);
+    }
+  } else {
+    // 새 무기나 아티팩트인 경우 (레벨 바 없음)
+    ctx.fillText(option.name, x + width/2, textStartY);
+    
+    // 설명
+    ctx.fillStyle = isHovered ? textColor : '#c5c6c7';
+    ctx.font = '14px Arial';
+    
+    // 설명 텍스트 그리기 (줄바꿈 처리)
+    const maxLineWidth = width - 20;
+    let currentY = textStartY + 20;
+    
+    // 설명 (효과)
+    const words = option.description.split(' ');
+    let line = '';
+    
+    for (let i = 0; i < words.length; i++) {
+      const testLine = line + words[i] + ' ';
+      const metrics = ctx.measureText(testLine);
+      
+      if (metrics.width > maxLineWidth && i > 0) {
+        ctx.fillText(line, x + width/2, currentY);
+        line = words[i] + ' ';
+        currentY += 18;
+      } else {
+        line = testLine;
+      }
+    }
+    ctx.fillText(line, x + width/2, currentY);
+    currentY += 18;
+    
+    // 플레이버 텍스트 (있는 경우만)
+    if (option.flavorText) {
+      ctx.fillStyle = isHovered ? '#FFD700' : '#D4AF37';
+      ctx.font = 'italic 12px Arial';
+      
+      currentY += 5;
+      const flavorWords = option.flavorText.split(' ');
+      line = '';
+      
+      for (let i = 0; i < flavorWords.length; i++) {
+        const testLine = line + flavorWords[i] + ' ';
+        const metrics = ctx.measureText(testLine);
+        
+        if (metrics.width > maxLineWidth && i > 0) {
+          ctx.fillText(line, x + width/2, currentY);
+          line = flavorWords[i] + ' ';
+          currentY += 16;
+        } else {
+          line = testLine;
+        }
+      }
+      ctx.fillText(line, x + width/2, currentY);
+    }
   }
 }
 
