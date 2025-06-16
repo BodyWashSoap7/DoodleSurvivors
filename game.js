@@ -5217,16 +5217,32 @@ function generateArtifactOptions() {
   // 이미 획득한 아티팩트 제외
   const excludeIds = player.acquiredArtifacts || [];
   
-  // 행운에 따른 4번째 선택지 확률 계산 (레벨업과 동일한 로직)
+  // 행운에 따른 4번째 선택지 확률 계산
   const baseLevelUpOptions = 3;
-  const fourthOptionChance = Math.min(player.getTotalLuck() * 0.5, 1.0); // 최대 100% 확률
+  const fourthOptionChance = Math.min(player.getTotalLuck() * 0.5, 1.0);
   const shouldShowFourthOption = Math.random() < fourthOptionChance;
   const optionCount = shouldShowFourthOption ? 4 : 3;
   
   // 아티팩트 시스템에서 계산된 개수만큼 선택
   const selectedArtifacts = artifactSystem.selectRandomArtifacts(optionCount, excludeIds);
   
-  // 레벨업 옵션으로 변환 (flavorText 포함)
+  // 선택된 아티팩트가 없는 경우 (모든 아티팩트 획득) 경험치 옵션으로 채우기
+  if (selectedArtifacts.length === 0) {
+    for (let i = 0; i < optionCount; i++) {
+      const xpGain = Math.floor((player.nextLevelExp) * 0.3);
+      selectedArtifacts.push({
+        id: 'exp_gain',
+        name: '경험치 획득',
+        description: `${xpGain} 경험치 획득`,
+        flavorText: '지식과 경험을 얻는다.',
+        rarity: ARTIFACT_RARITY.COMMON,
+        iconId: 'exp_gain',
+        effects: [{ type: 'expGain', value: xpGain }]
+      });
+    }
+  }
+  
+  // 레벨업 옵션으로 변환
   levelUpOptions = selectedArtifacts.map(artifact => ({
     type: 'artifact',
     artifactId: artifact.id,
