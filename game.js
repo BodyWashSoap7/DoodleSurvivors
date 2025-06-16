@@ -5786,9 +5786,16 @@ function drawOptionBox(x, y, width, height, option, isHovered) {
     ctx.fillText(option.name, x + width/2, textStartY);
     
     // 레벨 텍스트를 다음 줄에 표시
-    ctx.fillStyle = isHovered ? '#66fcf1' : '#45a29e';
     ctx.font = 'bold 16px Arial';
-    ctx.fillText(option.levelText || `Lv.${option.nextLevel}`, x + width/2, textStartY + 20);
+    
+    // 레벨이 0이면 NEW! 표시
+    if (option.currentLevel === 0) {
+      ctx.fillStyle = '#FFD700'; // 골드색
+      ctx.fillText('NEW!', x + width/2, textStartY + 20);
+    } else {
+      ctx.fillStyle = isHovered ? '#66fcf1' : '#45a29e';
+      ctx.fillText(`Lv.${option.nextLevel}`, x + width/2, textStartY + 20);
+    }
     
     // 레벨 진행 바 그리기
     const barWidth = width - 40;
