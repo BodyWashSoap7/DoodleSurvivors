@@ -6393,7 +6393,7 @@ function drawPerkScreen() {
   // 현재 골드 표시
   ctx.fillStyle = '#66fcf1';
   ctx.font = '20px Arial';
-  ctx.fillText(`보유 골드: ${gold}`, canvas.width / 2, 100);
+  ctx.fillText(`보유 골드: ${loadGold}`, canvas.width / 2, 100);
   
   // 마우스 호버 감지를 위한 변수
   hoveredPerkId = null;
