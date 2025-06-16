@@ -7579,14 +7579,19 @@ function onBossFightEnd() {
 }
 
 // 특정 위치에 적 스폰하는 헬퍼 함수
-function spawnEnemyAtPosition(x, y, isWaveSpawn) {
+function spawnEnemyAtPosition(x, y, enemyTypeName = null, scale = 1.0) {
   // 스폰 위치 유효성 확인
   if (!isValidSpawnPosition(x, y)) {
     return false;
   }
   
-  // 적 타입 선택 - 시간에 따라 강한 적 비율 증가
-  let enemyType = selectEnemyTypeByTime();
+  // 적 타입 선택 - 매개변수로 받은 타입이 있으면 사용, 없으면 시간 기반 선택
+  let enemyType;
+  if (enemyTypeName && ENEMY_TYPES[enemyTypeName]) {
+    enemyType = ENEMY_TYPES[enemyTypeName];
+  } else {
+    enemyType = selectEnemyTypeByTime();
+  }
   
   // 선택된 타입으로 적 생성
   let enemy;
@@ -7597,23 +7602,26 @@ function spawnEnemyAtPosition(x, y, isWaveSpawn) {
     // 시간에 따른 스탯 보정
     const timeMultiplier = 1 + (elapsedTime / 300); // 5분마다 2배
     
+    // scale 매개변수 적용
     const enemySpeed = (enemyType.speedBase + Math.random() * enemyType.speedVariance) 
                        * (1 - player.enemySpeedReduction)
-                       * (isWaveSpawn ? 1.2 : 1); // 웨이브 적은 20% 빠름
+                       * scale; // scale 적용
     
     const enemyHealth = Math.floor((enemyType.healthBase + Math.floor((player.level - 1) * enemyType.healthPerLevel)) 
                        * (1 - player.enemyHealthReduction)
-                       * timeMultiplier);
+                       * timeMultiplier
+                       * scale); // scale 적용
     
     const enemyAttack = (enemyType.attackBase + Math.floor((player.level - 1) * enemyType.attackPerLevel))
-                       * timeMultiplier;
+                       * timeMultiplier
+                       * scale; // scale 적용
     
-    enemy = new Enemy(x, y, enemyType.size, enemySpeed, enemyHealth, enemyAttack);
+    enemy = new Enemy(x, y, enemyType.size * scale, enemySpeed, enemyHealth, enemyAttack);
     
     // 추가 속성 설정
     enemy.type = enemyType.name;
-    enemy.expValue = Math.floor(enemyType.expValue * (isWaveSpawn ? 1.5 : 1));
-    enemy.goldValue = Math.floor(enemyType.goldValue * (isWaveSpawn ? 1.5 : 1));
+    enemy.expValue = Math.floor(enemyType.expValue * scale);
+    enemy.goldValue = Math.floor(enemyType.goldValue * scale);
     
     if (enemyType.canShoot) {
       enemy.canShoot = true;
@@ -8179,6 +8187,8 @@ function handleStartScreenClick() {
   if (mouseX >= canvas.width / 2 - buttonWidth - spacing/2 && 
       mouseX <= canvas.width / 2 - spacing/2 &&
       mouseY >= buttonY + 60 && mouseY <= buttonY + 60 + buttonHeight) {
+    permanentUpgrades.loadUpgrades();
+    gold = loadGold();
     currentGameState = GAME_STATE.UPGRADE;
     selectedPerkId = null; // 선택 초기화
     return;
