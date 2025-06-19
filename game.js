@@ -6654,6 +6654,16 @@ function drawOptionBox(x, y, width, height, option, isHovered) {
   } else {
     // 새 무기나 아티팩트인 경우 (레벨 바 없음)
     ctx.fillText(option.name, x + width/2, textStartY);
+
+    // 새 무기인 경우 NEW! 표시 추가
+    if (option.type === 'weapon') {
+      ctx.font = 'bold 16px Arial';
+      ctx.fillStyle = '#FFD700';
+      ctx.fillText('NEW!', x + width/2, textStartY + 20);
+      currentY = textStartY + 40; // NEW! 아래로 설명 위치 조정
+    } else {
+      currentY = textStartY + 20; // 아티팩트는 기존대로
+    }
     
     // 설명
     ctx.fillStyle = isHovered ? textColor : '#c5c6c7';
@@ -6661,7 +6671,6 @@ function drawOptionBox(x, y, width, height, option, isHovered) {
     
     // 설명 텍스트 그리기 (줄바꿈 처리)
     const maxLineWidth = width - 20;
-    let currentY = textStartY + 20;
     
     // 설명 (효과)
     const words = option.description.split(' ');
