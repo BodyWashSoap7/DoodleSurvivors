@@ -1447,7 +1447,7 @@ class Bullet {
 
   draw(offsetX, offsetY) {
     if (assetManager.loaded.weapons && assetManager.images.weapons.wind) {
-      const scale = 0.8; // 크기 조절 (0.8 = 80% 크기)
+      const scale = 0.4; // 크기 조절 (0.8 = 80% 크기)
       const drawSize = 64 * scale;
       
       ctx.save();
@@ -1559,7 +1559,7 @@ class WindWeapon extends Weapon {
       
       gameObjects.bullets.push(
         new Bullet(
-          player.x, player.y, 5, this.baseProjectileSpeed,
+          player.x, player.y, 2.5, this.baseProjectileSpeed,
           finalAngle,
           this.damage * player.getTotalRangedAttackPower() // 공격력 특성 적용
         )
@@ -5517,7 +5517,7 @@ function resetGame() {
   player.levelExpMultiplierBonus = 0;
 
   player.weapons = [];
-  addWeapon('wind');
+  addWeapon('flame');
 
   // 능력치 레벨 초기화
   for (let stat in player.statLevels) {
@@ -6998,7 +6998,7 @@ function draw() {
 
   // 플레이어 그리기
   if (player.image && player.image.complete) {
-    const playerSize = player.size * 2;
+    const playerSize = player.size;
     
     // 현재 프레임 위치 계산
     const spriteX = player.currentFrame * player.spriteWidth;
