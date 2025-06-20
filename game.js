@@ -3611,15 +3611,14 @@ class Enemy {
     const deathEffect = new DeathEffect(this.x, this.y, this.size, this.type);
     gameObjects.bullets.push(deathEffect); // bullets 배열에 추가 (같은 업데이트/드로우 루프 사용)
     
-    // 경험치 및 골드 획득
-    const expValue = this.expValue || 3;
+    // 최대 레벨이 아닐 때만 경험치 획득
+    if (player.level < MAX_PLAYER_LEVEL) {
+      const expValue = this.expValue || 3;
+      const finalExpGained = Math.floor(expValue * player.getTotalExpMultiplier());
+      player.exp += finalExpGained;
+    }
+    
     let goldValue = this.goldValue || 10;
-    
-    // 총 경험치 배율 적용
-    const finalExpGained = Math.floor(expValue * player.getTotalExpMultiplier());
-    player.exp += finalExpGained;
-    
-    // 총 골드 배율 적용
     goldValue = Math.floor(goldValue * player.getTotalGoldMultiplier());
     gold += goldValue;
     saveGold();
@@ -4287,11 +4286,12 @@ class Jewel extends GameObject {
       case 0: // 소 jewel
       case 1: // 중 jewel
       case 2: // 대 jewel
-        // 총 경험치 배율 적용
-        const finalExpGained = Math.floor(this.expValue * player.getTotalExpMultiplier());
-        player.exp += finalExpGained;
+
+        if (player.level < MAX_PLAYER_LEVEL) {
+          const finalExpGained = Math.floor(this.expValue * player.getTotalExpMultiplier());
+          player.exp += finalExpGained;
+        }
         
-        // 총 골드 배율 적용
         let goldValue = this.type + 5;
         goldValue = Math.floor(goldValue * player.getTotalGoldMultiplier());
         gold += goldValue;
@@ -4299,11 +4299,9 @@ class Jewel extends GameObject {
         break;
         
       case 3: // 자석 jewel
-        // 총 경험치 배율 적용
         const magnetExpGained = Math.floor(this.expValue * player.getTotalExpMultiplier());
         player.exp += magnetExpGained;
         
-        // 총 골드 배율 적용
         let magnetGold = 10;
         magnetGold = Math.floor(magnetGold * player.getTotalGoldMultiplier());
         gold += magnetGold;
@@ -4844,7 +4842,9 @@ class ArtifactSystem {
         player.bossDamageBonus = (player.bossDamageBonus || 0) + effect.value;
         break;
       case 'expGain':
-        player.exp += effect.value;
+        if (player.level < MAX_PLAYER_LEVEL) {
+          player.exp += effect.value;
+        }
         break;
     }
   }
@@ -4868,10 +4868,17 @@ const artifactSystem = new ArtifactSystem();
 //----------------------
 
 // 레벨업 시스템
+const MAX_PLAYER_LEVEL = 100;
+
 function checkLevelUp() {
   let leveledUp = false;
+
+  // 최대 레벨 체크 추가
+  if (player.level >= MAX_PLAYER_LEVEL) {
+    return; // 최대 레벨이면 더 이상 레벨업 불가
+  }
   
-  while (player.exp >= player.nextLevelExp) {
+  while (player.exp >= player.nextLevelExp && player.level < MAX_PLAYER_LEVEL) {
     // 초과 경험치 계산
     const excessExp = player.exp - player.nextLevelExp;
     
@@ -4883,14 +4890,19 @@ function checkLevelUp() {
     player.prevLevelExp = player.nextLevelExp;
     
     // 다음 레벨 경험치 계산
-    player.nextLevelExp = getXPForNextLevel(player.level);
+    if (player.level < MAX_PLAYER_LEVEL) {
+      player.nextLevelExp = getXPForNextLevel(player.level);
+    } else {
+      // 최대 레벨 도달 시
+      player.nextLevelExp = Infinity; // 다음 레벨 불가능
+    }
     
     // 초과 경험치 유지
     player.exp = excessExp;
   }
   
   // 레벨업 화면 띄우기
-  if (leveledUp) {
+  if (leveledUp && player.level < MAX_PLAYER_LEVEL) {
     isArtifactSelection = false;
     currentGameState = GAME_STATE.LEVEL_UP;
     pauseStartTime = gameTimeSystem.getTime();
@@ -6796,7 +6808,12 @@ function drawHUD() {
   // 레벨 (화면 하단)
   ctx.font = '24px Arial';
   ctx.textAlign = 'center';
-  drawTextWithStroke(`LEVEL ${player.level}`, canvas.width / 2, canvas.height - 40, '#ffff00', '#000000');
+  if (player.level >= MAX_PLAYER_LEVEL) {
+    // 최대 레벨 도달 시 특별 표시
+    drawTextWithStroke(`LEVEL MAX`, canvas.width / 2, canvas.height - 40, '#FFD700', '#000000');
+  } else {
+    drawTextWithStroke(`LEVEL ${player.level}`, canvas.width / 2, canvas.height - 40, '#ffff00', '#000000');
+  }
   
   // 경험치 바 (화면 최하단)
   const expBarHeight = 20;
@@ -6806,10 +6823,27 @@ function drawHUD() {
   ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
   ctx.fillRect(0, expBarY, canvas.width, expBarHeight);
   
-  // 경험치 바 진행도
-  const expProgress = player.exp / player.nextLevelExp;
-  ctx.fillStyle = '#00ff00';
-  ctx.fillRect(0, expBarY, canvas.width * expProgress, expBarHeight);
+  // 최대 레벨이 아닐 때만 경험치 바 표시
+  if (player.level < MAX_PLAYER_LEVEL) {
+    // 경험치 바 진행도
+    const expProgress = player.exp / player.nextLevelExp;
+    ctx.fillStyle = '#00ff00';
+    ctx.fillRect(0, expBarY, canvas.width * expProgress, expBarHeight);
+    
+    // 경험치 텍스트
+    ctx.font = '14px Arial';
+    ctx.textAlign = 'center';
+    drawTextWithStroke(`${player.exp} / ${player.nextLevelExp}`, canvas.width / 2, expBarY + 15, '#ffffff', '#000000', 2);
+  } else {
+    // 최대 레벨일 때는 금색 바로 가득 채움
+    ctx.fillStyle = '#FFD700';
+    ctx.fillRect(0, expBarY, canvas.width, expBarHeight);
+    
+    // 최대 레벨 텍스트
+    ctx.font = '14px Arial';
+    ctx.textAlign = 'center';
+    drawTextWithStroke('MAX LEVEL', canvas.width / 2, expBarY + 15, '#000000', '#FFD700', 2);
+  }
   
   // 테두리
   ctx.strokeStyle = '#66fcf1';
