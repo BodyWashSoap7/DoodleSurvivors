@@ -3635,9 +3635,9 @@ class Enemy {
   
     // 행운이 보물상자 드롭 확률에 영향 (5레벨 이상일 때만)
     if (player.level >= 5) {
-      const baseTreasure = 0.01;
-      const treasureLuckBonus = player.getTotalLuck() * 2;
-      const treasureChance = Math.min(baseTreasure * (1 + treasureLuckBonus), 0.2);
+      const baseTreasure = 0.005;
+      const treasureLuckBonus = Math.min(player.getTotalLuck() * 0.5, 2.0);
+      const treasureChance = Math.min(baseTreasure * (1 + treasureLuckBonus), 0.02);
       
       if (!this.isBoss && Math.random() < treasureChance) {
         gameObjects.terrain.push(new Treasure(this.x, this.y));
@@ -7346,8 +7346,8 @@ function generateChunk(chunkX, chunkY) {
     gameObjects.jewels.push(jewel);
   }
   
-  // 보물 생성 (5% 확률, 5레벨 이상일 때만)
-  if (player.level >= 1 && Math.random() < 0.5) {
+  // 보물 생성 (5% 확률, 5레벨 이상, 킬수 25 이상일 때만)
+  if (player.level >= 1 && Math.random() < 0.05 && totalKills >= 25) {
     const x = chunkX * CHUNK_SIZE + Math.random() * CHUNK_SIZE;
     const y = chunkY * CHUNK_SIZE + Math.random() * CHUNK_SIZE;
     const treasure = new Treasure(x, y);
