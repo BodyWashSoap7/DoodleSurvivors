@@ -91,12 +91,12 @@ const permanentUpgrades = {
       category: 'creation',
       type: 'physical', 
       name: '수집 범위',
-      description: '획득반경 +15',
+      description: '획득반경 +7.5',
       maxLevel: 8,
       currentLevel: 0,
       baseCost: 40,
       costMultiplier: 1.3,
-      effect: 15
+      effect: 7.5
     },
     
     // 창조 (마술) - 골드획득량, 행운
@@ -207,12 +207,12 @@ const permanentUpgrades = {
       category: 'will',
       type: 'physical',
       name: '신속함',
-      description: '이동속도 +0.2',
+      description: '이동속도 +0.1',
       maxLevel: 10,
       currentLevel: 0,
       baseCost: 70,
       costMultiplier: 1.5,
-      effect: 0.2
+      effect: 0.1
     },
     {
       id: 'will_physical_health',
@@ -576,10 +576,10 @@ const userProfileSystem = {
 
 // 적 관련 상수
 const MAX_ENEMIES = 300;
-const MIN_SPAWN_DISTANCE = 150;
+const MIN_SPAWN_DISTANCE = 100;
 const MAX_SPAWN_DISTANCE = 450;
 const ENEMY_SPAWN_INTERVAL = 500;
-const ENEMY_SPATIAL_GRID_SIZE = 100;
+const ENEMY_SPATIAL_GRID_SIZE = 50;
 let enemySpatialGrid = {};
 let totalKills = 0;
 
@@ -877,15 +877,15 @@ const player = {
   characterType: 1,
   image: null,
   
-  size: 15,
+  size: 7.5,
   
   // 기본값들
   baseAttackPower: 1,
   baseCooldownReduction: 0,
-  baseAttackRange: 1,
-  baseMoveSpeed: 2,
+  baseAttackRange: 0.5,
+  baseMoveSpeed: 1,
   baseMaxHealth: 100,
-  basePickupRadius: 100,
+  basePickupRadius: 50,
   baseDodgeRate: 0,
   baseLuck: 0,
   baseHealthRegen: 0,
@@ -1109,7 +1109,7 @@ class BossCage {
   constructor(centerX, centerY) {
     this.centerX = centerX;
     this.centerY = centerY;
-    this.size = 900;
+    this.size = 450;
     this.halfSize = this.size / 2;
     
     // 케이지 경계
@@ -1127,8 +1127,8 @@ class BossCage {
   
   // 플레이어를 케이지 안으로 제한
   constrainPlayer(player) {
-    player.x = Math.max(this.minX + 30, Math.min(this.maxX - 30, player.x));
-    player.y = Math.max(this.minY + 30, Math.min(this.maxY - 30, player.y));
+    player.x = Math.max(this.minX + 15, Math.min(this.maxX - 15, player.x));
+    player.y = Math.max(this.minY + 15, Math.min(this.maxY - 15, player.y));
   }
   
   // 케이지 그리기
@@ -1168,7 +1168,7 @@ class BossCage {
 // 특별 상자 클래스
 class SpecialTreasure extends GameObject {
   constructor(x, y) {
-    super(x, y, 40);
+    super(x, y, 20);
     this.collected = false;
     this.isTreasure = true;
   }
@@ -1286,7 +1286,7 @@ function startBossMode() {
   // Boss 몬스터 3마리 스폰
   for (let i = 0; i < totalBosses; i++) {
     const angle = (Math.PI * 2 * i) / totalBosses;
-    const distance = 250;
+    const distance = 125;
     
     const bossX = player.x + Math.cos(angle) * distance;
     const bossY = player.y + Math.sin(angle) * distance;
@@ -1489,7 +1489,7 @@ class WindWeapon extends Weapon {
       damage: 10
     });
     this.projectileCount = 1;
-    this.baseProjectileSpeed = 7; // 기본 투사체 속도 (고정)
+    this.baseProjectileSpeed = 3.5; // 기본 투사체 속도 (고정)
     
     // 연속 발사 관련 속성
     this.burstFiring = false; // 연속 발사 중인지 여부
@@ -1614,13 +1614,13 @@ class EarthWeapon extends Weapon {
       baseCooldown: 50,
       damage: 8
     });
-    this.orbitRadius = 150; // 고정된 궤도 반지름
+    this.orbitRadius = 75; // 궤도 반지름
     this.orbitSpeed = 0.03;       
     this.orbitAngle = 0;          
     this.orbCount = 1;            
     this.damageCooldown = 100;    
     this.lastDamageTime = 0;
-    this.baseOrbSize = 8; // 기본 구체 크기
+    this.baseOrbSize = 4; // 기본 구체 크기
     this.orbSize = this.baseOrbSize; // 현재 구체 크기
     
     // 구체를 게임 객체로 생성
@@ -1822,7 +1822,7 @@ class FlameWeapon extends Weapon {
       damage: 15
     });
     this.flameAngle = Math.PI / 3; // 60도 부채꼴
-    this.baseRange = 200; // 기본 범위
+    this.baseRange = 100; // 기본 범위
     this.range = this.baseRange;
     this.duration = 3000;
     this.activeFlames = [];
@@ -2052,9 +2052,9 @@ class LightningWeapon extends Weapon {
       damage: 15
     });
     this.chainCount = 3;
-    this.baseChainRange = 150; // 기본 체인 범위
+    this.baseChainRange = 75; // 기본 체인 범위
     this.chainRange = this.baseChainRange;
-    this.baseMaxTargetDistance = 400; // 기본 최대 거리
+    this.baseMaxTargetDistance = 200; // 기본 최대 거리
     this.maxTargetDistance = this.baseMaxTargetDistance;
   }
   
@@ -2376,10 +2376,10 @@ class FistWeapon extends MeleeWeapon {
       type: 'fist',
       baseCooldown: 400, // 빠른 공격속도
       damage: 15,
-      range: 100,
+      range: 50,
       effectDuration: 300
     });
-    this.baseRange = 100; // 기본 범위 저장
+    this.baseRange = 50; // 기본 범위 저장
   }
 
   // 공격 범위 특성 적용
@@ -2481,11 +2481,11 @@ class SwordWeapon extends MeleeWeapon {
       type: 'sword',
       baseCooldown: 800, // 중간 공격속도
       damage: 25,
-      range: 150, // 중간 사거리
+      range: 75, // 중간 사거리
       attackAngle: Math.PI / 3, // 60도 부채꼴
       effectDuration: 400
     });
-    this.baseRange = 150; // 기본 범위 저장
+    this.baseRange = 75; // 기본 범위 저장
   }
 
   // 공격 범위 특성 적용
@@ -2627,10 +2627,10 @@ class SpearWeapon extends Weapon {
       baseCooldown: 1200, // 느린 공격속도
       damage: 35
     });
-    this.projectileSpeed = 10; // 투사체 속도
-    this.projectileRange = 300; // 최대 사거리
+    this.projectileSpeed = 5; // 투사체 속도
+    this.projectileRange = 150; // 최대 사거리
     this.projectileCount = 1; // 동시 발사 수
-    this.projectileSpacing = 30; // 창 사이의 간격
+    this.projectileSpacing = 15; // 창 사이의 간격
   }
   
   fire() {
@@ -3126,9 +3126,9 @@ class SpearProjectile {
 const ENEMY_TYPES = {
   NORMAL: {
     name: "Normal",
-    size: 20,
-    speedBase: 0.5,
-    speedVariance: 0.1,
+    size: 10,
+    speedBase: 0.25,
+    speedVariance: 0.05,
     healthBase: 5,
     healthPerLevel: 1.5,
     attackBase: 10,
@@ -3139,9 +3139,9 @@ const ENEMY_TYPES = {
   },
   FAST: {
     name: "Fast",
-    size: 15,
-    speedBase: 1.5,
-    speedVariance: 0.2,
+    size: 7.5,
+    speedBase: 0.75,
+    speedVariance: 0.1,
     healthBase: 3,
     healthPerLevel: 1.0,
     attackBase: 5,
@@ -3152,9 +3152,9 @@ const ENEMY_TYPES = {
   },
   TANK: {
     name: "Tank",
-    size: 25,
-    speedBase: 0.3,
-    speedVariance: 0.05,
+    size: 12.5,
+    speedBase: 0.15,
+    speedVariance: 0.02,
     healthBase: 20,
     healthPerLevel: 2.5,
     attackBase: 15,
@@ -3165,9 +3165,9 @@ const ENEMY_TYPES = {
   },
   SHOOTER: {
     name: "Shooter",
-    size: 18,
-    speedBase: 0.4,
-    speedVariance: 0.1,
+    size: 9,
+    speedBase: 0.2,
+    speedVariance: 0.05,
     healthBase: 4,       // 체력이 적음
     healthPerLevel: 1.0,
     attackBase: 8,
@@ -3180,8 +3180,8 @@ const ENEMY_TYPES = {
   },
   BOSS: {
     name: "Boss",
-    size: 40,
-    speedBase: 0.3,
+    size: 20,
+    speedBase: 0.15,
     speedVariance: 0.0,
     healthBase: 100,
     healthPerLevel: 10,
@@ -3228,7 +3228,7 @@ class Enemy {
 
     // 발사 관련 속성
     this.canShoot = false;
-    this.shootRange = 300;
+    this.shootRange = 150;
     this.shootCooldown = 2000;
     this.lastShotTime = 0;
     
@@ -4204,30 +4204,30 @@ const JEWEL_TYPES = {
 
 class Jewel extends GameObject {
   constructor(x, y, type = 0) {
-    super(x, y, 8);
+    super(x, y, 4);
     this.type = type; // 0: 소, 1: 중, 2: 대, 3: 자석, 4: 체력
     this.collected = false;
     
     // 타입별 속성 설정
     switch(this.type) {
       case 0: // 소 jewel
-        this.size = 10;
+        this.size = 5;
         this.expValue = 20;
         break;
       case 1: // 중 jewel
-        this.size = 14;
+        this.size = 7;
         this.expValue = 50;
         break;
       case 2: // 대 jewel
-        this.size = 20;
+        this.size = 10;
         this.expValue = 250;
         break;
       case 3: // 자석 jewel
-        this.size = 20;
+        this.size = 10;
         this.expValue = 0;
         break;
       case 4: // 체력 jewel
-        this.size = 20;
+        this.size = 10;
         this.expValue = 0;
         break;
     }
@@ -4236,11 +4236,11 @@ class Jewel extends GameObject {
   update() {    
     let magnetRange;
     if (player.magnetActive) {
-      magnetRange = 2000; // 자석 효과 시 대폭 증가된 범위
+      magnetRange = 1000; // 자석 효과 시 대폭 증가된 범위
     } else {
       magnetRange = player.getTotalPickupRadius(); // 평소엔 업그레이드 적용 범위
     }
-    const pickupRange = 25; // 고정된 획득 범위
+    const pickupRange = 12.5; // 고정된 획득 범위
     
     const dx = player.x - this.x;
     const dy = player.y - this.y;
@@ -4357,7 +4357,7 @@ function getWeightedRandomJewelType() {
 
 class Treasure extends GameObject {
   constructor(x, y) {
-    super(x, y, 32);
+    super(x, y, 16);
     this.collected = false;
     this.isTreasure = true;
   }
@@ -4946,7 +4946,7 @@ function generateLevelUpOptions() {
     { 
       type: 'moveSpeed', 
       name: '이동속도 증가', 
-      baseValue: 0.2, // 레벨당 0.2 증가
+      baseValue: 0.1, // 레벨당 0.1 증가
       description: function(currentLevel) {
         return `이동속도 +${this.baseValue}`;
       },
@@ -4964,7 +4964,7 @@ function generateLevelUpOptions() {
     { 
       type: 'pickupRadius', 
       name: '아이템 획득 반경 증가', 
-      baseValue: 15, // 레벨당 15 증가
+      baseValue: 7.5, // 레벨당 7.5 증가
       description: function(currentLevel) {
         return `아이템 획득 범위 +${this.baseValue}`;
       },
@@ -7110,7 +7110,7 @@ function draw() {
   const healthBarWidth = 50;
   const healthBarHeight = 6;
   const healthBarX = canvas.width / 2 - healthBarWidth / 2;
-  const healthBarY = canvas.height / 2 - player.size * 2 - 20;
+  const healthBarY = canvas.height / 2 - player.size * 2 - 10;
   
   // 체력바 배경
   ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
@@ -7972,7 +7972,7 @@ function update() {
       jewel.update();
   
       // 플레이어 충돌 체크 (고정된 획득 반경 사용)
-      const pickupRange = 25; // 고정된 획득 범위
+      const pickupRange = 12.5; // 고정된 획득 범위
       if (detectCollision(jewel, { x: player.x, y: player.y, size: pickupRange })) {
         jewel.collect();
         gameObjects.jewels.splice(i, 1);
