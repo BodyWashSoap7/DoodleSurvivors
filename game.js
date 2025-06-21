@@ -882,7 +882,7 @@ const player = {
   // 기본값들
   baseAttackPower: 1,
   baseCooldownReduction: 0,
-  baseAttackRange: 0.5,
+  baseAttackRange: 1,
   baseMoveSpeed: 1,
   baseMaxHealth: 100,
   basePickupRadius: 50,
