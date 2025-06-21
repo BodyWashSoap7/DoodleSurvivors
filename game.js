@@ -2322,6 +2322,8 @@ const WeaponFactory = {
         return new SwordWeapon();
       case 'spear':
         return new SpearWeapon();
+      case 'magnetic':
+        return new MagneticWeapon();
       default:
         return new WindWeapon();
     }
@@ -3117,6 +3119,204 @@ class SpearProjectile {
     return this.used;
   }
 }
+
+//----------------------
+// 무기 합성 시스템
+//----------------------
+
+const weaponFusionSystem = {
+  recipes: [
+    {
+      ingredients: ['lightning', 'earth'],
+      result: 'magnetic',
+      name: '자기장'
+    }
+  ],
+  
+  // 합성 가능 여부 확인
+  canFuse(weapon1Type, weapon2Type) {
+    return this.recipes.some(recipe => 
+      (recipe.ingredients.includes(weapon1Type) && recipe.ingredients.includes(weapon2Type)) &&
+      weapon1Type !== weapon2Type
+    );
+  },
+  
+  // 합성 결과 가져오기
+  getFusionResult(weapon1Type, weapon2Type) {
+    const recipe = this.recipes.find(r => 
+      (r.ingredients.includes(weapon1Type) && r.ingredients.includes(weapon2Type)) &&
+      weapon1Type !== weapon2Type
+    );
+    return recipe ? recipe : null;
+  },
+  
+  // 합성 실행
+  performFusion(weapon1, weapon2) {
+    const result = this.getFusionResult(weapon1.type, weapon2.type);
+    if (!result) return null;
+    
+    // 기존 무기 제거
+    const index1 = player.weapons.indexOf(weapon1);
+    const index2 = player.weapons.indexOf(weapon2);
+    
+    if (index1 > index2) {
+      player.weapons.splice(index1, 1);
+      player.weapons.splice(index2, 1);
+    } else {
+      player.weapons.splice(index2, 1);
+      player.weapons.splice(index1, 1);
+    }
+    
+    // 새 무기 추가
+    const newWeapon = WeaponFactory.createWeapon(result.result);
+    player.weapons.push(newWeapon);
+    
+    return newWeapon;
+  }
+};
+
+// 자기장 무기 클래스
+class MagneticWeapon extends Weapon {
+  constructor() {
+    super({
+      type: 'magnetic',
+      baseCooldown: 100, // 지속 효과이므로 쿨다운 짧게
+      damage: 5
+    });
+    this.fieldRadius = 200;
+    this.tickDamage = 2;
+    this.damageInterval = 100; // 0.1초마다 데미지
+    this.lastDamageTime = 0;
+    
+    // 시각 효과
+    this.rotationAngle = 0;
+    this.pulseTime = 0;
+  }
+  
+  update() {
+    this.rotationAngle += 0.02;
+    this.pulseTime += 0.05;
+    
+    const currentTime = gameTimeSystem.getTime();
+    if (currentTime - this.lastDamageTime >= this.damageInterval) {
+      this.dealAreaDamage();
+      this.lastDamageTime = currentTime;
+    }
+  }
+  
+  dealAreaDamage() {
+    const range = this.fieldRadius * player.getTotalAttackRange();
+    
+    for (let enemy of gameObjects.enemies) {
+      if (enemy.state !== 'moving') continue;
+      
+      const dx = enemy.x - player.x;
+      const dy = enemy.y - player.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      
+      if (distance <= range) {
+        const damage = this.tickDamage * player.getTotalAttackPower();
+        enemy.takeDamage(damage);
+        
+        // 적을 약간 밀어냄
+        const pushForce = 0.5;
+        const pushX = (dx / distance) * pushForce;
+        const pushY = (dy / distance) * pushForce;
+        enemy.x += pushX;
+        enemy.y += pushY;
+      }
+    }
+  }
+  
+  fire() {
+    // 자기장은 지속 효과이므로 fire 메서드 사용 안함
+  }
+  
+  draw(offsetX, offsetY) {
+    const centerX = player.x + offsetX;
+    const centerY = player.y + offsetY;
+    const range = this.fieldRadius * player.getTotalAttackRange();
+    
+    ctx.save();
+    
+    // 자기장 효과
+    const pulseScale = 1 + Math.sin(this.pulseTime) * 0.1;
+    
+    // 외부 링
+    ctx.strokeStyle = '#00FFFF';
+    ctx.lineWidth = 3;
+    ctx.globalAlpha = 0.3;
+    
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, range * pulseScale, 0, Math.PI * 2);
+    ctx.stroke();
+    
+    // 회전하는 자기장 선
+    ctx.globalAlpha = 0.5;
+    const lineCount = 8;
+    
+    for (let i = 0; i < lineCount; i++) {
+      const angle = this.rotationAngle + (Math.PI * 2 * i / lineCount);
+      const innerRadius = range * 0.3;
+      
+      const startX = centerX + Math.cos(angle) * innerRadius;
+      const startY = centerY + Math.sin(angle) * innerRadius;
+      const endX = centerX + Math.cos(angle) * range;
+      const endY = centerY + Math.sin(angle) * range;
+      
+      const gradient = ctx.createLinearGradient(startX, startY, endX, endY);
+      gradient.addColorStop(0, 'rgba(0, 255, 255, 0)');
+      gradient.addColorStop(0.5, 'rgba(0, 255, 255, 0.5)');
+      gradient.addColorStop(1, 'rgba(0, 255, 255, 0)');
+      
+      ctx.strokeStyle = gradient;
+      ctx.lineWidth = 2;
+      
+      ctx.beginPath();
+      ctx.moveTo(startX, startY);
+      ctx.lineTo(endX, endY);
+      ctx.stroke();
+    }
+    
+    ctx.restore();
+  }
+  
+  applyLevelBonus() {
+    super.applyLevelBonus();
+    
+    switch(this.level) {
+      case 2:
+        this.tickDamage += 1;
+        break;
+      case 3:
+        this.fieldRadius += 20;
+        break;
+      case 4:
+        this.damageInterval *= 0.9;
+        break;
+      case 5:
+        this.tickDamage += 2;
+        break;
+      case 6:
+        this.fieldRadius += 30;
+        break;
+      case 7:
+        this.tickDamage += 2;
+        break;
+      case 8:
+        this.damageInterval *= 0.8;
+        break;
+      case 9:
+        this.fieldRadius += 40;
+        break;
+      case 10:
+        this.tickDamage += 3;
+        this.damageInterval *= 0.7;
+        break;
+    }
+  }
+}
+
 
 //----------------------
 // Enemy 클래스
@@ -5102,11 +5302,45 @@ function generateLevelUpOptions() {
   const shouldShowFourthOption = Math.random() < fourthOptionChance;
   const optionCount = shouldShowFourthOption ? 4 : 3;
 
+  // 합성 가능한 무기 체크
+  const fusionOptions = [];
+  const maxLevelWeapons = player.weapons.filter(w => w.level === w.maxLevel);
+  
+  if (maxLevelWeapons.length >= 2) {
+    // 모든 가능한 조합 체크
+    for (let i = 0; i < maxLevelWeapons.length; i++) {
+      for (let j = i + 1; j < maxLevelWeapons.length; j++) {
+        const result = weaponFusionSystem.getFusionResult(
+          maxLevelWeapons[i].type, 
+          maxLevelWeapons[j].type
+        );
+        
+        if (result && !player.weapons.some(w => w.type === result.result)) {
+          fusionOptions.push({
+            type: 'fusion',
+            weaponType: result.result,
+            name: result.name,
+            description: `${getWeaponDisplayName(maxLevelWeapons[i].type)} + ${getWeaponDisplayName(maxLevelWeapons[j].type)} 합성`,
+            flavorText: '무기 합성하기...',
+            isNew: true,
+            weapon1: maxLevelWeapons[i],
+            weapon2: maxLevelWeapons[j]
+          });
+        }
+      }
+    }
+  }
+  
   // 레벨업 옵션 생성 (확률 기반)
   levelUpOptions = [];
   
   for (let i = 0; i < optionCount; i++) {
     let selectedOption = null;
+
+    // 합성 무기가 있으면 무조건 첫 번째 옵션으로
+    if (i === 0 && fusionOptions.length > 0) {
+      selectedOption = fusionOptions[0];
+    }
     
     // 무기 업그레이드가 있는 경우, 30% 확률로 기존 무기 업그레이드 우선 선택
     if (weaponUpgradeOptions.length > 0 && Math.random() < 0.3) {
@@ -5280,6 +5514,17 @@ function applyLevelUpChoice(optionIndex) {
   
   const option = levelUpOptions[optionIndex];
   console.log("Selected option:", option);
+
+  if (option.type === 'fusion') {
+    // 무기 합성 실행
+    weaponFusionSystem.performFusion(option.weapon1, option.weapon2);
+    
+    // 게임 재개
+    currentGameState = GAME_STATE.PLAYING;
+    totalPausedTime += gameTimeSystem.getTime() - pauseStartTime;
+    gameTimeSystem.resume();
+    return;
+  }
 
   if (option.type === 'artifact') {
     // 경험치 획득 아티팩트 특별 처리
@@ -5791,6 +6036,13 @@ function drawOptionBox(x, y, width, height, option, isHovered) {
   ctx.fillStyle = textColor;
   ctx.font = 'bold 18px Arial';
   ctx.textAlign = 'center';
+
+  // 무기 합성인 경우
+  if (option.isNew) {
+    ctx.fillStyle = '#FFD700';
+    ctx.fillText('NEW!', x + width/2, textStartY - 20);
+    ctx.fillStyle = textColor;
+  }
   
   // 레벨이 있는 옵션인 경우 (능력치 또는 무기 업그레이드)
   if (option.currentLevel !== undefined && option.nextLevel !== undefined) {
@@ -6993,6 +7245,13 @@ function draw() {
   gameObjects.bullets.forEach(bullet => {
     if (!bullet.fromEnemy) {
       bullet.draw(offsetX, offsetY);
+    }
+  });
+
+  // 자기장 무기 효과 그리기
+  player.weapons.forEach(weapon => {
+    if (weapon.type === 'magnetic' && typeof weapon.draw === 'function') {
+      weapon.draw(offsetX, offsetY);
     }
   });
 
