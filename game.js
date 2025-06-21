@@ -7145,9 +7145,6 @@ function draw() {
     );
     ctx.stroke();
   }
-  
-  // HUD 그리기
-  drawHUD();
 
   // 적 그리기 (가장 우선적으로 보이도록 나중에 그리기)
   gameObjects.enemies.forEach(enemy => {
@@ -7160,6 +7157,9 @@ function draw() {
       bullet.draw(offsetX, offsetY);
     }
   });
+
+  // HUD 그리기
+  drawHUD();
 
   // 디버깅: 마우스 위치 표시
   if (currentGameState === GAME_STATE.PLAYING) {
