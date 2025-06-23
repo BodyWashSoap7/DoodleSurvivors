@@ -1109,7 +1109,7 @@ class BossCage {
   constructor(centerX, centerY) {
     this.centerX = centerX;
     this.centerY = centerY;
-    this.size = 450;
+    this.size = 1350;
     this.halfSize = this.size / 2;
     
     // 케이지 경계
