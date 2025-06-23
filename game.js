@@ -720,14 +720,14 @@ class AssetManager {
 
   loadWeaponImages() {
     this.loadImageSet('weapons', 
-      ['wind', 'earth', 'flame', 'lightningChain', 'lightningImpact', 'fist', 'sword', 'spear'], 
+      ['wind', 'earth', 'flame', 'lightningChain', 'lightningImpact', 'fist', 'sword', 'spear', 'magnetic'], 
       './img/weapons/{item}.png'
     );
   }
 
   loadWeaponIcons() {
     this.loadImageSet('weaponIcons', 
-      ['wind', 'earth', 'flame', 'lightning', 'fist', 'sword', 'spear'], 
+      ['wind', 'earth', 'flame', 'lightning', 'fist', 'sword', 'spear', 'magnetic'], 
       './img/weapon_icons/{item}_icon.png'
     );
   }
@@ -3309,18 +3309,36 @@ class MagneticField {
     const centerY = this.y + offsetY;
     const range = this.radius * player.getTotalAttackRange();
     
-    ctx.save();
-    
-    // 외부 링 그리기
-    ctx.strokeStyle = '#00FFFF';
-    ctx.lineWidth = 3;
-    ctx.globalAlpha = 0.3;
-    
-    ctx.beginPath();
-    ctx.arc(centerX, centerY, range, 0, Math.PI * 2);
-    ctx.stroke();
-    
-    ctx.restore();
+    // 이미지로 자기장 효과 그리기
+    if (assetManager.loaded.weapons && assetManager.images.weapons.magnetic) {
+      ctx.save();
+      
+      // 중앙으로 이동하고 회전
+      ctx.translate(centerX, centerY);
+      ctx.rotate(this.rotationAngle);
+      
+      // 스프라이트 프레임 계산
+      const frameWidth = 64;
+      const frameHeight = 64;
+      const frameX = this.currentFrame * frameWidth;
+      
+      // 공격 범위에 맞춰 크기 조정
+      const drawSize = range * 2;
+      
+      // 약간의 투명도 적용
+      ctx.globalAlpha = 0.8;
+      
+      // 이미지 그리기
+      ctx.drawImage(
+        assetManager.images.weapons.magnetic,
+        frameX, 0, // 소스 x, y
+        frameWidth, frameHeight, // 소스 크기
+        -drawSize / 2, -drawSize / 2, // 대상 위치 (중앙 정렬)
+        drawSize, drawSize // 대상 크기
+      );
+      
+      ctx.restore();
+    }
   }
   
   outOfBounds() {
