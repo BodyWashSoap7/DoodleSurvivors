@@ -3180,105 +3180,42 @@ class MagneticWeapon extends Weapon {
   constructor() {
     super({
       type: 'magnetic',
-      baseCooldown: 100, // 지속 효과이므로 쿨다운 짧게
+      baseCooldown: 100,
       damage: 5
     });
-    this.fieldRadius = 200;
+    this.fieldRadius = 100;
     this.tickDamage = 2;
-    this.damageInterval = 100; // 0.1초마다 데미지
-    this.lastDamageTime = 0;
-    
-    // 시각 효과
-    this.rotationAngle = 0;
-    this.pulseTime = 0;
+    this.damageInterval = 100;
+    this.magneticField = null; // 자기장 효과 객체
   }
   
   update() {
-    this.rotationAngle += 0.02;
-    this.pulseTime += 0.05;
-    
-    const currentTime = gameTimeSystem.getTime();
-    if (currentTime - this.lastDamageTime >= this.damageInterval) {
-      this.dealAreaDamage();
-      this.lastDamageTime = currentTime;
+    // 자기장이 없거나 사용됐으면 새로 생성
+    if (!this.magneticField || this.magneticField.used) {
+      this.createMagneticField();
     }
   }
   
-  dealAreaDamage() {
-    const range = this.fieldRadius * player.getTotalAttackRange();
-    
-    for (let enemy of gameObjects.enemies) {
-      if (enemy.state !== 'moving') continue;
-      
-      const dx = enemy.x - player.x;
-      const dy = enemy.y - player.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-      
-      if (distance <= range) {
-        const damage = this.tickDamage * player.getTotalAttackPower();
-        enemy.takeDamage(damage);
-        
-        // 적을 약간 밀어냄
-        const pushForce = 0.5;
-        const pushX = (dx / distance) * pushForce;
-        const pushY = (dy / distance) * pushForce;
-        enemy.x += pushX;
-        enemy.y += pushY;
-      }
+  createMagneticField() {
+    // 기존 자기장 제거
+    if (this.magneticField) {
+      this.magneticField.used = true;
     }
+    
+    // 새 자기장 생성
+    this.magneticField = new MagneticField(
+      player.x, 
+      player.y,
+      this.fieldRadius,
+      this.tickDamage * player.getTotalAttackPower(),
+      this.damageInterval
+    );
+    
+    gameObjects.bullets.push(this.magneticField);
   }
   
   fire() {
-    // 자기장은 지속 효과이므로 fire 메서드 사용 안함
-  }
-  
-  draw(offsetX, offsetY) {
-    const centerX = player.x + offsetX;
-    const centerY = player.y + offsetY;
-    const range = this.fieldRadius * player.getTotalAttackRange();
-    
-    ctx.save();
-    
-    // 자기장 효과
-    const pulseScale = 1 + Math.sin(this.pulseTime) * 0.1;
-    
-    // 외부 링
-    ctx.strokeStyle = '#00FFFF';
-    ctx.lineWidth = 3;
-    ctx.globalAlpha = 0.3;
-    
-    ctx.beginPath();
-    ctx.arc(centerX, centerY, range * pulseScale, 0, Math.PI * 2);
-    ctx.stroke();
-    
-    // 회전하는 자기장 선
-    ctx.globalAlpha = 0.5;
-    const lineCount = 8;
-    
-    for (let i = 0; i < lineCount; i++) {
-      const angle = this.rotationAngle + (Math.PI * 2 * i / lineCount);
-      const innerRadius = range * 0.3;
-      
-      const startX = centerX + Math.cos(angle) * innerRadius;
-      const startY = centerY + Math.sin(angle) * innerRadius;
-      const endX = centerX + Math.cos(angle) * range;
-      const endY = centerY + Math.sin(angle) * range;
-      
-      const gradient = ctx.createLinearGradient(startX, startY, endX, endY);
-      gradient.addColorStop(0, 'rgba(0, 255, 255, 0)');
-      gradient.addColorStop(0.5, 'rgba(0, 255, 255, 0.5)');
-      gradient.addColorStop(1, 'rgba(0, 255, 255, 0)');
-      
-      ctx.strokeStyle = gradient;
-      ctx.lineWidth = 2;
-      
-      ctx.beginPath();
-      ctx.moveTo(startX, startY);
-      ctx.lineTo(endX, endY);
-      ctx.stroke();
-    }
-    
-    ctx.restore();
+    // 사용하지 않음
   }
   
   applyLevelBonus() {
@@ -3314,6 +3251,87 @@ class MagneticWeapon extends Weapon {
         this.damageInterval *= 0.7;
         break;
     }
+    
+    // 레벨업 시 기존 자기장 업데이트
+    if (this.magneticField && !this.magneticField.used) {
+      this.magneticField.updateStats(
+        this.fieldRadius,
+        this.tickDamage * player.getTotalAttackPower(),
+        this.damageInterval
+      );
+    }
+  }
+}
+
+// 자기장 효과 클래스
+class MagneticField {
+  constructor(x, y, radius, damage, damageInterval) {
+    this.x = x;
+    this.y = y;
+    this.radius = radius;
+    this.damage = damage;
+    this.damageInterval = damageInterval;
+    this.lastDamageTime = 0;
+    this.used = false;
+  }
+  
+  update() {
+    // 플레이어 위치 추적
+    this.x = player.x;
+    this.y = player.y;
+    
+    // 데미지 처리
+    const currentTime = gameTimeSystem.getTime();
+    if (currentTime - this.lastDamageTime >= this.damageInterval) {
+      this.dealAreaDamage();
+      this.lastDamageTime = currentTime;
+    }
+  }
+  
+  dealAreaDamage() {
+    const range = this.radius * player.getTotalAttackRange();
+    
+    for (let enemy of gameObjects.enemies) {
+      if (enemy.state !== 'moving') continue;
+      
+      const dx = enemy.x - this.x;
+      const dy = enemy.y - this.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      
+      if (distance <= range) {
+        enemy.takeDamage(this.damage);
+      }
+    }
+  }
+  
+  draw(offsetX, offsetY) {
+    const centerX = this.x + offsetX;
+    const centerY = this.y + offsetY;
+    const range = this.radius * player.getTotalAttackRange();
+    
+    ctx.save();
+    
+    // 외부 링 그리기
+    ctx.strokeStyle = '#00FFFF';
+    ctx.lineWidth = 3;
+    ctx.globalAlpha = 0.3;
+    
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, range, 0, Math.PI * 2);
+    ctx.stroke();
+    
+    ctx.restore();
+  }
+  
+  outOfBounds() {
+    return this.used;
+  }
+  
+  // 무기 레벨업 시 스탯 업데이트
+  updateStats(radius, damage, damageInterval) {
+    this.radius = radius;
+    this.damage = damage;
+    this.damageInterval = damageInterval;
   }
 }
 
@@ -5762,7 +5780,7 @@ function resetGame() {
   player.levelExpMultiplierBonus = 0;
 
   player.weapons = [];
-  addWeapon('flame');
+  addWeapon('magnetic');
 
   // 능력치 레벨 초기화
   for (let stat in player.statLevels) {
@@ -7245,13 +7263,6 @@ function draw() {
   gameObjects.bullets.forEach(bullet => {
     if (!bullet.fromEnemy) {
       bullet.draw(offsetX, offsetY);
-    }
-  });
-
-  // 자기장 무기 효과 그리기
-  player.weapons.forEach(weapon => {
-    if (weapon.type === 'magnetic' && typeof weapon.draw === 'function') {
-      weapon.draw(offsetX, offsetY);
     }
   });
 
