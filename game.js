@@ -3273,12 +3273,30 @@ class MagneticField {
     this.damageInterval = damageInterval;
     this.lastDamageTime = 0;
     this.used = false;
+
+    // 애니메이션 관련 속성
+    this.rotationAngle = 0;
+    this.rotationSpeed = 0.02;
+    this.currentFrame = 0;
+    this.frameCount = 4;
+    this.frameTime = 0;
+    this.frameDuration = 100;
   }
   
   update() {
     // 플레이어 위치 추적
     this.x = player.x;
     this.y = player.y;
+
+    // 회전 애니메이션
+    this.rotationAngle += this.rotationSpeed;
+    
+    // 프레임 애니메이션
+    this.frameTime += 16;
+    if (this.frameTime >= this.frameDuration) {
+      this.frameTime = 0;
+      this.currentFrame = (this.currentFrame + 1) % this.frameCount;
+    }
     
     // 데미지 처리
     const currentTime = gameTimeSystem.getTime();
