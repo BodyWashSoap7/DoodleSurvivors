@@ -6645,7 +6645,7 @@ function drawSettingsScreen() {
   ctx.fillText('▶', canvas.width / 2 + 120, canvas.height / 2 + 70);
   
   // 캐릭터 이미지 미리보기
-  const previewSize = player.size * 4;
+  const previewSize = player.size * 8;
   const centerX = canvas.width / 2;
   const centerY = canvas.height / 2 + 50;
   
