@@ -6553,7 +6553,7 @@ function drawStartScreen() {
   ctx.fillText(`보유 골드: ${loadGold()}`, canvas.width / 2, canvas.height / 4 + 70);
   
   // 캐릭터 미리보기
-  const previewSize = player.size * 3;
+  const previewSize = player.size * 9;
   const previewX = canvas.width / 2;
   const previewY = canvas.height / 2 + 20;
   
