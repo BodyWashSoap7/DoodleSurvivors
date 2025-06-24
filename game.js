@@ -1109,7 +1109,7 @@ class BossCage {
   constructor(centerX, centerY) {
     this.centerX = centerX;
     this.centerY = centerY;
-    this.size = 1350;
+    this.size = 800;
     this.halfSize = this.size / 2;
     
     // 케이지 경계
@@ -1286,7 +1286,7 @@ function startBossMode() {
   // Boss 몬스터 3마리 스폰
   for (let i = 0; i < totalBosses; i++) {
     const angle = (Math.PI * 2 * i) / totalBosses;
-    const distance = 125;
+    const distance = 300;
     
     const bossX = player.x + Math.cos(angle) * distance;
     const bossY = player.y + Math.sin(angle) * distance;
@@ -8206,13 +8206,13 @@ function update() {
   updateSpawnSystem();
 
   // 보스전 경고 체크 (보스전 시작 5초 전)
-  if (!bossMode && !bossWarningActive && elapsedTime % 180 == 175 && 
+  if (!bossMode && !bossWarningActive && elapsedTime % 15 == 10 && 
       gameObjects.enemies.filter(e => e.isBossModeEnemy).length === 0) {
     startBossWarning();
   }
 
   // 3분(180초) 체크 및 보스전 시작
-  if (!bossMode && bossWarningActive && elapsedTime % 180 == 0 && elapsedTime !== 0 && gameObjects.enemies.filter(e => e.isBossModeEnemy).length === 0) {
+  if (!bossMode && bossWarningActive && elapsedTime % 15 == 0 && elapsedTime !== 0 && gameObjects.enemies.filter(e => e.isBossModeEnemy).length === 0) {
     startBossMode();
   }
   
