@@ -1963,7 +1963,7 @@ class FlameEffect {
       // 적과 플레이어 사이의 각도 계산
       const dx = enemy.x - this.x;
       const dy = enemy.y - this.y;
-      const distanceToEnemy = Math.sqrt(dx * dx + dy * dy);
+      const distanceToEnemy = Math.sqrt(dx * dx + dy * dy) - enemy.size;
       
       // 범위 내에 있는지 확인
       if (distanceToEnemy <= this.range) {
@@ -2073,7 +2073,7 @@ class LightningWeapon extends Weapon {
       if (enemy.state === 'moving') {
         const dx = enemy.x - player.x;
         const dy = enemy.y - player.y;
-        const distance = Math.hypot(dx, dy);
+        const distance = Math.hypot(dx, dy) - enemy.size;
         
         if (distance < minDistance) {
           minDistance = distance;
@@ -2202,7 +2202,7 @@ class ChainLightningEffect {
       
       const dx = enemy.x - sourceEnemy.x;
       const dy = enemy.y - sourceEnemy.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
+      const distance = Math.sqrt(dx * dx + dy * dy) - enemy.size;
       
       return distance <= this.chainRange;
     });
@@ -2400,7 +2400,7 @@ class FistWeapon extends MeleeWeapon {
       
       const dx = enemy.x - player.x;
       const dy = enemy.y - player.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
+      const distance = Math.sqrt(dx * dx + dy * dy) - enemy.size;
       
       if (distance <= this.range && distance < minDistance) {
         minDistance = distance;
@@ -2506,7 +2506,7 @@ class SwordWeapon extends MeleeWeapon {
       
       const dx = enemy.x - player.x;
       const dy = enemy.y - player.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
+      const distance = Math.sqrt(dx * dx + dy * dy) - enemy.size;
       
       if (distance < minDistance) {
         minDistance = distance;
@@ -2542,7 +2542,7 @@ class SwordWeapon extends MeleeWeapon {
       
       const dx = enemy.x - player.x;
       const dy = enemy.y - player.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
+      const distance = Math.sqrt(dx * dx + dy * dy) - enemy.size;
       
       if (distance <= this.range) { // 공격 범위 특성이 적용된 범위 사용
         // 적과 플레이어 사이의 각도
@@ -3037,7 +3037,7 @@ class SpearProjectile {
     // 창의 중심점과 적 사이의 거리
     const dx = enemy.x - this.x;
     const dy = enemy.y - this.y;
-    const distance = Math.sqrt(dx * dx + dy * dy);
+    const distance = Math.sqrt(dx * dx + dy * dy) - enemy.size;
     
     // 기본 원형 충돌 체크
     if (distance < this.size + enemy.size) {
@@ -3314,7 +3314,7 @@ class MagneticField {
       
       const dx = enemy.x - this.x;
       const dy = enemy.y - this.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
+      const distance = Math.sqrt(dx * dx + dy * dy) - enemy.size;
       
       if (distance <= range) {
         enemy.takeDamage(this.damage);
@@ -3936,7 +3936,7 @@ class Enemy {
           
           const distX = this.x - enemy.x;
           const distY = this.y - enemy.y;
-          const distance = Math.sqrt(distX * distX + distY * distY);
+          const distance = Math.sqrt(distX * distX + distY * distY) - enemy.size;
           
           if (distance < separationRadius && distance > 0) {
             const force = (separationRadius - distance) / separationRadius;
@@ -7585,7 +7585,7 @@ function findNearestEnemy() {
     if (enemy.state === 'moving') {
       const dx = enemy.x - player.x;
       const dy = enemy.y - player.y;
-      const distance = Math.hypot(dx, dy);
+      const distance = Math.hypot(dx, dy) - enemy.size;
       
       if (distance < minDistance) {
         minDistance = distance;
