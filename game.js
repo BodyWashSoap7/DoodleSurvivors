@@ -5304,6 +5304,13 @@ function generateLevelUpOptions() {
       description: '긴 사거리 관통 공격',
       flavorText: 'dd..'
     },
+    { 
+      type: 'weapon', 
+      weaponType: 'magnetic', 
+      name: '자기장',
+      description: '플레이어 주위 지속 공격',
+      flavorText: 'dd..'
+    }
   ];
 
   // 기존 무기 업그레이드 옵션들
@@ -5315,7 +5322,8 @@ function generateLevelUpOptions() {
     'lightning': 'dd.',
     'fist': 'dd.',
     'sword': 'dd.',
-    'spear': 'dd.'
+    'spear': 'dd.',
+    'magnetic': 'dd.'
   };
 
   for (let weapon of player.weapons) {
@@ -5505,7 +5513,8 @@ function getWeaponDisplayName(weaponType) {
     'lightning': '번개',
     'fist': '주먹',
     'sword': '검',
-    'spear': '창'
+    'spear': '창',
+    'magnetic': '자기장'
   };
   return names[weaponType] || weaponType;
 }
