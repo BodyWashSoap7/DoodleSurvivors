@@ -3384,7 +3384,7 @@ class PlasmaWeapon extends Weapon {
     super({
       type: 'plasma',
       baseCooldown: 100,
-      damage: 8
+      damage: 20
     });
     
     this.beamWidth = 3;      // 레이저 빔 너비
@@ -3509,6 +3509,10 @@ class ContinuousPlasmaBeam {
     
     // 프레임당 한 번만 데미지를 받도록 추적
     this.hitEnemiesThisFrame = new Set();
+    
+    // 잔상 효과를 위한 각도 히스토리 추가
+    this.angleHistory = [];
+    this.maxHistoryLength = 8; // 최대 8개의 잔상
   }
   
   update() {
@@ -3527,8 +3531,19 @@ class ContinuousPlasmaBeam {
     this.startX = player.x;
     this.startY = player.y;
     
-    // 이전 각도 저장
+    // 이전 각도 저장 (잔상용)
     this.previousAngle = this.angle;
+    
+    // 현재 각도를 히스토리에 추가
+    this.angleHistory.push({
+      angle: this.angle,
+      timestamp: gameTimeSystem.getTime()
+    });
+    
+    // 오래된 히스토리 제거
+    if (this.angleHistory.length > this.maxHistoryLength) {
+      this.angleHistory.shift();
+    }
     
     // 타겟 추적
     if (this.parentWeapon.targetTracking) {
@@ -3546,9 +3561,6 @@ class ContinuousPlasmaBeam {
         // 부드러운 회전 (최대 회전 속도 제한)
         const maxRotation = 0.05;
         this.angle += Math.max(-maxRotation, Math.min(maxRotation, normalizedDiff * 0.1));
-      } else {
-        // 타겟이 없으면 회전
-        this.angle = this.parentWeapon.currentAngle;
       }
     } else {
       this.angle = this.parentWeapon.currentAngle;
@@ -3639,38 +3651,72 @@ class ContinuousPlasmaBeam {
   }
   
   draw(offsetX, offsetY) {
-      const drawStartX = this.startX + offsetX;
-      const drawStartY = this.startY + offsetY;
-      const drawEndX = this.startX + Math.cos(this.angle) * this.length + offsetX;
-      const drawEndY = this.startY + Math.sin(this.angle) * this.length + offsetY;
+    const drawStartX = this.startX + offsetX;
+    const drawStartY = this.startY + offsetY;
+    
+    ctx.save();
+    
+    // 잔상 효과 그리기 (가장 오래된 것부터)
+    const currentTime = gameTimeSystem.getTime();
+    for (let i = 0; i < this.angleHistory.length - 1; i++) {
+      const historyEntry = this.angleHistory[i];
+      const age = currentTime - historyEntry.timestamp;
+      const maxAge = 500; // 500ms 동안 잔상 유지
       
-      ctx.save();
-            
-      // 메인 빔 그리기 (기존 코드 그대로)
-      // 외부 글로우 효과
-      ctx.globalAlpha = 0.4;
-      ctx.strokeStyle = '#FF00FF';
-      ctx.lineWidth = this.width * 8;
-      ctx.shadowBlur = 30;
-      ctx.shadowColor = '#FF00FF';
-      ctx.beginPath();
-      ctx.moveTo(drawStartX, drawStartY);
-      ctx.lineTo(drawEndX, drawEndY);
-      ctx.stroke();
-      
-      // 중간 글로우
-      ctx.globalAlpha = 0.6;
-      ctx.strokeStyle = '#00FFFF';
-      ctx.lineWidth = this.width * 5;
-      ctx.shadowBlur = 20;
-      ctx.shadowColor = '#00FFFF';
-      ctx.beginPath();
-      ctx.moveTo(drawStartX, drawStartY);
-      ctx.lineTo(drawEndX, drawEndY);
-      ctx.stroke();
-      
-      // 코어 빔 (에너지 플로우 효과)
-      ctx.globalAlpha = 1.0;
+      if (age < maxAge) {
+        const ageRatio = age / maxAge;
+        const alpha = (1 - ageRatio) * 0.8 // 최대 80% 투명도에서 시작
+        
+        // 잔상 빔 그리기
+        this.drawBeamWithAlpha(
+          drawStartX, 
+          drawStartY, 
+          historyEntry.angle, 
+          alpha * (i / this.angleHistory.length), // 오래된 잔상일수록 더 투명
+          true // 잔상 모드
+        );
+      }
+    }
+    
+    // 메인 빔 그리기 (현재 각도)
+    this.drawBeamWithAlpha(drawStartX, drawStartY, this.angle, 1.0, false);
+    
+    ctx.restore();
+  }
+
+  drawBeamWithAlpha(drawStartX, drawStartY, angle, alpha, isAfterimage) {
+    const drawEndX = drawStartX + Math.cos(angle) * this.length;
+    const drawEndY = drawStartY + Math.sin(angle) * this.length;
+    
+    // 잔상일 경우 더 얇고 흐릿하게
+    const widthMultiplier = isAfterimage ? 0.6 : 1.0;
+    const glowMultiplier = isAfterimage ? 0.5 : 1.0;
+    
+    // 외부 글로우 효과
+    ctx.globalAlpha = alpha * 0.4 * glowMultiplier;
+    ctx.strokeStyle = '#FF00FF';
+    ctx.lineWidth = this.width * 8 * widthMultiplier;
+    ctx.shadowBlur = 30 * glowMultiplier;
+    ctx.shadowColor = '#FF00FF';
+    ctx.beginPath();
+    ctx.moveTo(drawStartX, drawStartY);
+    ctx.lineTo(drawEndX, drawEndY);
+    ctx.stroke();
+    
+    // 중간 글로우
+    ctx.globalAlpha = alpha * 0.6 * glowMultiplier;
+    ctx.strokeStyle = '#00FFFF';
+    ctx.lineWidth = this.width * 5 * widthMultiplier;
+    ctx.shadowBlur = 20 * glowMultiplier;
+    ctx.shadowColor = '#00FFFF';
+    ctx.beginPath();
+    ctx.moveTo(drawStartX, drawStartY);
+    ctx.lineTo(drawEndX, drawEndY);
+    ctx.stroke();
+    
+    // 코어 빔 (에너지 플로우 효과) - 잔상이 아닐 때만
+    if (!isAfterimage) {
+      ctx.globalAlpha = alpha;
       const coreGradient = ctx.createLinearGradient(
         drawStartX, drawStartY,
         drawEndX, drawEndY
@@ -3704,7 +3750,7 @@ class ContinuousPlasmaBeam {
       ctx.stroke();
       
       // 중심선 (밝은 코어)
-      ctx.globalAlpha = 1.0;
+      ctx.globalAlpha = alpha;
       ctx.strokeStyle = '#FFFFFF';
       ctx.lineWidth = this.width * 1.5;
       ctx.shadowBlur = 10;
@@ -3716,7 +3762,7 @@ class ContinuousPlasmaBeam {
       
       // 임팩트 효과 (빔 끝부분)
       const impactSize = this.width * 10;
-      ctx.globalAlpha = 0.8;
+      ctx.globalAlpha = alpha * 0.8;
       const impactGradient = ctx.createRadialGradient(
         drawEndX, drawEndY, 0,
         drawEndX, drawEndY, impactSize
@@ -3733,7 +3779,7 @@ class ContinuousPlasmaBeam {
       
       // 시작점 효과
       const startSize = this.width * 6;
-      ctx.globalAlpha = 0.6;
+      ctx.globalAlpha = alpha * 0.6;
       const startGradient = ctx.createRadialGradient(
         drawStartX, drawStartY, 0,
         drawStartX, drawStartY, startSize
@@ -3746,8 +3792,7 @@ class ContinuousPlasmaBeam {
       ctx.beginPath();
       ctx.arc(drawStartX, drawStartY, startSize, 0, Math.PI * 2);
       ctx.fill();
-      
-      ctx.restore();
+    }
   }
   
   outOfBounds() {
