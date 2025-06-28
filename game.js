@@ -720,14 +720,14 @@ class AssetManager {
 
   loadWeaponImages() {
     this.loadImageSet('weapons', 
-      ['wind', 'earth', 'flame', 'lightningChain', 'lightningImpact', 'fist', 'sword', 'spear', 'magnetic'], 
+      ['wind', 'earth', 'flame', 'lightningChain', 'lightningImpact', 'fist', 'sword', 'spear', 'magnetic', 'plasma'], 
       './img/weapons/{item}.png'
     );
   }
 
   loadWeaponIcons() {
     this.loadImageSet('weaponIcons', 
-      ['wind', 'earth', 'flame', 'lightning', 'fist', 'sword', 'spear', 'magnetic'], 
+      ['wind', 'earth', 'flame', 'lightning', 'fist', 'sword', 'spear', 'magnetic', 'plasma'], 
       './img/weapon_icons/{item}_icon.png'
     );
   }
@@ -2324,6 +2324,8 @@ const WeaponFactory = {
         return new SpearWeapon();
       case 'magnetic':
         return new MagneticWeapon();
+      case 'plasma':
+        return new PlasmaWeapon();
       default:
         return new WindWeapon();
     }
@@ -3130,6 +3132,11 @@ const weaponFusionSystem = {
       ingredients: ['lightning', 'earth'],
       result: 'magnetic',
       name: '자기장'
+    },
+    {
+      ingredients: ['flame', 'lightning'],
+      result: 'plasma',
+      name: '플라즈마 레이저'
     }
   ],
   
@@ -3371,6 +3378,389 @@ class MagneticField {
   }
 }
 
+// 플라즈마 레이저 무기 클래스
+class PlasmaWeapon extends Weapon {
+  constructor() {
+    super({
+      type: 'plasma',
+      baseCooldown: 100,
+      damage: 8
+    });
+    
+    this.beamWidth = 3;      // 레이저 빔 너비
+    this.beamLength = 300;   // 레이저 빔 길이
+    this.rotationSpeed = 0.02; // 회전 속도
+    this.currentAngle = 0;   // 현재 빔 각도
+    this.currentBeam = null; // 현재 활성 빔
+    this.targetTracking = true; // 타겟 추적 여부
+  }
+  
+  update() {
+    // 빔이 없거나 만료되었으면 새로 생성
+    if (!this.currentBeam || this.currentBeam.expired) {
+      this.createContinuousBeam();
+    }
+    
+    // 빔 각도 회전 (타겟이 없을 때만)
+    if (!this.targetTracking || !findNearestEnemy()) {
+      this.currentAngle += this.rotationSpeed;
+    }
+  }
+  
+  createContinuousBeam() {
+    // 기존 빔이 있으면 제거
+    if (this.currentBeam) {
+      this.currentBeam.expired = true;
+    }
+    
+    // 가장 가까운 적 찾기
+    const nearestEnemy = findNearestEnemy();
+    let angle = this.currentAngle;
+    
+    if (nearestEnemy && this.targetTracking) {
+      // 적 방향으로 레이저 조준
+      angle = Math.atan2(nearestEnemy.y - player.y, nearestEnemy.x - player.x);
+    }
+    
+    // 지속형 빔 생성
+    const beam = new ContinuousPlasmaBeam(
+      player.x,
+      player.y,
+      angle,
+      this.beamLength,
+      this.beamWidth,
+      this.damage * player.getTotalRangedAttackPower(),
+      this
+    );
+    
+    this.currentBeam = beam;
+    gameObjects.bullets.push(beam);
+  }
+  
+  fire() {
+    // 사용하지 않음 (지속형 빔이므로)
+  }
+  
+  applyLevelBonus() {
+    super.applyLevelBonus();
+    
+    switch(this.level) {
+      case 2:
+        this.beamWidth += 1;  // 빔 너비 증가
+        break;
+      case 3:
+        this.beamLength += 50;  // 빔 길이 증가
+        break;
+      case 4:
+        this.damage += 3;
+        break;
+      case 5:
+        this.rotationSpeed = 0.025;  // 회전 속도 증가
+        break;
+      case 6:
+        this.beamWidth += 2;
+        this.damage += 4;
+        break;
+      case 7:
+        this.beamLength += 75;
+        break;
+      case 8:
+        this.beamWidth += 2;
+        this.damage += 5;
+        break;
+      case 9:
+        this.rotationSpeed = 0.03;
+        break;
+      case 10:
+        this.beamWidth += 3;  // 최종 빔 너비
+        this.beamLength += 100;  // 최종 빔 길이
+        this.damage += 8;
+        break;
+    }
+    
+    // 현재 빔 업데이트
+    if (this.currentBeam && !this.currentBeam.expired) {
+      this.currentBeam.updateStats(this.beamLength, this.beamWidth, this.damage * player.getTotalRangedAttackPower());
+    }
+  }
+}
+
+// 플라즈마 빔 효과 클래스
+class ContinuousPlasmaBeam {
+  constructor(x, y, angle, length, width, damage, parentWeapon) {
+    this.startX = x;
+    this.startY = y;
+    this.angle = angle;
+    this.previousAngle = angle; // 이전 프레임의 각도 추가
+    this.length = length;
+    this.width = width;
+    this.damage = damage;
+    this.parentWeapon = parentWeapon;
+    this.expired = false;
+    this.used = false;
+    
+    // 애니메이션 속성
+    this.colorPhase = 0;
+    this.energyFlow = 0;
+    
+    // 데미지 틱 속성
+    this.damageTick = 50;  // 50ms마다 데미지
+    this.lastDamageTime = 0;
+    
+    // 프레임당 한 번만 데미지를 받도록 추적
+    this.hitEnemiesThisFrame = new Set();
+  }
+  
+  update() {
+    // 빔이 부모 무기에서 분리되었는지 확인
+    if (!this.parentWeapon || this.parentWeapon.currentBeam !== this) {
+      this.expired = true;
+      this.used = true;
+      return;
+    }
+    
+    // 애니메이션 업데이트
+    this.colorPhase += 0.03;
+    this.energyFlow += 0.1;
+    
+    // 플레이어 위치에서 빔 시작
+    this.startX = player.x;
+    this.startY = player.y;
+    
+    // 이전 각도 저장
+    this.previousAngle = this.angle;
+    
+    // 타겟 추적
+    if (this.parentWeapon.targetTracking) {
+      const nearestEnemy = findNearestEnemy();
+      if (nearestEnemy) {
+        // 부드러운 각도 전환
+        const targetAngle = Math.atan2(nearestEnemy.y - player.y, nearestEnemy.x - player.x);
+        const angleDiff = targetAngle - this.angle;
+        
+        // 각도 정규화
+        let normalizedDiff = angleDiff;
+        while (normalizedDiff > Math.PI) normalizedDiff -= Math.PI * 2;
+        while (normalizedDiff < -Math.PI) normalizedDiff += Math.PI * 2;
+        
+        // 부드러운 회전 (최대 회전 속도 제한)
+        const maxRotation = 0.05;
+        this.angle += Math.max(-maxRotation, Math.min(maxRotation, normalizedDiff * 0.1));
+      } else {
+        // 타겟이 없으면 회전
+        this.angle = this.parentWeapon.currentAngle;
+      }
+    } else {
+      this.angle = this.parentWeapon.currentAngle;
+    }
+    
+    // 데미지 처리
+    const currentTime = gameTimeSystem.getTime();
+    if (currentTime - this.lastDamageTime >= this.damageTick) {
+      // 이번 프레임의 히트 목록 초기화
+      this.hitEnemiesThisFrame.clear();
+      
+      // 회전 경로를 포함한 데미지 처리
+      this.dealSweepDamage();
+      this.lastDamageTime = currentTime;
+    }
+  }
+  
+  dealSweepDamage() {
+    // 회전한 각도 계산
+    let angleDiff = this.angle - this.previousAngle;
+    
+    // 각도 정규화 (-π ~ π)
+    while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+    while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+    
+    // 스윕할 단계 수 계산 (각도 차이에 비례)
+    const sweepSteps = Math.max(1, Math.ceil(Math.abs(angleDiff) * 10));
+    
+    // 각 단계별로 충돌 검사
+    for (let step = 0; step <= sweepSteps; step++) {
+      const t = step / sweepSteps;
+      const checkAngle = this.previousAngle + angleDiff * t;
+      
+      // 해당 각도에서의 빔 끝점 계산
+      const endX = this.startX + Math.cos(checkAngle) * this.length;
+      const endY = this.startY + Math.sin(checkAngle) * this.length;
+      
+      // 모든 적과 충돌 검사
+      for (let enemy of gameObjects.enemies) {
+        if (enemy.state !== 'moving') continue;
+        
+        // 이미 이번 프레임에 맞은 적은 제외
+        if (this.hitEnemiesThisFrame.has(enemy)) continue;
+        
+        // 선분과 원의 충돌 검사
+        if (this.checkBeamCollision(enemy, endX, endY)) {
+          enemy.takeDamage(this.damage / 20);  // 틱당 데미지
+          this.hitEnemiesThisFrame.add(enemy); // 중복 방지
+        }
+      }
+    }
+  }
+  
+  checkBeamCollision(enemy, endX, endY) {
+    // 점과 선분 사이의 최단 거리 계산
+    const A = enemy.x - this.startX;
+    const B = enemy.y - this.startY;
+    const C = endX - this.startX;
+    const D = endY - this.startY;
+    
+    const dot = A * C + B * D;
+    const lenSq = C * C + D * D;
+    let param = -1;
+    
+    if (lenSq !== 0) {
+      param = dot / lenSq;
+    }
+    
+    let xx, yy;
+    
+    if (param < 0) {
+      xx = this.startX;
+      yy = this.startY;
+    } else if (param > 1) {
+      xx = endX;
+      yy = endY;
+    } else {
+      xx = this.startX + param * C;
+      yy = this.startY + param * D;
+    }
+    
+    const dx = enemy.x - xx;
+    const dy = enemy.y - yy;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    
+    // 빔 너비와 적 크기를 고려한 충돌 판정
+    return distance <= this.width + enemy.size;
+  }
+  
+  draw(offsetX, offsetY) {
+      const drawStartX = this.startX + offsetX;
+      const drawStartY = this.startY + offsetY;
+      const drawEndX = this.startX + Math.cos(this.angle) * this.length + offsetX;
+      const drawEndY = this.startY + Math.sin(this.angle) * this.length + offsetY;
+      
+      ctx.save();
+            
+      // 메인 빔 그리기 (기존 코드 그대로)
+      // 외부 글로우 효과
+      ctx.globalAlpha = 0.4;
+      ctx.strokeStyle = '#FF00FF';
+      ctx.lineWidth = this.width * 8;
+      ctx.shadowBlur = 30;
+      ctx.shadowColor = '#FF00FF';
+      ctx.beginPath();
+      ctx.moveTo(drawStartX, drawStartY);
+      ctx.lineTo(drawEndX, drawEndY);
+      ctx.stroke();
+      
+      // 중간 글로우
+      ctx.globalAlpha = 0.6;
+      ctx.strokeStyle = '#00FFFF';
+      ctx.lineWidth = this.width * 5;
+      ctx.shadowBlur = 20;
+      ctx.shadowColor = '#00FFFF';
+      ctx.beginPath();
+      ctx.moveTo(drawStartX, drawStartY);
+      ctx.lineTo(drawEndX, drawEndY);
+      ctx.stroke();
+      
+      // 코어 빔 (에너지 플로우 효과)
+      ctx.globalAlpha = 1.0;
+      const coreGradient = ctx.createLinearGradient(
+        drawStartX, drawStartY,
+        drawEndX, drawEndY
+      );
+      
+      // 색상 애니메이션
+      const hue1 = 180 + Math.sin(this.colorPhase) * 60;
+      const hue2 = 300 + Math.cos(this.colorPhase) * 60;
+      
+      // 에너지 플로우를 위한 여러 색상 정지점
+      const stops = 5;
+      for (let i = 0; i <= stops; i++) {
+        const position = i / stops;
+        const flowPosition = (position + this.energyFlow * 0.2) % 1;
+        const intensity = Math.sin(flowPosition * Math.PI) * 0.3 + 0.7;
+        
+        if (i % 2 === 0) {
+          coreGradient.addColorStop(position, `hsla(${hue1}, 100%, ${intensity * 100}%, 1)`);
+        } else {
+          coreGradient.addColorStop(position, `hsla(${hue2}, 100%, ${intensity * 100}%, 1)`);
+        }
+      }
+      
+      ctx.strokeStyle = coreGradient;
+      ctx.lineWidth = this.width * 3;
+      ctx.shadowBlur = 15;
+      ctx.shadowColor = '#FFFFFF';
+      ctx.beginPath();
+      ctx.moveTo(drawStartX, drawStartY);
+      ctx.lineTo(drawEndX, drawEndY);
+      ctx.stroke();
+      
+      // 중심선 (밝은 코어)
+      ctx.globalAlpha = 1.0;
+      ctx.strokeStyle = '#FFFFFF';
+      ctx.lineWidth = this.width * 1.5;
+      ctx.shadowBlur = 10;
+      ctx.shadowColor = '#FFFFFF';
+      ctx.beginPath();
+      ctx.moveTo(drawStartX, drawStartY);
+      ctx.lineTo(drawEndX, drawEndY);
+      ctx.stroke();
+      
+      // 임팩트 효과 (빔 끝부분)
+      const impactSize = this.width * 10;
+      ctx.globalAlpha = 0.8;
+      const impactGradient = ctx.createRadialGradient(
+        drawEndX, drawEndY, 0,
+        drawEndX, drawEndY, impactSize
+      );
+      impactGradient.addColorStop(0, '#FFFFFF');
+      impactGradient.addColorStop(0.2, `hsl(${hue2}, 100%, 70%)`);
+      impactGradient.addColorStop(0.5, `hsl(${hue1}, 100%, 50%)`);
+      impactGradient.addColorStop(1, 'transparent');
+      
+      ctx.fillStyle = impactGradient;
+      ctx.beginPath();
+      ctx.arc(drawEndX, drawEndY, impactSize, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // 시작점 효과
+      const startSize = this.width * 6;
+      ctx.globalAlpha = 0.6;
+      const startGradient = ctx.createRadialGradient(
+        drawStartX, drawStartY, 0,
+        drawStartX, drawStartY, startSize
+      );
+      startGradient.addColorStop(0, '#FFFFFF');
+      startGradient.addColorStop(0.5, `hsl(${hue1}, 100%, 70%)`);
+      startGradient.addColorStop(1, 'transparent');
+      
+      ctx.fillStyle = startGradient;
+      ctx.beginPath();
+      ctx.arc(drawStartX, drawStartY, startSize, 0, Math.PI * 2);
+      ctx.fill();
+      
+      ctx.restore();
+  }
+  
+  outOfBounds() {
+    return this.used;
+  }
+  
+  // 무기 레벨업 시 스탯 업데이트
+  updateStats(length, width, damage) {
+    this.length = length;
+    this.width = width;
+    this.damage = damage;
+  }
+}
 
 //----------------------
 // Enemy 클래스
@@ -5514,7 +5904,8 @@ function getWeaponDisplayName(weaponType) {
     'fist': '주먹',
     'sword': '검',
     'spear': '창',
-    'magnetic': '자기장'
+    'magnetic': '자기장',
+    'plasma': '플라즈마 레이저'
   };
   return names[weaponType] || weaponType;
 }
@@ -5825,7 +6216,7 @@ function resetGame() {
   player.levelExpMultiplierBonus = 0;
 
   player.weapons = [];
-  addWeapon('magnetic');
+  addWeapon('plasma');
 
   // 능력치 레벨 초기화
   for (let stat in player.statLevels) {
