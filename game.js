@@ -3391,14 +3391,18 @@ class PlasmaWeapon extends Weapon {
     this.beamLength = 300;   // 레이저 빔 길이
     this.rotationSpeed = 0.02; // 회전 속도
     this.currentAngle = 0;   // 현재 빔 각도
-    this.currentBeam = null; // 현재 활성 빔
+    this.currentBeams = [];  // 현재 활성 빔들 (배열로 변경)
     this.targetTracking = true; // 타겟 추적 여부
+    this.beamCount = 1;      // 빔 개수 추가
   }
   
   update() {
-    // 빔이 없거나 만료되었으면 새로 생성
-    if (!this.currentBeam || this.currentBeam.expired) {
-      this.createContinuousBeam();
+    // 모든 빔이 만료되었는지 확인
+    const hasActiveBeam = this.currentBeams.some(beam => beam && !beam.expired);
+    
+    // 빔이 없거나 모두 만료되었으면 새로 생성
+    if (!hasActiveBeam || this.currentBeams.length !== this.beamCount) {
+      this.createContinuousBeams();
     }
     
     // 빔 각도 회전 (타겟이 없을 때만)
@@ -3407,34 +3411,43 @@ class PlasmaWeapon extends Weapon {
     }
   }
   
-  createContinuousBeam() {
-    // 기존 빔이 있으면 제거
-    if (this.currentBeam) {
-      this.currentBeam.expired = true;
-    }
+  createContinuousBeams() {
+    // 기존 빔들이 있으면 제거
+    this.currentBeams.forEach(beam => {
+      if (beam) beam.expired = true;
+    });
+    this.currentBeams = [];
     
     // 가장 가까운 적 찾기
     const nearestEnemy = findNearestEnemy();
-    let angle = this.currentAngle;
+    let baseAngle = this.currentAngle;
     
     if (nearestEnemy && this.targetTracking) {
       // 적 방향으로 레이저 조준
-      angle = Math.atan2(nearestEnemy.y - player.y, nearestEnemy.x - player.x);
+      baseAngle = Math.atan2(nearestEnemy.y - player.y, nearestEnemy.x - player.x);
     }
     
-    // 지속형 빔 생성
-    const beam = new ContinuousPlasmaBeam(
-      player.x,
-      player.y,
-      angle,
-      this.beamLength,
-      this.beamWidth,
-      this.damage * player.getTotalRangedAttackPower(),
-      this
-    );
+    // 빔 개수만큼 생성
+    const angleStep = (Math.PI * 2) / this.beamCount; // 360도를 빔 개수로 나눔
     
-    this.currentBeam = beam;
-    gameObjects.bullets.push(beam);
+    for (let i = 0; i < this.beamCount; i++) {
+      const angle = baseAngle + (angleStep * i);
+      
+      // 지속형 빔 생성
+      const beam = new ContinuousPlasmaBeam(
+        player.x,
+        player.y,
+        angle,
+        this.beamLength,
+        this.beamWidth,
+        this.damage * player.getTotalRangedAttackPower(),
+        this,
+        i // 빔 인덱스 추가
+      );
+      
+      this.currentBeams.push(beam);
+      gameObjects.bullets.push(beam);
+    }
   }
   
   fire() {
@@ -3444,20 +3457,25 @@ class PlasmaWeapon extends Weapon {
   applyLevelBonus() {
     super.applyLevelBonus();
     
+    const prevBeamCount = this.beamCount; // 이전 빔 개수 저장
+    
     switch(this.level) {
       case 2:
-        this.beamWidth += 1;  // 빔 너비 증가
+        this.beamCount = 2;  // 2개 빔
+        this.beamWidth += 1;
         break;
       case 3:
-        this.beamLength += 50;  // 빔 길이 증가
+        this.beamLength += 50;
         break;
       case 4:
+        this.beamCount = 3;  // 3개 빔
         this.damage += 3;
         break;
       case 5:
-        this.rotationSpeed = 0.025;  // 회전 속도 증가
+        this.rotationSpeed = 0.025;
         break;
       case 6:
+        this.beamCount = 4;  // 4개 빔
         this.beamWidth += 2;
         this.damage += 4;
         break;
@@ -3465,6 +3483,7 @@ class PlasmaWeapon extends Weapon {
         this.beamLength += 75;
         break;
       case 8:
+        this.beamCount = 5;  // 5개 빔
         this.beamWidth += 2;
         this.damage += 5;
         break;
@@ -3472,30 +3491,43 @@ class PlasmaWeapon extends Weapon {
         this.rotationSpeed = 0.03;
         break;
       case 10:
-        this.beamWidth += 3;  // 최종 빔 너비
-        this.beamLength += 100;  // 최종 빔 길이
+        this.beamCount = 6;  // 6개 빔 (최대)
+        this.beamWidth += 3;
+        this.beamLength += 100;
         this.damage += 8;
         break;
     }
     
-    // 현재 빔 업데이트
-    if (this.currentBeam && !this.currentBeam.expired) {
-      this.currentBeam.updateStats(this.beamLength, this.beamWidth, this.damage * player.getTotalRangedAttackPower());
+    // 빔 개수가 변경되었으면 빔을 다시 생성
+    if (prevBeamCount !== this.beamCount) {
+      // 기존 빔들 제거
+      this.currentBeams.forEach(beam => {
+        if (beam) beam.expired = true;
+      });
+      this.currentBeams = [];
     }
+    
+    // 현재 빔들 업데이트
+    this.currentBeams.forEach(beam => {
+      if (beam && !beam.expired) {
+        beam.updateStats(this.beamLength, this.beamWidth, this.damage * player.getTotalRangedAttackPower());
+      }
+    });
   }
 }
 
 // 플라즈마 빔 효과 클래스
 class ContinuousPlasmaBeam {
-  constructor(x, y, angle, length, width, damage, parentWeapon) {
+  constructor(x, y, angle, length, width, damage, parentWeapon, beamIndex = 0) {
     this.startX = x;
     this.startY = y;
     this.angle = angle;
-    this.previousAngle = angle; // 이전 프레임의 각도 추가
+    this.previousAngle = angle;
     this.length = length;
     this.width = width;
     this.damage = damage;
     this.parentWeapon = parentWeapon;
+    this.beamIndex = beamIndex; // 빔 인덱스 추가
     this.expired = false;
     this.used = false;
     
@@ -3504,20 +3536,20 @@ class ContinuousPlasmaBeam {
     this.energyFlow = 0;
     
     // 데미지 틱 속성
-    this.damageTick = 50;  // 50ms마다 데미지
+    this.damageTick = 50;
     this.lastDamageTime = 0;
     
     // 프레임당 한 번만 데미지를 받도록 추적
     this.hitEnemiesThisFrame = new Set();
     
-    // 잔상 효과를 위한 각도 히스토리 추가
+    // 잔상 효과를 위한 각도 히스토리
     this.angleHistory = [];
-    this.maxHistoryLength = 8; // 최대 8개의 잔상
+    this.maxHistoryLength = 8;
   }
   
   update() {
     // 빔이 부모 무기에서 분리되었는지 확인
-    if (!this.parentWeapon || this.parentWeapon.currentBeam !== this) {
+    if (!this.parentWeapon || !this.parentWeapon.currentBeams.includes(this)) {
       this.expired = true;
       this.used = true;
       return;
@@ -3545,8 +3577,8 @@ class ContinuousPlasmaBeam {
       this.angleHistory.shift();
     }
     
-    // 타겟 추적
-    if (this.parentWeapon.targetTracking) {
+    // 타겟 추적 (첫 번째 빔만 추적, 나머지는 각도 유지)
+    if (this.parentWeapon.targetTracking && this.beamIndex === 0) {
       const nearestEnemy = findNearestEnemy();
       if (nearestEnemy) {
         // 부드러운 각도 전환
@@ -3561,23 +3593,31 @@ class ContinuousPlasmaBeam {
         // 부드러운 회전 (최대 회전 속도 제한)
         const maxRotation = 0.05;
         this.angle += Math.max(-maxRotation, Math.min(maxRotation, normalizedDiff * 0.1));
+        
+        // 다른 빔들의 각도도 업데이트
+        const angleStep = (Math.PI * 2) / this.parentWeapon.beamCount;
+        this.parentWeapon.currentBeams.forEach((beam, index) => {
+          if (beam && index !== 0 && !beam.expired) {
+            beam.angle = this.angle + (angleStep * index);
+          }
+        });
       }
-    } else {
-      this.angle = this.parentWeapon.currentAngle;
+    } else if (!this.parentWeapon.targetTracking) {
+      // 타겟 추적이 꺼져있으면 회전
+      const angleStep = (Math.PI * 2) / this.parentWeapon.beamCount;
+      this.angle = this.parentWeapon.currentAngle + (angleStep * this.beamIndex);
     }
     
     // 데미지 처리
     const currentTime = gameTimeSystem.getTime();
     if (currentTime - this.lastDamageTime >= this.damageTick) {
-      // 이번 프레임의 히트 목록 초기화
       this.hitEnemiesThisFrame.clear();
-      
-      // 회전 경로를 포함한 데미지 처리
       this.dealSweepDamage();
       this.lastDamageTime = currentTime;
     }
   }
   
+  // 나머지 메서드들은 기존과 동일...
   dealSweepDamage() {
     // 회전한 각도 계산
     let angleDiff = this.angle - this.previousAngle;
@@ -3665,7 +3705,7 @@ class ContinuousPlasmaBeam {
       
       if (age < maxAge) {
         const ageRatio = age / maxAge;
-        const alpha = (1 - ageRatio) * 0.8 // 최대 80% 투명도에서 시작
+        const alpha = (1 - ageRatio) * 0.8; // 최대 80% 투명도에서 시작
         
         // 잔상 빔 그리기
         this.drawBeamWithAlpha(
