@@ -5778,13 +5778,6 @@ function generateLevelUpOptions() {
       name: '창', 
       description: '긴 사거리 관통 공격',
       flavorText: 'dd..'
-    },
-    { 
-      type: 'weapon', 
-      weaponType: 'magnetic', 
-      name: '자기장',
-      description: '플레이어 주위 지속 공격',
-      flavorText: 'dd..'
     }
   ];
 
