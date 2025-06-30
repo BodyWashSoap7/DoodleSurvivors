@@ -3131,12 +3131,16 @@ const weaponFusionSystem = {
     {
       ingredients: ['lightning', 'earth'],
       result: 'magnetic',
-      name: '자기장'
+      name: '자기장',
+      description: '플레이어 주변에 지속 피해',
+      flavorText: 'dd.d.d'
     },
     {
       ingredients: ['flame', 'lightning'],
       result: 'plasma',
-      name: '플라즈마 레이저'
+      name: '플라즈마 레이저',
+      description: '적을 관통하는 지속 피해',
+      flavorText: 'dd.d.d'
     }
   ],
   
@@ -5791,7 +5795,8 @@ function generateLevelUpOptions() {
     'fist': 'dd.',
     'sword': 'dd.',
     'spear': 'dd.',
-    'magnetic': 'dd.'
+    'magnetic': 'dd.',
+    'plasma': 'dd.'
   };
 
   for (let weapon of player.weapons) {
@@ -5850,8 +5855,8 @@ function generateLevelUpOptions() {
             type: 'fusion',
             weaponType: result.result,
             name: result.name,
-            description: `${getWeaponDisplayName(maxLevelWeapons[i].type)} + ${getWeaponDisplayName(maxLevelWeapons[j].type)} 합성`,
-            flavorText: '무기 합성하기...',
+            description: result.description || `${getWeaponDisplayName(maxLevelWeapons[i].type)} + ${getWeaponDisplayName(maxLevelWeapons[j].type)} 합성`,
+            flavorText: result.flavorText || '무기 합성하기...',
             isNew: true,
             weapon1: maxLevelWeapons[i],
             weapon2: maxLevelWeapons[j]
@@ -6295,17 +6300,13 @@ function resetGame() {
 
   player.weapons = [];
   
-  // 화염 무기를 9레벨로 시작
   const flameWeapon = WeaponFactory.createWeapon('flame');
-  // 9레벨까지 업그레이드
   for (let i = 1; i < 9; i++) {
     flameWeapon.upgrade();
   }
   player.weapons.push(flameWeapon);
 
-  // 화염 무기를 9레벨로 시작
   const lightningWeapon = WeaponFactory.createWeapon('lightning');
-  // 9레벨까지 업그레이드
   for (let i = 1; i < 9; i++) {
     lightningWeapon.upgrade();
   }
