@@ -6301,7 +6301,22 @@ function resetGame() {
   player.levelExpMultiplierBonus = 0;
 
   player.weapons = [];
-  addWeapon('plasma');
+  
+  // 화염 무기를 9레벨로 시작
+  const flameWeapon = WeaponFactory.createWeapon('flame');
+  // 9레벨까지 업그레이드
+  for (let i = 1; i < 9; i++) {
+    flameWeapon.upgrade();
+  }
+  player.weapons.push(flameWeapon);
+
+  // 화염 무기를 9레벨로 시작
+  const lightningWeapon = WeaponFactory.createWeapon('lightning');
+  // 9레벨까지 업그레이드
+  for (let i = 1; i < 9; i++) {
+    lightningWeapon.upgrade();
+  }
+  player.weapons.push(lightningWeapon);
 
   // 능력치 레벨 초기화
   for (let stat in player.statLevels) {
