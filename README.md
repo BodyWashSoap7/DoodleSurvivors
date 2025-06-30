@@ -178,3 +178,4 @@ BFG 크고 멋진 총: 공격력 증가
 
 https://github.com/BodyWashSoap7/DoodleSurvivors/compare/62fcf91...df42e07
 https://github.com/BodyWashSoap7/DoodleSurvivors/compare/df42e07...176bf9d
+https://github.com/BodyWashSoap7/DoodleSurvivors/compare/176bf9d...db6b1e4
