@@ -944,6 +944,9 @@ const player = {
   enemySpeedReduction: 0,
   enemyHealthReduction: 0,
 
+  // 합성된 무기 추적
+  fusedWeapons: [], // 합성에 사용된 무기 타입들을 저장
+
   // 자석 효과 관련 속성들
   magnetActive: false,
   magnetDuration: 0,
@@ -3165,6 +3168,14 @@ const weaponFusionSystem = {
   performFusion(weapon1, weapon2) {
     const result = this.getFusionResult(weapon1.type, weapon2.type);
     if (!result) return null;
+    
+    // 합성에 사용된 무기 타입들을 기록
+    if (!player.fusedWeapons.includes(weapon1.type)) {
+      player.fusedWeapons.push(weapon1.type);
+    }
+    if (!player.fusedWeapons.includes(weapon2.type)) {
+      player.fusedWeapons.push(weapon2.type);
+    }
     
     // 기존 무기 제거
     const index1 = player.weapons.indexOf(weapon1);
@@ -5820,7 +5831,8 @@ function generateLevelUpOptions() {
   // 사용 가능한 새 무기들 필터링 (이미 보유하지 않은 무기들)
   const playerWeaponTypes = player.weapons.map(w => w.type);
   const availableNewWeapons = newWeaponOptions.filter(weapon => 
-    !playerWeaponTypes.includes(weapon.weaponType)
+    !playerWeaponTypes.includes(weapon.weaponType) && 
+    !player.fusedWeapons.includes(weapon.weaponType) // 합성된 무기 제외
   );
 
   // 최대 레벨에 도달하지 않은 능력치만 필터링
@@ -6299,15 +6311,16 @@ function resetGame() {
   player.levelExpMultiplierBonus = 0;
 
   player.weapons = [];
+  player.fusedWeapons = [];
   
   const flameWeapon = WeaponFactory.createWeapon('flame');
-  for (let i = 1; i < 9; i++) {
+  for (let i = 1; i < 10; i++) {
     flameWeapon.upgrade();
   }
   player.weapons.push(flameWeapon);
 
   const lightningWeapon = WeaponFactory.createWeapon('lightning');
-  for (let i = 1; i < 9; i++) {
+  for (let i = 1; i < 10; i++) {
     lightningWeapon.upgrade();
   }
   player.weapons.push(lightningWeapon);
