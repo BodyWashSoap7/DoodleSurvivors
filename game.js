@@ -6490,7 +6490,7 @@ function drawOptionBox(x, y, width, height, option, isHovered) {
       option.rarity.bgColor;
     borderColor = option.rarity.borderColor;
     textColor = isHovered ? '#FFFFFF' : option.rarity.color;
-  } else if (option.type === 'weapon' || option.type === 'weaponUpgrade') {
+  } else if (option.type === 'weapon' || option.type === 'weaponUpgrade' || option.type === 'fusion') {
     // 새 무기인 경우 - 청록색 계열
     bgColor = isHovered ? 'rgba(69, 162, 158, 0.5)' : 'rgba(31, 40, 51, 0.5)';
     borderColor = isHovered ? '#66fcf1' : '#45a29e';
@@ -6512,7 +6512,7 @@ function drawOptionBox(x, y, width, height, option, isHovered) {
   ctx.strokeRect(x, y, width, height);
 
   // 특별 효과 추가 (새 무기, 무기 업그레이드, 아티팩트인 경우)
-  if (option.type === 'weapon' || option.type === 'weaponUpgrade' || option.rarity || 
+  if (option.type === 'weapon' || option.type === 'weaponUpgrade' || option.type === 'fusion' || option.rarity || 
       (option.currentLevel !== undefined && option.type !== 'weaponUpgrade')) {
     // 내부 글로우 효과
     ctx.save();
@@ -6574,7 +6574,7 @@ function drawOptionBox(x, y, width, height, option, isHovered) {
       assetManager.images.artifactIcons[option.iconId], 
       iconX, iconY, iconSize, iconSize
     );
-  } else if (option.type === 'weapon' || option.type === 'weaponUpgrade') {
+  } else if (option.type === 'weapon' || option.type === 'weaponUpgrade' || option.type === 'fusion') {
     // 무기 아이콘
     if (assetManager.loaded.weaponIcons && 
         assetManager.images.weaponIcons[option.weaponType]) {
