@@ -178,6 +178,8 @@ BFG 크고 멋진 총: 공격력 증가
 
 합성 무기 선택지의 색깔을 짙은 붉은색 계열로 만들기
 
+메인메뉴로 나가면 캐릭터 크기 커지는 버그
+
 https://github.com/BodyWashSoap7/DoodleSurvivors/compare/62fcf91...df42e07
 https://github.com/BodyWashSoap7/DoodleSurvivors/compare/df42e07...176bf9d
 https://github.com/BodyWashSoap7/DoodleSurvivors/compare/176bf9d...db6b1e4
