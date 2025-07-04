@@ -6490,8 +6490,13 @@ function drawOptionBox(x, y, width, height, option, isHovered) {
       option.rarity.bgColor;
     borderColor = option.rarity.borderColor;
     textColor = isHovered ? '#FFFFFF' : option.rarity.color;
-  } else if (option.type === 'weapon' || option.type === 'weaponUpgrade' || option.type === 'fusion') {
-    // 새 무기인 경우 - 청록색 계열
+  } else if (option.type === 'fusion') {
+    // 합성 무기인 경우 - 짙은 붉은색 계열로 변경
+    bgColor = isHovered ? 'rgba(139, 0, 0, 0.7)' : 'rgba(80, 0, 0, 0.5)';
+    borderColor = isHovered ? '#FF6B6B' : '#8B0000';
+    textColor = isHovered ? '#FFFFFF' : '#FFB3B3';
+  } else if (option.type === 'weapon' || option.type === 'weaponUpgrade') {
+    // 일반 무기인 경우 - 청록색 계열
     bgColor = isHovered ? 'rgba(69, 162, 158, 0.5)' : 'rgba(31, 40, 51, 0.5)';
     borderColor = isHovered ? '#66fcf1' : '#45a29e';
     textColor = isHovered ? '#FFFFFF' : '#ffffff';
@@ -6520,8 +6525,11 @@ function drawOptionBox(x, y, width, height, option, isHovered) {
     // 아티팩트의 경우 레어리티에 따라 글로우 강도 조절
     let glowAlpha = 0.3;
     let glowColor = borderColor;
-    
-    if (option.rarity) {
+
+    if (option.type === 'fusion') {
+      glowAlpha = 0.5;
+      glowColor = '#DC143C'; // 크림슨 색상
+    } else if (option.rarity) {
       // 레어리티별 글로우 강도
       switch(option.rarity) {
         case ARTIFACT_RARITY.LEGENDARY:
