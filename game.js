@@ -6336,7 +6336,7 @@ function resetGame() {
   
   // 아티팩트 초기화
   player.acquiredArtifacts = [];
-  player.size = 15;
+  player.size = 7.5;
   player.enemySpeedReduction = 0;
   player.enemyHealthReduction = 0;
   player.enemyBulletSlowdown = 0;
