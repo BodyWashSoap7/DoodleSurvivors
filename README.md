@@ -180,6 +180,36 @@ BFG 크고 멋진 총: 공격력 증가
 
 메인메뉴로 나가면 캐릭터 크기 커지는 버그
 
+// 자기장 무기 클래스
+class MagneticWeapon extends Weapon {
+
+}
+
+// 자기장 효과 클래스
+class MagneticField {
+
+}
+
+// 플라즈마 레이저 무기 클래스
+class PlasmaWeapon extends Weapon {
+
+}
+
+// 플라즈마 빔 효과 클래스
+class ContinuousPlasmaBeam {
+
+}
+
+// 인페르노 무기 클래스
+class InfernoWeapon extends Weapon {
+
+}
+
+// 인페르노 투사체 클래스
+class InfernoProjectile {
+
+}
+
 https://github.com/BodyWashSoap7/DoodleSurvivors/compare/62fcf91...df42e07
 https://github.com/BodyWashSoap7/DoodleSurvivors/compare/df42e07...176bf9d
 https://github.com/BodyWashSoap7/DoodleSurvivors/compare/176bf9d...db6b1e4
