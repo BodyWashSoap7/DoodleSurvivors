@@ -3876,7 +3876,7 @@ class InfernoWeapon extends Weapon {
   constructor() {
     super({
       type: 'inferno',
-      baseCooldown: 3000, // 3초 쿨타임
+      baseCooldown: 5000, // 3초 쿨타임
       damage: 12
     });
     
@@ -3974,7 +3974,7 @@ class InfernoWeapon extends Weapon {
         this.projectileSpeed = 7; // 속도 증가
         break;
       case 4:
-        this.burstInterval = 40; // 연사 속도 증가
+        this.burstInterval = 45; // 연사 속도 증가
         break;
       case 5:
         this.directions = 3; // 3방향 발사
@@ -3989,7 +3989,7 @@ class InfernoWeapon extends Weapon {
         this.damage += 4;
         break;
       case 8:
-        this.burstInterval = 30; // 더 빠른 연사
+        this.burstInterval = 40; // 더 빠른 연사
         this.projectileSpeed = 8;
         break;
       case 9:
@@ -3999,7 +3999,7 @@ class InfernoWeapon extends Weapon {
       case 10:
         this.directions = 5; // 5방향 발사
         this.burstCount = 32;
-        this.burstInterval = 30; // 최대 연사 속도
+        this.burstInterval = 35; // 최대 연사 속도
         this.damage += 6;
         this.baseCooldown *= 0.7; // 최종 쿨타임
         break;
@@ -4109,8 +4109,6 @@ class InfernoProjectile {
       
       ctx.restore();
     }
-    
-
   }
   
   outOfBounds() {
