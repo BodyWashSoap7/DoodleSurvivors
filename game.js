@@ -1478,7 +1478,7 @@ class Bullet {
   }
 
   outOfBounds() {
-    const maxDistance = 500;
+    const maxDistance = 2000;
     return !isWithinDistance(this, player, maxDistance);
   }
 }
@@ -2329,6 +2329,8 @@ const WeaponFactory = {
         return new MagneticWeapon();
       case 'plasma':
         return new PlasmaWeapon();
+      case 'inferno':
+        return new InfernoWeapon();
       default:
         return new WindWeapon();
     }
@@ -3144,6 +3146,13 @@ const weaponFusionSystem = {
       name: '플라즈마 레이저',
       description: '적을 관통하는 지속 피해',
       flavorText: 'dd.d.d'
+    },
+    {
+      ingredients: ['flame', 'wind'],
+      result: 'inferno',
+      name: '인페르노',
+      description: '화염 투사체를 빠른 속도로 연속 발사',
+      flavorText: 'dd.d.d'
     }
   ],
   
@@ -3859,6 +3868,253 @@ class ContinuousPlasmaBeam {
     this.length = length;
     this.width = width;
     this.damage = damage;
+  }
+}
+
+// 인페르노 무기 클래스
+class InfernoWeapon extends Weapon {
+  constructor() {
+    super({
+      type: 'inferno',
+      baseCooldown: 3000, // 3초 쿨타임
+      damage: 12
+    });
+    
+    // 연속 발사 관련
+    this.burstCount = 16; // 연속 발사 횟수
+    this.burstInterval = 50; // 발사 간격 (ms)
+    this.burstFiring = false; // 연속 발사 중인지
+    this.currentBurst = 0; // 현재 발사 횟수
+    this.lastBurstTime = 0;
+    
+    // 투사체 속성
+    this.projectileSpeed = 6; // 빠른 속도
+    this.projectileRange = 500; // 사거리
+    
+    // 다방향 발사
+    this.directions = 1; // 발사 방향 수
+    this.spreadAngle = 72 * Math.PI / 180; // 72도를 라디안으로
+  }
+  
+  update() {
+    const now = gameTimeSystem.getTime();
+    
+    // 연속 발사 중이 아니고 쿨다운이 끝났으면 발사 시작
+    if (!this.burstFiring && now - this.lastAttackTime >= this.cooldown) {
+      this.startBurst();
+      this.lastAttackTime = now;
+    }
+    
+    // 연속 발사 처리
+    if (this.burstFiring) {
+      if (now - this.lastBurstTime >= this.burstInterval) {
+        this.fireBurst();
+        this.lastBurstTime = now;
+        this.currentBurst++;
+        
+        // 연속 발사 완료
+        if (this.currentBurst >= this.burstCount) {
+          this.burstFiring = false;
+          this.currentBurst = 0;
+        }
+      }
+    }
+  }
+  
+  startBurst() {
+    this.burstFiring = true;
+    this.currentBurst = 0;
+    this.lastBurstTime = gameTimeSystem.getTime();
+  }
+  
+  fireBurst() {
+    // 마우스 방향 계산
+    const baseAngle = Math.atan2(mouseWorldY - player.y, mouseWorldX - player.x);
+    
+    // 다방향 발사
+    if (this.directions === 1) {
+      // 단일 방향
+      this.createProjectile(baseAngle);
+    } else {
+      // 다방향 (중앙 + 좌우 대칭)
+      const halfDirections = Math.floor(this.directions / 2);
+      
+      for (let i = -halfDirections; i <= halfDirections; i++) {
+        const angle = baseAngle + (i * this.spreadAngle);
+        this.createProjectile(angle);
+      }
+    }
+  }
+  
+  createProjectile(angle) {
+    const projectile = new InfernoProjectile(
+      player.x,
+      player.y,
+      angle,
+      this.projectileSpeed,
+      this.projectileRange,
+      this.damage * player.getTotalRangedAttackPower()
+    );
+    gameObjects.bullets.push(projectile);
+  }
+  
+  fire() {
+    // 사용하지 않음 (update에서 자동 발사)
+  }
+  
+  applyLevelBonus() {
+    super.applyLevelBonus();
+    
+    switch(this.level) {
+      case 2:
+        this.burstCount = 20; // 연속 발사 횟수 증가
+        break;
+      case 3:
+        this.damage += 3;
+        this.projectileSpeed = 7; // 속도 증가
+        break;
+      case 4:
+        this.burstInterval = 40; // 연사 속도 증가
+        break;
+      case 5:
+        this.directions = 3; // 3방향 발사
+        this.damage += 3;
+        break;
+      case 6:
+        this.burstCount = 24;
+        this.baseCooldown *= 0.85; // 쿨타임 감소
+        break;
+      case 7:
+        this.projectileRange += 100; // 사거리 증가
+        this.damage += 4;
+        break;
+      case 8:
+        this.burstInterval = 30; // 더 빠른 연사
+        this.projectileSpeed = 8;
+        break;
+      case 9:
+        this.burstCount = 28;
+        this.damage += 5;
+        break;
+      case 10:
+        this.directions = 5; // 5방향 발사
+        this.burstCount = 32;
+        this.burstInterval = 30; // 최대 연사 속도
+        this.damage += 6;
+        this.baseCooldown *= 0.7; // 최종 쿨타임
+        break;
+    }
+    
+    this.updateCooldown(player.getTotalCooldownReduction());
+  }
+}
+
+// 인페르노 투사체 클래스
+class InfernoProjectile {
+  constructor(x, y, angle, speed, maxRange, damage) {
+    this.x = x;
+    this.y = y;
+    this.angle = angle;
+    this.speed = speed;
+    this.maxRange = maxRange;
+    this.damage = damage;
+    this.distanceTraveled = 0;
+    this.used = false;
+    
+    // 크기 관련 (거리에 따라 커짐)
+    this.baseSize = 8; // 기본 크기 증가
+    this.size = this.baseSize;
+    this.maxSize = 20; // 최대 크기
+    
+    // 관통한 적 추적 (중복 데미지 방지)
+    this.hitEnemies = new Set();
+    
+    // 애니메이션
+    this.animationTime = 0;
+    this.currentFrame = 0;
+    this.frameCount = 4;
+    this.frameDuration = 50;
+    this.frameTime = 0;
+  }
+  
+  update() {
+    // 이동
+    const moveX = Math.cos(this.angle) * this.speed;
+    const moveY = Math.sin(this.angle) * this.speed;
+    
+    this.x += moveX;
+    this.y += moveY;
+    this.distanceTraveled += this.speed;
+    
+    // 거리에 따라 크기 증가
+    const sizeProgress = Math.min(this.distanceTraveled / this.maxRange, 1);
+    this.size = this.baseSize + (this.maxSize - this.baseSize) * sizeProgress;
+    
+    // 애니메이션 업데이트
+    this.frameTime += 16;
+    if (this.frameTime >= this.frameDuration) {
+      this.frameTime = 0;
+      this.currentFrame = (this.currentFrame + 1) % this.frameCount;
+    }
+    
+    // 최대 거리 도달 시 제거
+    if (this.distanceTraveled >= this.maxRange) {
+      this.used = true;
+      return;
+    }
+    
+    // 적과의 충돌 체크 (관통형)
+    for (let enemy of gameObjects.enemies) {
+      if (enemy.state === 'moving' && !this.hitEnemies.has(enemy)) {
+        // 커진 충돌 범위
+        const distance = Math.sqrt(
+          Math.pow(enemy.x - this.x, 2) + 
+          Math.pow(enemy.y - this.y, 2)
+        );
+        
+        if (distance < this.size + enemy.size) {
+          enemy.takeDamage(this.damage);
+          this.hitEnemies.add(enemy); // 이미 맞은 적으로 기록
+        }
+      }
+    }
+  }
+  
+  draw(offsetX, offsetY) {
+    const drawX = this.x + offsetX;
+    const drawY = this.y + offsetY;
+    
+    // 메인 투사체
+    if (assetManager.loaded.weapons && assetManager.images.weapons.flame) {
+      ctx.save();
+      
+      // 회전하는 화염 효과
+      ctx.translate(drawX, drawY);
+      ctx.rotate(this.angle + this.currentFrame * Math.PI / 2);
+      
+      const frameX = this.currentFrame * 64;
+      const drawSize = this.size * 4; // 크기 증가
+      
+      // 화염 이미지 그리기
+      ctx.globalAlpha = 0.9;
+      ctx.drawImage(
+        assetManager.images.weapons.flame,
+        frameX, 0,
+        64, 64,
+        -drawSize / 2,
+        -drawSize / 2,
+        drawSize,
+        drawSize
+      );
+      
+      ctx.restore();
+    }
+    
+
+  }
+  
+  outOfBounds() {
+    return this.used;
   }
 }
 
@@ -6000,7 +6256,8 @@ function getWeaponDisplayName(weaponType) {
     'sword': '검',
     'spear': '창',
     'magnetic': '자기장',
-    'plasma': '플라즈마 레이저'
+    'plasma': '플라즈마 레이저',
+    'inferno': '인페르노'
   };
   return names[weaponType] || weaponType;
 }
@@ -6313,13 +6570,13 @@ function resetGame() {
   player.weapons = [];
   player.fusedWeapons = [];
   
-  const flameWeapon = WeaponFactory.createWeapon('flame');
+  const flameWeapon = WeaponFactory.createWeapon('inferno');
   for (let i = 1; i < 10; i++) {
     flameWeapon.upgrade();
   }
   player.weapons.push(flameWeapon);
 
-  const lightningWeapon = WeaponFactory.createWeapon('lightning');
+  const lightningWeapon = WeaponFactory.createWeapon('earth');
   for (let i = 1; i < 10; i++) {
     lightningWeapon.upgrade();
   }
