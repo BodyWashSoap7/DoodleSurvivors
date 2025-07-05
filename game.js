@@ -3185,6 +3185,14 @@ const weaponFusionSystem = {
     if (!player.fusedWeapons.includes(weapon2.type)) {
       player.fusedWeapons.push(weapon2.type);
     }
+
+    // 대지 무기의 구체 제거 처리
+    if (weapon1.type === 'earth' && weapon1.removeOldOrbs) {
+      weapon1.removeOldOrbs();
+    }
+    if (weapon2.type === 'earth' && weapon2.removeOldOrbs) {
+      weapon2.removeOldOrbs();
+    }
     
     // 기존 무기 제거
     const index1 = player.weapons.indexOf(weapon1);
