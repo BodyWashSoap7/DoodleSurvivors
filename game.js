@@ -720,14 +720,14 @@ class AssetManager {
 
   loadWeaponImages() {
     this.loadImageSet('weapons', 
-      ['wind', 'earth', 'flame', 'lightningChain', 'lightningImpact', 'fist', 'sword', 'spear', 'magnetic', 'plasma'], 
+      ['wind', 'earth', 'flame', 'lightningChain', 'lightningImpact', 'fist', 'sword', 'spear', 'magnetic', 'plasma', 'inferno', 'supernova'], 
       './img/weapons/{item}.png'
     );
   }
 
   loadWeaponIcons() {
     this.loadImageSet('weaponIcons', 
-      ['wind', 'earth', 'flame', 'lightning', 'fist', 'sword', 'spear', 'magnetic', 'plasma'], 
+      ['wind', 'earth', 'flame', 'lightning', 'fist', 'sword', 'spear', 'magnetic', 'plasma', 'inferno', 'supernova'], 
       './img/weapon_icons/{item}_icon.png'
     );
   }
@@ -2331,6 +2331,8 @@ const WeaponFactory = {
         return new PlasmaWeapon();
       case 'inferno':
         return new InfernoWeapon();
+      case 'supernova':
+        return new SupernovaWeapon();
       default:
         return new WindWeapon();
     }
@@ -3152,6 +3154,13 @@ const weaponFusionSystem = {
       result: 'inferno',
       name: '인페르노',
       description: '화염 투사체를 빠른 속도로 연속 발사',
+      flavorText: 'dd.d.d'
+    },
+    {
+      ingredients: ['flame', 'earth'],
+      result: 'supernova',
+      name: '슈퍼노바',
+      description: '주변에 주기적으로 데미지를 주는 별을 설치',
       flavorText: 'dd.d.d'
     }
   ],
@@ -4121,6 +4130,341 @@ class InfernoProjectile {
   
   outOfBounds() {
     return this.used;
+  }
+}
+
+// 슈퍼노바 무기 클래스
+class SupernovaWeapon extends Weapon {
+  constructor() {
+    super({
+      type: 'supernova',
+      baseCooldown: 3000, // 3초 쿨타임
+      damage: 25
+    });
+    
+    this.activeStars = []; // 활성화된 별들
+    this.maxStars = 3; // 동시에 존재할 수 있는 최대 별 개수
+    this.starDuration = 5000; // 별 지속시간 5초
+    this.starRange = 100; // 별의 데미지 범위
+    this.tickInterval = 200; // 0.2초마다 데미지
+  }
+  
+  fire() {
+    // 최대 별 개수 제한
+    if (this.activeStars.length >= this.maxStars) {
+      // 가장 오래된 별 제거
+      const oldestStar = this.activeStars.shift();
+      oldestStar.used = true;
+    }
+    
+    // 플레이어 주변 랜덤 위치에 별 생성
+    const angle = Math.random() * Math.PI * 2;
+    const distance = 50 // 50~150 거리
+    
+    const starX = player.x + Math.cos(angle) * (distance + Math.random() * 100);
+    const starY = player.y + Math.sin(angle) * (distance + Math.random() * 100);
+    
+    const star = new SupernovaStar(
+      starX, 
+      starY,
+      this.starRange,
+      this.damage * player.getTotalRangedAttackPower(),
+      this.starDuration,
+      this.tickInterval
+    );
+    
+    this.activeStars.push(star);
+    gameObjects.bullets.push(star);
+  }
+  
+  update() {
+    // 기본 무기 업데이트
+    super.update();
+    
+    // 사용 완료된 별 제거
+    this.activeStars = this.activeStars.filter(star => !star.used);
+  }
+  
+  applyLevelBonus() {
+    super.applyLevelBonus();
+    
+    switch(this.level) {
+      case 2:
+        this.maxStars = 4; // 최대 별 개수 증가
+        break;
+      case 3:
+        this.starRange += 25; // 범위 증가
+        this.distance += 25;
+        break;
+      case 4:
+        this.damage += 8; // 데미지 증가
+        this.starDuration += 1000; // 지속시간 증가
+        break;
+      case 5:
+        this.maxStars = 5; // 최대 별 개수 증가
+        this.baseCooldown *= 0.85; // 쿨타임 감소
+        break;
+      case 6:
+        this.starRange += 30; // 범위 추가 증가
+        this.tickInterval = 150; // 더 빠른 틱
+        break;
+      case 7:
+        this.damage += 10; // 데미지 추가 증가
+        this.maxStars = 6; // 최대 별 개수 증가
+        break;
+      case 8:
+        this.starDuration += 1500; // 지속시간 추가 증가
+        this.starRange += 35; // 범위 추가 증가
+        this.distance += 35;
+        break;
+      case 9:
+        this.baseCooldown *= 0.8; // 쿨타임 추가 감소
+        this.damage += 12; // 데미지 추가 증가
+        this.maxStars = 7;
+        break;
+      case 10:
+        this.maxStars = 8; // 최대 별 개수 (최대)
+        self.tickInterval = 100; // 최고속 틱
+        this.damage += 15; // 최종 데미지 보너스
+        this.starDuration = 8000; // 최종 지속시간
+        break;
+    }
+    
+    this.updateCooldown(player.getTotalCooldownReduction());
+  }
+}
+
+class SupernovaStar {
+  constructor(x, y, range, damage, duration, tickInterval) {
+    this.x = x;
+    this.y = y;
+    this.range = range;
+    this.damage = damage;
+    this.duration = duration;
+    this.tickInterval = tickInterval;
+    this.startTime = gameTimeSystem.getTime();
+    this.lastTickTime = this.startTime;
+    this.used = false;
+    
+    // 애니메이션 속성
+    this.rotation = 0;
+    this.rotationSpeed = 0.03;
+    this.pulseTime = 0;
+    
+    // 파동 효과 속성
+    this.waveRadius = 0;
+    this.waveMaxRadius = this.range * 1.2;
+    this.waveSpeed = 2;
+    this.waveAlpha = 0;
+    this.lastWaveTime = this.startTime;
+    this.waveInterval = 1000;
+    
+    // 생성 애니메이션 속성
+    this.spawnProgress = 0;
+    this.spawnDuration = 500; // 0.5초 동안 생성 애니메이션
+    this.isSpawning = true;
+    this.spawnScale = 0;
+  }
+  
+  update() {
+    const currentTime = gameTimeSystem.getTime();
+    const elapsedTime = currentTime - this.startTime;
+    
+    // 생성 애니메이션 업데이트
+    if (this.isSpawning) {
+      this.spawnProgress = Math.min(1, elapsedTime / this.spawnDuration);
+      
+      // 이징 함수 적용 (빠르게 시작해서 천천히 끝남)
+      const easedProgress = 1 - Math.pow(1 - this.spawnProgress, 3);
+      this.spawnScale = easedProgress;
+      
+      if (this.spawnProgress >= 1) {
+        this.isSpawning = false;
+        this.spawnScale = 1;
+      }
+    }
+    
+    // 지속시간 체크
+    if (elapsedTime >= this.duration) {
+      this.used = true;
+      return;
+    }
+    
+    // 애니메이션 업데이트
+    this.rotation += this.rotationSpeed;
+    this.pulseTime += 0.05;
+    
+    // 파동 효과 업데이트
+    this.updateWaveEffect(currentTime);
+    
+    // 주기적 데미지 (생성 중에는 데미지 없음)
+    if (!this.isSpawning && currentTime - this.lastTickTime >= this.tickInterval) {
+      this.dealDamage();
+      this.lastTickTime = currentTime;
+    }
+  }
+  
+  updateWaveEffect(currentTime) {
+    // 파동 확장
+    if (this.waveRadius > 0) {
+      this.waveRadius += this.waveSpeed;
+      this.waveAlpha = Math.max(0, 1 - (this.waveRadius / this.waveMaxRadius));
+      
+      // 파동이 최대 범위를 넘으면 리셋
+      if (this.waveRadius >= this.waveMaxRadius) {
+        this.waveRadius = 0;
+        this.waveAlpha = 0;
+      }
+    }
+    
+    // 새로운 파동 시작
+    if (currentTime - this.lastWaveTime >= this.waveInterval) {
+      this.waveRadius = 10; // 시작 반경
+      this.waveAlpha = 1;
+      this.lastWaveTime = currentTime;
+    }
+  }
+  
+  dealDamage() {
+    // 범위 내 모든 적에게 동일한 데미지
+    for (let enemy of gameObjects.enemies) {
+      if (enemy.state !== 'moving') continue;
+      
+      const dx = enemy.x - this.x;
+      const dy = enemy.y - this.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      
+      if (distance <= this.range + enemy.size) {
+        // 거리에 상관없이 동일한 데미지
+        const finalDamage = this.damage / (1000 / this.tickInterval);
+        enemy.takeDamage(finalDamage);
+      }
+    }
+  }
+  
+  draw(offsetX, offsetY) {
+    const drawX = this.x + offsetX;
+    const drawY = this.y + offsetY;
+    
+    ctx.save();
+    
+    // 남은 시간에 따른 투명도
+    const remainingTime = this.duration - (gameTimeSystem.getTime() - this.startTime);
+    let alpha = 1.0;
+    if (remainingTime < 1000) {
+      alpha = remainingTime / 1000;
+    }
+    
+    // 생성 중일 때 투명도 조절
+    if (this.isSpawning) {
+      alpha *= this.spawnProgress;
+    }
+    
+    // 범위 표시 (반투명 원) - 생성 애니메이션 적용
+    ctx.globalAlpha = alpha * 0.15;
+    ctx.fillStyle = '#FFD700';
+    ctx.beginPath();
+    ctx.arc(drawX, drawY, this.range * this.spawnScale, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // 범위 테두리 - 생성 애니메이션 적용
+    ctx.globalAlpha = alpha * 0.4;
+    ctx.strokeStyle = '#FFA500';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(drawX, drawY, this.range * this.spawnScale, 0, Math.PI * 2);
+    ctx.stroke();
+    
+    // 파동 효과 그리기 (생성 완료 후에만)
+    if (!this.isSpawning && this.waveRadius > 0 && this.waveAlpha > 0) {
+      ctx.globalAlpha = alpha * this.waveAlpha * 0.6;
+      
+      const waveGradient = ctx.createRadialGradient(
+        drawX, drawY, Math.max(0, this.waveRadius - 20),
+        drawX, drawY, this.waveRadius
+      );
+      waveGradient.addColorStop(0, 'transparent');
+      waveGradient.addColorStop(0.5, '#FFD700');
+      waveGradient.addColorStop(1, '#FFA500');
+      
+      ctx.strokeStyle = waveGradient;
+      ctx.lineWidth = 15;
+      ctx.beginPath();
+      ctx.arc(drawX, drawY, this.waveRadius, 0, Math.PI * 2);
+      ctx.stroke();
+      
+      ctx.globalAlpha = alpha * this.waveAlpha * 0.8;
+      ctx.strokeStyle = '#FFFFFF';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(drawX, drawY, this.waveRadius, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    
+    // 중심 별 이미지
+    ctx.globalAlpha = alpha;
+    
+    // 생성 애니메이션 중 회전 가속
+    const rotationBoost = this.isSpawning ? (1 - this.spawnProgress) * 0.2 : 0;
+    
+    // 펄스 효과 + 생성 스케일
+    const pulseScale = 1 + Math.sin(this.pulseTime) * 0.1;
+    const starSize = 64 * pulseScale * this.spawnScale;
+    
+    // 생성 중 빛나는 효과
+    if (this.isSpawning) {
+      const glowSize = starSize * (2 - this.spawnProgress);
+      const glowGradient = ctx.createRadialGradient(
+        drawX, drawY, 0,
+        drawX, drawY, glowSize
+      );
+      glowGradient.addColorStop(0, 'rgba(255, 255, 255, 0.8)');
+      glowGradient.addColorStop(0.3, 'rgba(255, 215, 0, 0.5)');
+      glowGradient.addColorStop(1, 'transparent');
+      
+      ctx.globalAlpha = alpha * (1 - this.spawnProgress) * 0.6;
+      ctx.fillStyle = glowGradient;
+      ctx.beginPath();
+      ctx.arc(drawX, drawY, glowSize, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = alpha;
+    }
+    
+    // 별 이미지
+    if (assetManager.loaded.weapons && assetManager.images.weapons.supernova) {
+      ctx.translate(drawX, drawY);
+      ctx.rotate(this.rotation + rotationBoost);
+      
+      ctx.drawImage(
+        assetManager.images.weapons.supernova,
+        -starSize / 2,
+        -starSize / 2,
+        starSize,
+        starSize
+      );
+    } else {
+      // 이미지가 없을 때 대체 그리기
+      ctx.translate(drawX, drawY);
+      ctx.rotate(this.rotation + rotationBoost);
+      
+      const glowGradient = ctx.createRadialGradient(0, 0, 0, 0, 0, starSize / 2);
+      glowGradient.addColorStop(0, '#FFFFFF');
+      glowGradient.addColorStop(0.3, '#FFD700');
+      glowGradient.addColorStop(0.7, '#FFA500');
+      glowGradient.addColorStop(1, 'rgba(255, 165, 0, 0)');
+      
+      ctx.fillStyle = glowGradient;
+      ctx.beginPath();
+      ctx.arc(0, 0, starSize / 2, 0, Math.PI * 2);
+      ctx.fill();
+      
+      ctx.fillStyle = '#FFFFFF';
+      ctx.beginPath();
+      ctx.arc(0, 0, starSize / 6, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    
+    ctx.restore();
   }
 }
 
@@ -6263,7 +6607,8 @@ function getWeaponDisplayName(weaponType) {
     'spear': '창',
     'magnetic': '자기장',
     'plasma': '플라즈마 레이저',
-    'inferno': '인페르노'
+    'inferno': '인페르노',
+    'supernova': '슈퍼노바'
   };
   return names[weaponType] || weaponType;
 }
@@ -6576,7 +6921,7 @@ function resetGame() {
   player.weapons = [];
   player.fusedWeapons = [];
   
-  const flameWeapon = WeaponFactory.createWeapon('inferno');
+  const flameWeapon = WeaponFactory.createWeapon('supernova');
   for (let i = 1; i < 10; i++) {
     flameWeapon.upgrade();
   }
