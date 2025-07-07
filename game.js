@@ -4247,23 +4247,24 @@ class SupernovaStar {
     this.used = false;
     
     // 애니메이션 속성
-    this.rotation = 0;
-    this.rotationSpeed = 0.03;
     this.pulseTime = 0;
     
-    // 파동 효과 속성
-    this.waveRadius = 0;
-    this.waveMaxRadius = this.range * 1.2;
-    this.waveSpeed = 2;
-    this.waveAlpha = 0;
+    // 다중 파동 효과 속성
+    this.waves = []; // 활성 파동들
     this.lastWaveTime = this.startTime;
-    this.waveInterval = 1000;
+    this.waveInterval = 800; // 파동 생성 간격
+    this.maxWaves = 3; // 동시에 표시되는 최대 파동 수
     
     // 생성 애니메이션 속성
     this.spawnProgress = 0;
-    this.spawnDuration = 500; // 0.5초 동안 생성 애니메이션
+    this.spawnDuration = 500;
     this.isSpawning = true;
     this.spawnScale = 0;
+    
+    // 파티클 효과
+    this.particles = [];
+    this.lastParticleTime = this.startTime;
+    this.particleInterval = 100;
   }
   
   update() {
@@ -4273,8 +4274,6 @@ class SupernovaStar {
     // 생성 애니메이션 업데이트
     if (this.isSpawning) {
       this.spawnProgress = Math.min(1, elapsedTime / this.spawnDuration);
-      
-      // 이징 함수 적용 (빠르게 시작해서 천천히 끝남)
       const easedProgress = 1 - Math.pow(1 - this.spawnProgress, 3);
       this.spawnScale = easedProgress;
       
@@ -4291,37 +4290,98 @@ class SupernovaStar {
     }
     
     // 애니메이션 업데이트
-    this.rotation += this.rotationSpeed;
     this.pulseTime += 0.05;
     
     // 파동 효과 업데이트
-    this.updateWaveEffect(currentTime);
+    this.updateWaves(currentTime);
     
-    // 주기적 데미지 (생성 중에는 데미지 없음)
+    // 파티클 업데이트
+    this.updateParticles(currentTime);
+    
+    // 주기적 데미지
     if (!this.isSpawning && currentTime - this.lastTickTime >= this.tickInterval) {
       this.dealDamage();
       this.lastTickTime = currentTime;
     }
   }
   
-  updateWaveEffect(currentTime) {
-    // 파동 확장
-    if (this.waveRadius > 0) {
-      this.waveRadius += this.waveSpeed;
-      this.waveAlpha = Math.max(0, 1 - (this.waveRadius / this.waveMaxRadius));
+  updateWaves(currentTime) {
+    // 기존 파동들 업데이트
+    for (let i = this.waves.length - 1; i >= 0; i--) {
+      const wave = this.waves[i];
+      wave.radius += wave.speed;
+      wave.alpha = Math.max(0, 1 - (wave.radius / wave.maxRadius));
       
-      // 파동이 최대 범위를 넘으면 리셋
-      if (this.waveRadius >= this.waveMaxRadius) {
-        this.waveRadius = 0;
-        this.waveAlpha = 0;
+      // 파동이 최대 범위를 벗어나면 제거
+      if (wave.radius >= wave.maxRadius) {
+        this.waves.splice(i, 1);
       }
     }
     
-    // 새로운 파동 시작
-    if (currentTime - this.lastWaveTime >= this.waveInterval) {
-      this.waveRadius = 10; // 시작 반경
-      this.waveAlpha = 1;
+    // 새로운 파동 생성
+    if (currentTime - this.lastWaveTime >= this.waveInterval && this.waves.length < this.maxWaves) {
+      this.createNewWave();
       this.lastWaveTime = currentTime;
+    }
+  }
+  
+  createNewWave() {
+    this.waves.push({
+      radius: 10,
+      maxRadius: this.range * 1.5,
+      speed: 3,
+      alpha: 1,
+      color: this.getRandomWaveColor(),
+      thickness: 15 + Math.random() * 10
+    });
+  }
+  
+  getRandomWaveColor() {
+    const colors = [
+      { r: 255, g: 215, b: 0 },   // 금색
+      { r: 255, g: 165, b: 0 },   // 주황색
+      { r: 255, g: 255, b: 255 }, // 흰색
+      { r: 255, g: 100, b: 100 }  // 연한 빨강
+    ];
+    return colors[Math.floor(Math.random() * colors.length)];
+  }
+  
+  updateParticles(currentTime) {
+    // 파티클 업데이트
+    for (let i = this.particles.length - 1; i >= 0; i--) {
+      const particle = this.particles[i];
+      particle.life -= 0.02;
+      particle.y -= particle.speed;
+      particle.x += Math.sin(particle.wobble) * 0.5;
+      particle.wobble += 0.1;
+      
+      if (particle.life <= 0) {
+        this.particles.splice(i, 1);
+      }
+    }
+    
+    // 새 파티클 생성
+    if (currentTime - this.lastParticleTime >= this.particleInterval && !this.isSpawning) {
+      this.createParticles();
+      this.lastParticleTime = currentTime;
+    }
+  }
+  
+  createParticles() {
+    const particleCount = 2 + Math.floor(Math.random() * 3);
+    for (let i = 0; i < particleCount; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const distance = Math.random() * this.range * 0.8;
+      
+      this.particles.push({
+        x: this.x + Math.cos(angle) * distance,
+        y: this.y + Math.sin(angle) * distance,
+        size: 3 + Math.random() * 4,
+        life: 1,
+        speed: 0.5 + Math.random() * 1,
+        wobble: Math.random() * Math.PI * 2,
+        color: this.getRandomWaveColor()
+      });
     }
   }
   
@@ -4335,7 +4395,6 @@ class SupernovaStar {
       const distance = Math.sqrt(dx * dx + dy * dy);
       
       if (distance <= this.range + enemy.size) {
-        // 거리에 상관없이 동일한 데미지
         const finalDamage = this.damage / (1000 / this.tickInterval);
         enemy.takeDamage(finalDamage);
       }
@@ -4355,85 +4414,156 @@ class SupernovaStar {
       alpha = remainingTime / 1000;
     }
     
-    // 생성 중일 때 투명도 조절
     if (this.isSpawning) {
       alpha *= this.spawnProgress;
     }
     
-    // 범위 표시 (반투명 원) - 생성 애니메이션 적용
-    ctx.globalAlpha = alpha * 0.15;
-    ctx.fillStyle = '#FFD700';
+    // 바닥 효과 (범위 표시)
+    this.drawGroundEffect(drawX, drawY, alpha);
+    
+    // 파동 효과들 그리기
+    this.drawWaves(drawX, drawY, alpha);
+    
+    // 파티클 그리기
+    this.drawParticles(offsetX, offsetY, alpha);
+    
+    // 중심 별 그리기
+    this.drawCenterStar(drawX, drawY, alpha);
+    
+    ctx.restore();
+  }
+  
+  drawGroundEffect(drawX, drawY, alpha) {
+    // 바닥 그라디언트 효과
+    const groundGradient = ctx.createRadialGradient(
+      drawX, drawY, 0,
+      drawX, drawY, this.range * this.spawnScale
+    );
+    
+    groundGradient.addColorStop(0, `rgba(255, 215, 0, ${alpha * 0.3})`);
+    groundGradient.addColorStop(0.5, `rgba(255, 165, 0, ${alpha * 0.2})`);
+    groundGradient.addColorStop(0.8, `rgba(255, 100, 0, ${alpha * 0.1})`);
+    groundGradient.addColorStop(1, 'transparent');
+    
+    ctx.fillStyle = groundGradient;
     ctx.beginPath();
     ctx.arc(drawX, drawY, this.range * this.spawnScale, 0, Math.PI * 2);
     ctx.fill();
     
-    // 범위 테두리 - 생성 애니메이션 적용
+    // 범위 테두리 (점선)
     ctx.globalAlpha = alpha * 0.4;
     ctx.strokeStyle = '#FFA500';
     ctx.lineWidth = 2;
+    ctx.setLineDash([10, 5]);
     ctx.beginPath();
     ctx.arc(drawX, drawY, this.range * this.spawnScale, 0, Math.PI * 2);
     ctx.stroke();
-    
-    // 파동 효과 그리기 (생성 완료 후에만)
-    if (!this.isSpawning && this.waveRadius > 0 && this.waveAlpha > 0) {
-      ctx.globalAlpha = alpha * this.waveAlpha * 0.6;
+    ctx.setLineDash([]);
+  }
+  
+  drawWaves(drawX, drawY, alpha) {
+    // 각 파동 그리기
+    this.waves.forEach((wave, index) => {
+      ctx.globalAlpha = alpha * wave.alpha * 0.8;
       
+      // 파동 그라디언트
       const waveGradient = ctx.createRadialGradient(
-        drawX, drawY, Math.max(0, this.waveRadius - 20),
-        drawX, drawY, this.waveRadius
+        drawX, drawY, Math.max(0, wave.radius - wave.thickness),
+        drawX, drawY, wave.radius
       );
+      
+      const color = wave.color;
       waveGradient.addColorStop(0, 'transparent');
-      waveGradient.addColorStop(0.5, '#FFD700');
-      waveGradient.addColorStop(1, '#FFA500');
+      waveGradient.addColorStop(0.3, `rgba(${color.r}, ${color.g}, ${color.b}, 0.2)`);
+      waveGradient.addColorStop(0.7, `rgba(${color.r}, ${color.g}, ${color.b}, 0.8)`);
+      waveGradient.addColorStop(1, `rgba(${color.r}, ${color.g}, ${color.b}, 0.2)`);
       
       ctx.strokeStyle = waveGradient;
-      ctx.lineWidth = 15;
+      ctx.lineWidth = wave.thickness;
       ctx.beginPath();
-      ctx.arc(drawX, drawY, this.waveRadius, 0, Math.PI * 2);
+      ctx.arc(drawX, drawY, wave.radius, 0, Math.PI * 2);
       ctx.stroke();
       
-      ctx.globalAlpha = alpha * this.waveAlpha * 0.8;
+      // 파동 내부 빛
+      ctx.globalAlpha = alpha * wave.alpha * 0.5;
       ctx.strokeStyle = '#FFFFFF';
       ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.arc(drawX, drawY, this.waveRadius, 0, Math.PI * 2);
+      ctx.arc(drawX, drawY, wave.radius, 0, Math.PI * 2);
       ctx.stroke();
-    }
-    
-    // 중심 별 이미지
+      
+      // 파동 외부 글로우
+      if (wave.alpha > 0.5) {
+        ctx.globalAlpha = alpha * wave.alpha * 0.3;
+        ctx.strokeStyle = `rgba(${color.r}, ${color.g}, ${color.b}, 0.5)`;
+        ctx.lineWidth = wave.thickness * 1.5;
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = `rgba(${color.r}, ${color.g}, ${color.b}, 0.8)`;
+        ctx.beginPath();
+        ctx.arc(drawX, drawY, wave.radius, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+      }
+    });
+  }
+  
+  drawParticles(offsetX, offsetY, alpha) {
+    this.particles.forEach(particle => {
+      ctx.globalAlpha = alpha * particle.life * 0.8;
+      
+      // 파티클 글로우
+      const particleGradient = ctx.createRadialGradient(
+        particle.x + offsetX, particle.y + offsetY, 0,
+        particle.x + offsetX, particle.y + offsetY, particle.size
+      );
+      
+      const color = particle.color;
+      particleGradient.addColorStop(0, `rgba(${color.r}, ${color.g}, ${color.b}, 1)`);
+      particleGradient.addColorStop(0.5, `rgba(${color.r}, ${color.g}, ${color.b}, 0.8)`);
+      particleGradient.addColorStop(1, 'transparent');
+      
+      ctx.fillStyle = particleGradient;
+      ctx.beginPath();
+      ctx.arc(particle.x + offsetX, particle.y + offsetY, particle.size, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // 파티클 코어
+      ctx.globalAlpha = alpha * particle.life;
+      ctx.fillStyle = '#FFFFFF';
+      ctx.beginPath();
+      ctx.arc(particle.x + offsetX, particle.y + offsetY, particle.size * 0.3, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  }
+  
+  drawCenterStar(drawX, drawY, alpha) {
     ctx.globalAlpha = alpha;
+    ctx.save();
+    ctx.translate(drawX, drawY);
     
-    // 생성 애니메이션 중 회전 가속
-    const rotationBoost = this.isSpawning ? (1 - this.spawnProgress) * 0.2 : 0;
+    // 외부 글로우
+    const glowSize = 80 * this.spawnScale;
+    const glowGradient = ctx.createRadialGradient(0, 0, 0, 0, 0, glowSize);
+    glowGradient.addColorStop(0, 'rgba(255, 255, 255, 0.9)');
+    glowGradient.addColorStop(0.2, 'rgba(255, 215, 0, 0.7)');
+    glowGradient.addColorStop(0.5, 'rgba(255, 165, 0, 0.4)');
+    glowGradient.addColorStop(1, 'transparent');
     
-    // 펄스 효과 + 생성 스케일
+    ctx.fillStyle = glowGradient;
+    ctx.beginPath();
+    ctx.arc(0, 0, glowSize, 0, Math.PI * 2);
+    ctx.fill();
+    
+    ctx.restore();
+    
+    // 별 이미지 그리기
     const pulseScale = 1 + Math.sin(this.pulseTime) * 0.1;
     const starSize = 64 * pulseScale * this.spawnScale;
     
-    // 생성 중 빛나는 효과
-    if (this.isSpawning) {
-      const glowSize = starSize * (2 - this.spawnProgress);
-      const glowGradient = ctx.createRadialGradient(
-        drawX, drawY, 0,
-        drawX, drawY, glowSize
-      );
-      glowGradient.addColorStop(0, 'rgba(255, 255, 255, 0.8)');
-      glowGradient.addColorStop(0.3, 'rgba(255, 215, 0, 0.5)');
-      glowGradient.addColorStop(1, 'transparent');
-      
-      ctx.globalAlpha = alpha * (1 - this.spawnProgress) * 0.6;
-      ctx.fillStyle = glowGradient;
-      ctx.beginPath();
-      ctx.arc(drawX, drawY, glowSize, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.globalAlpha = alpha;
-    }
-    
-    // 별 이미지
     if (assetManager.loaded.weapons && assetManager.images.weapons.supernova) {
+      ctx.save();
       ctx.translate(drawX, drawY);
-      ctx.rotate(this.rotation + rotationBoost);
+      ctx.rotate(this.rotation);
       
       ctx.drawImage(
         assetManager.images.weapons.supernova,
@@ -4442,29 +4572,8 @@ class SupernovaStar {
         starSize,
         starSize
       );
-    } else {
-      // 이미지가 없을 때 대체 그리기
-      ctx.translate(drawX, drawY);
-      ctx.rotate(this.rotation + rotationBoost);
-      
-      const glowGradient = ctx.createRadialGradient(0, 0, 0, 0, 0, starSize / 2);
-      glowGradient.addColorStop(0, '#FFFFFF');
-      glowGradient.addColorStop(0.3, '#FFD700');
-      glowGradient.addColorStop(0.7, '#FFA500');
-      glowGradient.addColorStop(1, 'rgba(255, 165, 0, 0)');
-      
-      ctx.fillStyle = glowGradient;
-      ctx.beginPath();
-      ctx.arc(0, 0, starSize / 2, 0, Math.PI * 2);
-      ctx.fill();
-      
-      ctx.fillStyle = '#FFFFFF';
-      ctx.beginPath();
-      ctx.arc(0, 0, starSize / 6, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.restore();
     }
-    
-    ctx.restore();
   }
 }
 
