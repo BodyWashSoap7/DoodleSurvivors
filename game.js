@@ -3568,13 +3568,17 @@ class ContinuousPlasmaBeam {
     this.width = width;
     this.damage = damage;
     this.parentWeapon = parentWeapon;
-    this.beamIndex = beamIndex; // 빔 인덱스 추가
+    this.beamIndex = beamIndex;
     this.expired = false;
     this.used = false;
     
-    // 애니메이션 속성
-    this.colorPhase = 0;
-    this.energyFlow = 0;
+    // 스프라이트 애니메이션 속성
+    this.currentFrame = 0;
+    this.frameCount = 4; // 4개의 프레임
+    this.frameTime = 0;
+    this.frameDuration = 100; // 각 프레임 지속 시간 (ms)
+    this.frameWidth = 256; // 각 프레임 너비
+    this.frameHeight = 64; // 각 프레임 높이
     
     // 데미지 틱 속성
     this.damageTick = 50;
@@ -3582,10 +3586,6 @@ class ContinuousPlasmaBeam {
     
     // 프레임당 한 번만 데미지를 받도록 추적
     this.hitEnemiesThisFrame = new Set();
-    
-    // 잔상 효과를 위한 각도 히스토리
-    this.angleHistory = [];
-    this.maxHistoryLength = 8;
   }
   
   update() {
@@ -3596,27 +3596,19 @@ class ContinuousPlasmaBeam {
       return;
     }
     
-    // 애니메이션 업데이트
-    this.colorPhase += 0.03;
-    this.energyFlow += 0.1;
+    // 애니메이션 프레임 업데이트
+    this.frameTime += 16;
+    if (this.frameTime >= this.frameDuration) {
+      this.frameTime = 0;
+      this.currentFrame = (this.currentFrame + 1) % this.frameCount;
+    }
     
     // 플레이어 위치에서 빔 시작
     this.startX = player.x;
     this.startY = player.y;
     
-    // 이전 각도 저장 (잔상용)
+    // 이전 각도 저장 (스윕 데미지용)
     this.previousAngle = this.angle;
-    
-    // 현재 각도를 히스토리에 추가
-    this.angleHistory.push({
-      angle: this.angle,
-      timestamp: gameTimeSystem.getTime()
-    });
-    
-    // 오래된 히스토리 제거
-    if (this.angleHistory.length > this.maxHistoryLength) {
-      this.angleHistory.shift();
-    }
     
     // 타겟 추적 (첫 번째 빔만 추적, 나머지는 각도 유지)
     if (this.parentWeapon.targetTracking && this.beamIndex === 0) {
@@ -3658,7 +3650,6 @@ class ContinuousPlasmaBeam {
     }
   }
   
-  // 나머지 메서드들은 기존과 동일...
   dealSweepDamage() {
     // 회전한 각도 계산
     let angleDiff = this.angle - this.previousAngle;
@@ -3737,143 +3728,43 @@ class ContinuousPlasmaBeam {
     
     ctx.save();
     
-    // 잔상 효과 그리기 (가장 오래된 것부터)
-    const currentTime = gameTimeSystem.getTime();
-    for (let i = 0; i < this.angleHistory.length - 1; i++) {
-      const historyEntry = this.angleHistory[i];
-      const age = currentTime - historyEntry.timestamp;
-      const maxAge = 500; // 500ms 동안 잔상 유지
-      
-      if (age < maxAge) {
-        const ageRatio = age / maxAge;
-        const alpha = (1 - ageRatio) * 0.8; // 최대 80% 투명도에서 시작
-        
-        // 잔상 빔 그리기
-        this.drawBeamWithAlpha(
-          drawStartX, 
-          drawStartY, 
-          historyEntry.angle, 
-          alpha * (i / this.angleHistory.length), // 오래된 잔상일수록 더 투명
-          true // 잔상 모드
-        );
-      }
+    // 플라즈마 이미지가 로드되었는지 확인
+    if (!assetManager.loaded.weapons || !assetManager.images.weapons.plasma) {
+      ctx.restore();
+      return;
     }
     
-    // 메인 빔 그리기 (현재 각도)
-    this.drawBeamWithAlpha(drawStartX, drawStartY, this.angle, 1.0, false);
+    // 빔의 끝점 계산
+    const drawEndX = drawStartX + Math.cos(this.angle) * this.length;
+    const drawEndY = drawStartY + Math.sin(this.angle) * this.length;
+    
+    // 빔의 중심점과 거리 계산
+    const centerX = (drawStartX + drawEndX) / 2;
+    const centerY = (drawStartY + drawEndY) / 2;
+    const distance = Math.hypot(drawEndX - drawStartX, drawEndY - drawStartY);
+    
+    // 캔버스를 중심점으로 이동하고 회전
+    ctx.translate(centerX, centerY);
+    ctx.rotate(this.angle);
+    
+    // 스프라이트 시트에서 현재 프레임 위치 계산, 256x256 이미지에서 4개의 프레임이 세로로 배열됨
+    const frameY = this.currentFrame * this.frameHeight;
+    
+    // 그리기 크기
+    const drawWidth = distance;
+    const drawHeight = this.width * 8;
+    
+    // 플라즈마 스프라이트 프레임 그리기
+    ctx.globalAlpha = 1.0;
+    ctx.drawImage(
+      assetManager.images.weapons.plasma,
+      0, frameY, // 소스 x, y (현재 프레임)
+      this.frameWidth, this.frameHeight, // 소스 크기
+      -drawWidth / 2, -drawHeight / 2, // 대상 위치 (중앙 정렬)
+      drawWidth, drawHeight // 대상 크기
+    );
     
     ctx.restore();
-  }
-
-  drawBeamWithAlpha(drawStartX, drawStartY, angle, alpha, isAfterimage) {
-    const drawEndX = drawStartX + Math.cos(angle) * this.length;
-    const drawEndY = drawStartY + Math.sin(angle) * this.length;
-    
-    // 잔상일 경우 더 얇고 흐릿하게
-    const widthMultiplier = isAfterimage ? 0.6 : 1.0;
-    const glowMultiplier = isAfterimage ? 0.5 : 1.0;
-    
-    // 외부 글로우 효과
-    ctx.globalAlpha = alpha * 0.4 * glowMultiplier;
-    ctx.strokeStyle = '#FF00FF';
-    ctx.lineWidth = this.width * 8 * widthMultiplier;
-    ctx.shadowBlur = 30 * glowMultiplier;
-    ctx.shadowColor = '#FF00FF';
-    ctx.beginPath();
-    ctx.moveTo(drawStartX, drawStartY);
-    ctx.lineTo(drawEndX, drawEndY);
-    ctx.stroke();
-    
-    // 중간 글로우
-    ctx.globalAlpha = alpha * 0.6 * glowMultiplier;
-    ctx.strokeStyle = '#00FFFF';
-    ctx.lineWidth = this.width * 5 * widthMultiplier;
-    ctx.shadowBlur = 20 * glowMultiplier;
-    ctx.shadowColor = '#00FFFF';
-    ctx.beginPath();
-    ctx.moveTo(drawStartX, drawStartY);
-    ctx.lineTo(drawEndX, drawEndY);
-    ctx.stroke();
-    
-    // 코어 빔 (에너지 플로우 효과) - 잔상이 아닐 때만
-    if (!isAfterimage) {
-      ctx.globalAlpha = alpha;
-      const coreGradient = ctx.createLinearGradient(
-        drawStartX, drawStartY,
-        drawEndX, drawEndY
-      );
-      
-      // 색상 애니메이션
-      const hue1 = 180 + Math.sin(this.colorPhase) * 60;
-      const hue2 = 300 + Math.cos(this.colorPhase) * 60;
-      
-      // 에너지 플로우를 위한 여러 색상 정지점
-      const stops = 5;
-      for (let i = 0; i <= stops; i++) {
-        const position = i / stops;
-        const flowPosition = (position + this.energyFlow * 0.2) % 1;
-        const intensity = Math.sin(flowPosition * Math.PI) * 0.3 + 0.7;
-        
-        if (i % 2 === 0) {
-          coreGradient.addColorStop(position, `hsla(${hue1}, 100%, ${intensity * 100}%, 1)`);
-        } else {
-          coreGradient.addColorStop(position, `hsla(${hue2}, 100%, ${intensity * 100}%, 1)`);
-        }
-      }
-      
-      ctx.strokeStyle = coreGradient;
-      ctx.lineWidth = this.width * 3;
-      ctx.shadowBlur = 15;
-      ctx.shadowColor = '#FFFFFF';
-      ctx.beginPath();
-      ctx.moveTo(drawStartX, drawStartY);
-      ctx.lineTo(drawEndX, drawEndY);
-      ctx.stroke();
-      
-      // 중심선 (밝은 코어)
-      ctx.globalAlpha = alpha;
-      ctx.strokeStyle = '#FFFFFF';
-      ctx.lineWidth = this.width * 1.5;
-      ctx.shadowBlur = 10;
-      ctx.shadowColor = '#FFFFFF';
-      ctx.beginPath();
-      ctx.moveTo(drawStartX, drawStartY);
-      ctx.lineTo(drawEndX, drawEndY);
-      ctx.stroke();
-      
-      // 임팩트 효과 (빔 끝부분)
-      const impactSize = this.width * 10;
-      ctx.globalAlpha = alpha * 0.8;
-      const impactGradient = ctx.createRadialGradient(
-        drawEndX, drawEndY, 0,
-        drawEndX, drawEndY, impactSize
-      );
-      impactGradient.addColorStop(0, '#FFFFFF');
-      impactGradient.addColorStop(0.2, `hsl(${hue2}, 100%, 70%)`);
-      impactGradient.addColorStop(0.5, `hsl(${hue1}, 100%, 50%)`);
-      impactGradient.addColorStop(1, 'transparent');
-      
-      ctx.fillStyle = impactGradient;
-      ctx.beginPath();
-      ctx.arc(drawEndX, drawEndY, impactSize, 0, Math.PI * 2);
-      ctx.fill();
-      
-      // 시작점 효과
-      const startSize = this.width * 6;
-      ctx.globalAlpha = alpha * 0.6;
-      const startGradient = ctx.createRadialGradient(
-        drawStartX, drawStartY, 0,
-        drawStartX, drawStartY, startSize
-      );
-      startGradient.addColorStop(0, '#FFFFFF');
-      startGradient.addColorStop(0.5, `hsl(${hue1}, 100%, 70%)`);
-      startGradient.addColorStop(1, 'transparent');
-      
-      ctx.fillStyle = startGradient;
-      ctx.beginPath();
-      ctx.arc(drawStartX, drawStartY, startSize, 0, Math.PI * 2);
-      ctx.fill();
-    }
   }
   
   outOfBounds() {
@@ -6941,7 +6832,7 @@ function resetGame() {
   player.weapons = [];
   player.fusedWeapons = [];
   
-  const flameWeapon = WeaponFactory.createWeapon('supernova');
+  const flameWeapon = WeaponFactory.createWeapon('plasma');
   for (let i = 1; i < 10; i++) {
     flameWeapon.upgrade();
   }
