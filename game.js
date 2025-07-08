@@ -720,7 +720,7 @@ class AssetManager {
 
   loadWeaponImages() {
     this.loadImageSet('weapons', 
-      ['wind', 'earth', 'flame', 'lightningChain', 'lightningImpact', 'fist', 'sword', 'spear', 'magnetic', 'plasma', 'inferno', 'supernova'], 
+      ['wind', 'earth', 'flame', 'lightningChain', 'lightningImpact', 'fist', 'sword', 'spear', 'magnetic', 'plasma', 'inferno', 'supernova', 'supernovaParticle'], 
       './img/weapons/{item}.png'
     );
   }
@@ -4146,7 +4146,7 @@ class SupernovaWeapon extends Weapon {
     this.maxStars = 3; // 동시에 존재할 수 있는 최대 별 개수
     this.starDuration = 5000; // 별 지속시간 5초
     this.starRange = 100; // 별의 데미지 범위
-    this.tickInterval = 200; // 0.2초마다 데미지
+    this.tickInterval = 800; // 0.2초마다 데미지
   }
   
   fire() {
@@ -4206,7 +4206,7 @@ class SupernovaWeapon extends Weapon {
         break;
       case 6:
         this.starRange += 30; // 범위 추가 증가
-        this.tickInterval = 150; // 더 빠른 틱
+        this.tickInterval = 600; // 더 빠른 틱
         break;
       case 7:
         this.damage += 10; // 데미지 추가 증가
@@ -4224,7 +4224,7 @@ class SupernovaWeapon extends Weapon {
         break;
       case 10:
         this.maxStars = 8; // 최대 별 개수 (최대)
-        self.tickInterval = 100; // 최고속 틱
+        this.tickInterval = 400; // 최고속 틱
         this.damage += 15; // 최종 데미지 보너스
         this.starDuration = 8000; // 최종 지속시간
         break;
@@ -4260,11 +4260,6 @@ class SupernovaStar {
     this.spawnDuration = 500;
     this.isSpawning = true;
     this.spawnScale = 0;
-    
-    // 파티클 효과
-    this.particles = [];
-    this.lastParticleTime = this.startTime;
-    this.particleInterval = 100;
   }
   
   update() {
@@ -4294,9 +4289,6 @@ class SupernovaStar {
     
     // 파동 효과 업데이트
     this.updateWaves(currentTime);
-    
-    // 파티클 업데이트
-    this.updateParticles(currentTime);
     
     // 주기적 데미지
     if (!this.isSpawning && currentTime - this.lastTickTime >= this.tickInterval) {
@@ -4331,58 +4323,9 @@ class SupernovaStar {
       maxRadius: this.range * 1.5,
       speed: 3,
       alpha: 1,
-      color: this.getRandomWaveColor(),
+      color: { r: 255, g: 165, b: 0 },
       thickness: 15 + Math.random() * 10
     });
-  }
-  
-  getRandomWaveColor() {
-    const colors = [
-      { r: 255, g: 215, b: 0 },   // 금색
-      { r: 255, g: 165, b: 0 },   // 주황색
-      { r: 255, g: 255, b: 255 }, // 흰색
-      { r: 255, g: 100, b: 100 }  // 연한 빨강
-    ];
-    return colors[Math.floor(Math.random() * colors.length)];
-  }
-  
-  updateParticles(currentTime) {
-    // 파티클 업데이트
-    for (let i = this.particles.length - 1; i >= 0; i--) {
-      const particle = this.particles[i];
-      particle.life -= 0.02;
-      particle.y -= particle.speed;
-      particle.x += Math.sin(particle.wobble) * 0.5;
-      particle.wobble += 0.1;
-      
-      if (particle.life <= 0) {
-        this.particles.splice(i, 1);
-      }
-    }
-    
-    // 새 파티클 생성
-    if (currentTime - this.lastParticleTime >= this.particleInterval && !this.isSpawning) {
-      this.createParticles();
-      this.lastParticleTime = currentTime;
-    }
-  }
-  
-  createParticles() {
-    const particleCount = 2 + Math.floor(Math.random() * 3);
-    for (let i = 0; i < particleCount; i++) {
-      const angle = Math.random() * Math.PI * 2;
-      const distance = Math.random() * this.range * 0.8;
-      
-      this.particles.push({
-        x: this.x + Math.cos(angle) * distance,
-        y: this.y + Math.sin(angle) * distance,
-        size: 3 + Math.random() * 4,
-        life: 1,
-        speed: 0.5 + Math.random() * 1,
-        wobble: Math.random() * Math.PI * 2,
-        color: this.getRandomWaveColor()
-      });
-    }
   }
   
   dealDamage() {
@@ -4423,9 +4366,6 @@ class SupernovaStar {
     
     // 파동 효과들 그리기
     this.drawWaves(drawX, drawY, alpha);
-    
-    // 파티클 그리기
-    this.drawParticles(offsetX, offsetY, alpha);
     
     // 중심 별 그리기
     this.drawCenterStar(drawX, drawY, alpha);
@@ -4504,35 +4444,6 @@ class SupernovaStar {
         ctx.stroke();
         ctx.shadowBlur = 0;
       }
-    });
-  }
-  
-  drawParticles(offsetX, offsetY, alpha) {
-    this.particles.forEach(particle => {
-      ctx.globalAlpha = alpha * particle.life * 0.8;
-      
-      // 파티클 글로우
-      const particleGradient = ctx.createRadialGradient(
-        particle.x + offsetX, particle.y + offsetY, 0,
-        particle.x + offsetX, particle.y + offsetY, particle.size
-      );
-      
-      const color = particle.color;
-      particleGradient.addColorStop(0, `rgba(${color.r}, ${color.g}, ${color.b}, 1)`);
-      particleGradient.addColorStop(0.5, `rgba(${color.r}, ${color.g}, ${color.b}, 0.8)`);
-      particleGradient.addColorStop(1, 'transparent');
-      
-      ctx.fillStyle = particleGradient;
-      ctx.beginPath();
-      ctx.arc(particle.x + offsetX, particle.y + offsetY, particle.size, 0, Math.PI * 2);
-      ctx.fill();
-      
-      // 파티클 코어
-      ctx.globalAlpha = alpha * particle.life;
-      ctx.fillStyle = '#FFFFFF';
-      ctx.beginPath();
-      ctx.arc(particle.x + offsetX, particle.y + offsetY, particle.size * 0.3, 0, Math.PI * 2);
-      ctx.fill();
     });
   }
   
