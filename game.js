@@ -6652,6 +6652,7 @@ function generateLevelUpOptions() {
     'spear': 'dd.',
     'magnetic': 'dd.',
     'plasma': 'dd.',
+    'inferno': 'dd.',
     'supernova': 'dd.',
     'lightningBolt': 'dd.'
   };
@@ -6735,8 +6736,8 @@ function generateLevelUpOptions() {
       selectedOption = fusionOptions[0];
     }
     
-    // 무기 업그레이드가 있는 경우, 30% 확률로 기존 무기 업그레이드 우선 선택
-    if (weaponUpgradeOptions.length > 0 && Math.random() < 0.3) {
+    // 무기 업그레이드가 있는 경우, 50% 확률로 기존 무기 업그레이드 우선 선택
+    if (weaponUpgradeOptions.length > 0 && Math.random() < 0.5) {
       // 기존 무기 업그레이드 선택 (이미 선택된 것 제외)
       const availableUpgrades = weaponUpgradeOptions.filter(upgrade => 
         !levelUpOptions.some(option => 
@@ -7162,13 +7163,13 @@ function resetGame() {
   player.weapons = [];
   player.fusedWeapons = [];
   
-  const flameWeapon = WeaponFactory.createWeapon('lightningBolt');
+  const flameWeapon = WeaponFactory.createWeapon('wind');
   for (let i = 1; i < 10; i++) {
     flameWeapon.upgrade();
   }
   player.weapons.push(flameWeapon);
 
-  const lightningWeapon = WeaponFactory.createWeapon('earth');
+  const lightningWeapon = WeaponFactory.createWeapon('lightning');
   for (let i = 1; i < 10; i++) {
     lightningWeapon.upgrade();
   }
@@ -7339,8 +7340,9 @@ function drawOptionBox(x, y, width, height, option, isHovered) {
       option.rarity.bgColor;
     borderColor = option.rarity.borderColor;
     textColor = isHovered ? '#FFFFFF' : option.rarity.color;
-  } else if (option.type === 'fusion') {
-    // 합성 무기인 경우 - 짙은 붉은색 계열로 변경
+  } else if (option.type === 'fusion' || (option.type === 'weaponUpgrade' && 
+            weaponFusionSystem.recipes.some(recipe => recipe.result === option.weaponType))) {
+    // 합성 무기인 경우 또는 합성 무기 레벨업인 경우 - 짙은 붉은색 계열로 변경
     bgColor = isHovered ? 'rgba(139, 0, 0, 0.7)' : 'rgba(80, 0, 0, 0.5)';
     borderColor = isHovered ? '#FF6B6B' : '#8B0000';
     textColor = isHovered ? '#FFFFFF' : '#FFB3B3';
@@ -7375,7 +7377,8 @@ function drawOptionBox(x, y, width, height, option, isHovered) {
     let glowAlpha = 0.3;
     let glowColor = borderColor;
 
-    if (option.type === 'fusion') {
+    if (option.type === 'fusion' || (option.type === 'weaponUpgrade' && 
+            weaponFusionSystem.recipes.some(recipe => recipe.result === option.weaponType))) {
       glowAlpha = 0.5;
       glowColor = '#DC143C'; // 크림슨 색상
     } else if (option.rarity) {
