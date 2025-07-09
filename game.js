@@ -4482,11 +4482,13 @@ class LightningBoltProjectile {
     this.used = false;
     this.size = 8; // 충돌 판정용 크기
     
-    // 256x64 스프라이트 정보
+    // 256x256 스프라이트 정보
     this.spriteWidth = 256;
-    this.spriteHeight = 64;
+    this.spriteHeight = 256;
     
     // 애니메이션 관련
+    this.frameWidth = 256;
+    this.frameHeight = 64;
     this.frameCount = 4;
     this.currentFrame = 0;
     this.frameTime = 0;
@@ -4649,7 +4651,7 @@ class LightningBoltProjectile {
   }
   
   draw(offsetX, offsetY) {
-    if (!assetManager.loaded.weapons || !assetManager.images.weapons.lightningChain) {
+    if (!assetManager.loaded.weapons || !assetManager.images.weapons.lightningBolt) {
       return;
     }
     
@@ -4662,7 +4664,7 @@ class LightningBoltProjectile {
       
       ctx.globalAlpha = alpha;
       
-      const trailSize = this.spriteWidth * 0.3 * scale;
+      const trailSize = this.frameWidth * 0.3 * scale;
       
       ctx.translate(trailPoint.x + offsetX, trailPoint.y + offsetY);
       ctx.rotate(this.angle);
@@ -4670,9 +4672,9 @@ class LightningBoltProjectile {
       // 잔상은 현재 프레임보다 한 프레임 뒤
       const trailFrame = Math.max(0, this.currentFrame - 1);
       ctx.drawImage(
-        assetManager.images.weapons.lightningChain,
+        assetManager.images.weapons.lightningBolt,
         0, trailFrame * this.spriteHeight,
-        this.spriteWidth, this.spriteHeight,
+        this.frameWidth, this.frameHeight,
         -trailSize / 2, -trailSize / 2,
         trailSize, trailSize
       );
@@ -4686,15 +4688,15 @@ class LightningBoltProjectile {
     ctx.rotate(this.angle);
     
     // 현재 애니메이션 프레임
-    const drawSize = this.spriteWidth * 0.2; // 크기 조정
+    const drawSize = this.frameWidth * 0.2; // 크기 조정
     
     ctx.drawImage(
       assetManager.images.weapons.lightningBolt,
       0, this.currentFrame * this.spriteHeight,
-      this.spriteWidth, this.spriteHeight,
+      this.frameWidth, this.frameHeight,
       -drawSize / 2, -drawSize / 2,
       drawSize, drawSize
-    );    
+    );
     ctx.restore();
   }
   
