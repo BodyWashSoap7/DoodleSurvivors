@@ -4574,7 +4574,7 @@ class LightningBoltProjectile {
       // 각도 업데이트
       this.angle = Math.atan2(this.vy, this.vx);
       
-      // 약간의 랜덤 변화 추가 (더 흥미진진하게)
+      // 약간의 랜덤 변화 추가
       const randomAngle = (Math.random() - 0.5) * 0.3;
       this.angle += randomAngle;
       this.vx = Math.cos(this.angle) * this.speed;
@@ -4680,40 +4680,21 @@ class LightningBoltProjectile {
       ctx.setTransform(1, 0, 0, 1, 0, 0); // 변환 초기화
     });
     
-    // 메인 번개 볼트 그리기
+    // 번개 볼트 그리기
     ctx.globalAlpha = 1.0;
     ctx.translate(this.x + offsetX, this.y + offsetY);
     ctx.rotate(this.angle);
     
     // 현재 애니메이션 프레임
-    const drawSize = this.spriteWidth * 0.4; // 크기 조정
+    const drawSize = this.spriteWidth * 0.2; // 크기 조정
     
     ctx.drawImage(
-      assetManager.images.weapons.lightningChain,
+      assetManager.images.weapons.lightningBolt,
       0, this.currentFrame * this.spriteHeight,
       this.spriteWidth, this.spriteHeight,
       -drawSize / 2, -drawSize / 2,
       drawSize, drawSize
-    );
-    
-    // 전기 스파크 효과 (선택사항)
-    if (this.bounceCount > 0) {
-      ctx.globalAlpha = 0.7;
-      ctx.strokeStyle = '#00FFFF';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      for (let i = 0; i < 3; i++) {
-        const sparkAngle = Math.random() * Math.PI * 2;
-        const sparkLength = 10 + Math.random() * 15;
-        ctx.moveTo(0, 0);
-        ctx.lineTo(
-          Math.cos(sparkAngle) * sparkLength,
-          Math.sin(sparkAngle) * sparkLength
-        );
-      }
-      ctx.stroke();
-    }
-    
+    );    
     ctx.restore();
   }
   
