@@ -4410,10 +4410,8 @@ class LightningBoltWeapon extends Weapon {
       const dy = nearestEnemy.y - player.y;
       angle = Math.atan2(dy, dx);
     } else {
-      // 적이 없으면 마우스 방향으로 발사
-      const dx = mouseWorldX - player.x;
-      const dy = mouseWorldY - player.y;
-      angle = Math.atan2(dy, dx);
+      // 적이 없으면 무작위 방향으로 발사
+      angle = Math.random() * Math.PI * 2; // 0 ~ 2π 사이의 랜덤 각도
     }
     
     const bolt = new LightningBoltProjectile(
@@ -7163,13 +7161,13 @@ function resetGame() {
   player.weapons = [];
   player.fusedWeapons = [];
   
-  const flameWeapon = WeaponFactory.createWeapon('wind');
+  const flameWeapon = WeaponFactory.createWeapon('lightningBolt');
   for (let i = 1; i < 10; i++) {
     flameWeapon.upgrade();
   }
   player.weapons.push(flameWeapon);
 
-  const lightningWeapon = WeaponFactory.createWeapon('lightning');
+  const lightningWeapon = WeaponFactory.createWeapon('earth');
   for (let i = 1; i < 10; i++) {
     lightningWeapon.upgrade();
   }
