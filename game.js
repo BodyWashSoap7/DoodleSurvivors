@@ -4440,7 +4440,7 @@ class LightningBoltWeapon extends Weapon {
         break;
       case 4:
         this.damage += 8; // 데미지 증가
-        this.baseCooldown *= 0.9; // 쿨타임 감소
+        this.baseCooldown *= 0.8; // 쿨타임 감소
         break;
       case 5:
         this.maxBounces = 5; // 반사 횟수 추가 증가
@@ -4453,7 +4453,7 @@ class LightningBoltWeapon extends Weapon {
         this.damage += 10; // 데미지 추가 증가
         break;
       case 8:
-        this.baseCooldown *= 0.85; // 쿨타임 추가 감소
+        this.baseCooldown *= 0.7; // 쿨타임 추가 감소
         break;
       case 9:
         this.maxBounces = 7; // 반사 횟수 추가 증가
@@ -4461,6 +4461,7 @@ class LightningBoltWeapon extends Weapon {
       case 10:
         this.maxBounces = 8; // 최대 반사 횟수
         this.damage += 15; // 최종 데미지 보너스
+        this.baseCooldown *= 0.6;
         this.projectileSpeed += 2; // 최종 속도 증가
         break;
     }
@@ -4664,7 +4665,7 @@ class LightningBoltProjectile {
       
       ctx.globalAlpha = alpha;
       
-      const trailSize = this.frameWidth * 0.3 * scale;
+      const trailSize = this.frameWidth * 0.5 * scale;
       
       ctx.translate(trailPoint.x + offsetX, trailPoint.y + offsetY);
       ctx.rotate(this.angle);
@@ -4673,10 +4674,10 @@ class LightningBoltProjectile {
       const trailFrame = Math.max(0, this.currentFrame - 1);
       ctx.drawImage(
         assetManager.images.weapons.lightningBolt,
-        0, trailFrame * this.spriteHeight,
+        0, trailFrame * this.frameHeight,
         this.frameWidth, this.frameHeight,
-        -trailSize / 2, -trailSize / 2,
-        trailSize, trailSize
+        -trailSize / 2, -trailSize / 8,
+        trailSize, trailSize / 4
       );
       
       ctx.setTransform(1, 0, 0, 1, 0, 0); // 변환 초기화
@@ -4688,14 +4689,14 @@ class LightningBoltProjectile {
     ctx.rotate(this.angle);
     
     // 현재 애니메이션 프레임
-    const drawSize = this.frameWidth * 0.2; // 크기 조정
+    const drawSize = this.frameWidth * 0.4; // 크기 조정
     
     ctx.drawImage(
       assetManager.images.weapons.lightningBolt,
-      0, this.currentFrame * this.spriteHeight,
+      0, this.currentFrame * this.frameHeight,
       this.frameWidth, this.frameHeight,
-      -drawSize / 2, -drawSize / 2,
-      drawSize, drawSize
+      -drawSize / 2, -drawSize / 8,
+      drawSize, drawSize / 4
     );
     ctx.restore();
   }
