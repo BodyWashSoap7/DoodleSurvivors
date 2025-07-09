@@ -4388,15 +4388,15 @@ class SupernovaStar {
   }
 }
 
-// 자기장 무기 클래스 (바람 + 번개 조합)
+// 질풍신뢰 무기 클래스
 class LightningBoltWeapon extends Weapon {
   constructor() {
     super({
-      type: 'magnetic',
+      type: 'lightningBolt',
       baseCooldown: 800,
       damage: 20
     });
-    this.projectileSpeed = 4;
+    this.projectileSpeed = 7;
     this.maxBounces = 3; // 최대 반사 횟수
   }
   
@@ -4436,7 +4436,7 @@ class LightningBoltWeapon extends Weapon {
         this.maxBounces = 4; // 반사 횟수 증가
         break;
       case 3:
-        this.projectileSpeed += 0.5; // 속도 증가
+        this.projectileSpeed += 1; // 속도 증가
         break;
       case 4:
         this.damage += 8; // 데미지 증가
@@ -4446,7 +4446,7 @@ class LightningBoltWeapon extends Weapon {
         this.maxBounces = 5; // 반사 횟수 추가 증가
         break;
       case 6:
-        this.projectileSpeed += 0.5; // 속도 추가 증가
+        this.projectileSpeed += 1; // 속도 추가 증가
         break;
       case 7:
         this.maxBounces = 6; // 반사 횟수 추가 증가
@@ -4461,7 +4461,7 @@ class LightningBoltWeapon extends Weapon {
       case 10:
         this.maxBounces = 8; // 최대 반사 횟수
         this.damage += 15; // 최종 데미지 보너스
-        this.projectileSpeed += 1; // 최종 속도 증가
+        this.projectileSpeed += 2; // 최종 속도 증가
         break;
     }
     
