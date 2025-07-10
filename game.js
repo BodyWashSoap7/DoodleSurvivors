@@ -719,15 +719,22 @@ class AssetManager {
   }
 
   loadWeaponImages() {
-    this.loadImageSet('weapons', 
-      ['wind', 'earth', 'flame', 'lightningChain', 'lightningImpact', 'fist', 'sword', 'spear', 'magnetic', 'plasma', 'inferno', 'supernova', 'supernovaParticle', 'lightningBolt'], 
-      './img/weapons/{item}.png'
-    );
+    // 기존 무기들...
+    const weaponList = ['wind', 'earth', 'flame', 'lightningChain', 'lightningImpact', 
+                        'fist', 'sword', 'spear', 'magnetic', 'plasma', 'inferno', 
+                        'supernova', 'supernovaParticle', 'lightningBolt'];
+    
+    // 폴터가이스트 이미지 8개 추가
+    for (let i = 1; i <= 8; i++) {
+      weaponList.push(`poltergeist_${i}`);
+    }
+    
+    this.loadImageSet('weapons', weaponList, './img/weapons/{item}.png');
   }
 
   loadWeaponIcons() {
     this.loadImageSet('weaponIcons', 
-      ['wind', 'earth', 'flame', 'lightning', 'fist', 'sword', 'spear', 'magnetic', 'plasma', 'inferno', 'supernova', 'lightningBolt'], 
+      ['wind', 'earth', 'flame', 'lightning', 'fist', 'sword', 'spear', 'magnetic', 'plasma', 'inferno', 'supernova', 'lightningBolt', 'poltergeist'], 
       './img/weapon_icons/{item}_icon.png'
     );
   }
@@ -2335,6 +2342,8 @@ const WeaponFactory = {
         return new SupernovaWeapon();
       case 'lightningBolt':
         return new LightningBoltWeapon();
+      case 'poltergeist':
+        return new PoltergeistWeapon();
       default:
         return new WindWeapon();
     }
@@ -3162,7 +3171,7 @@ const weaponFusionSystem = {
       ingredients: ['flame', 'earth'],
       result: 'supernova',
       name: '슈퍼노바',
-      description: '주변에 주기적으로 데미지를 주는 별을 설치',
+      description: '주변에 주기적으로 데미지를 주는 별 설치',
       flavorText: 'dd.d.d'
     },
     {
@@ -3170,6 +3179,13 @@ const weaponFusionSystem = {
       result: 'lightningBolt',
       name: '질풍신뢰',
       description: '적 사이에서 튀기는 번개 투사체 발사',
+      flavorText: 'dd.d.d'
+    },
+    {
+      ingredients: ['wind', 'earth'],
+      result: 'poltergeist',
+      name: '폴터가이스트',
+      description: '주변을 돌며 데미지를 주는 물체 소환',
       flavorText: 'dd.d.d'
     }
   ],
@@ -4697,6 +4713,234 @@ class LightningBoltProjectile {
       drawSize, drawSize / 4
     );
     ctx.restore();
+  }
+  
+  outOfBounds() {
+    return this.used;
+  }
+}
+
+// 폴터가이스트 무기 클래스
+class PoltergeistWeapon extends Weapon {
+  constructor() {
+    super({
+      type: 'poltergeist',
+      baseCooldown: 5000, // 5초 쿨타임
+      damage: 25
+    });
+    
+    this.circleCount = 1; // 동시에 생성되는 원의 수
+    this.circleRadius = 100; // 원의 반경 (궤도 크기)
+    this.projectileDuration = 3000; // 지속시간 (3초)
+    this.projectilesPerCircle = 3; // 원 하나당 유령 수
+    this.spawnDistance = 120; // 플레이어로부터 소환 거리
+    this.baseGhostSize = 15; // 기본 유령 크기
+  }
+  
+  fire() {
+    // 여러 개의 원을 다른 위치에 생성
+    for (let i = 0; i < this.circleCount; i++) {
+      // 플레이어 주변에 원의 중심점 설정
+      const angle = (Math.PI * 2 * i / this.circleCount) + Math.random() * Math.PI * 2;
+      const spawnX = player.x + Math.cos(angle) * this.spawnDistance;
+      const spawnY = player.y + Math.sin(angle) * this.spawnDistance;
+      
+      // 한 원에 속하는 여러 유령 생성 (균등하게 배치)
+      for (let j = 0; j < this.projectilesPerCircle; j++) {
+        const startAngle = (Math.PI * 2 * j) / this.projectilesPerCircle + Math.random() * Math.PI * 2;
+        
+        const ghost = new PoltergeistProjectile(
+          spawnX, // 이 지점이 원의 중심
+          spawnY,
+          startAngle,
+          this.circleRadius, // 이 반경으로 원을 그림
+          this.damage * player.getTotalRangedAttackPower(),
+          this.projectileDuration,
+          this.baseGhostSize
+        );
+        
+        gameObjects.bullets.push(ghost);
+      }
+    }
+  }
+  
+  applyLevelBonus() {
+    super.applyLevelBonus();
+    
+    switch(this.level) {
+      case 2:
+        this.baseGhostSize = 18;
+        break;
+      case 3:
+        this.circleRadius += 20; // 원 반경 증가
+        this.damage += 10; // 데미지 증가
+        break;
+      case 4:
+        this.circleCount = 2; // 원 개수 증가
+        this.baseGhostSize = 21;
+        break;
+      case 5:
+        this.projectileDuration += 500; // 지속시간 증가
+        this.baseCooldown *= 0.9; // 쿨타임 감소
+        break;
+      case 6:
+        this.projectilesPerCircle = 4; // 원당 유령 수 증가
+        this.damage += 10;
+        this.baseGhostSize = 24;
+        break;
+      case 7:
+        this.circleCount = 3; // 원 개수 증가
+        this.circleRadius += 25;
+        break;
+      case 8:
+        this.projectileDuration += 700; // 지속시간 추가 증가
+        this.damage += 10;
+        this.baseGhostSize = 27;
+        break;
+      case 9:
+        this.damage += 10;
+        this.baseCooldown *= 0.9; // 쿨타임 추가 감소
+        break;
+      case 10:
+        this.circleCount = 4;
+        this.damage += 10; // 최종 데미지 보너스
+        this.circleRadius += 30; // 최종 반경
+        this.projectileDuration = 4000; // 최종 지속시간
+        this.baseGhostSize = 30;
+        break;
+    }
+    
+    this.updateCooldown(player.getTotalCooldownReduction());
+  }
+}
+
+// 폴터가이스트 투사체 클래스
+class PoltergeistProjectile {
+  constructor(centerX, centerY, startAngle, orbitRadius, damage, duration, size) {
+    this.centerX = centerX; // 고정된 중심점 (소환 위치)
+    this.centerY = centerY;
+    this.angle = startAngle;
+    this.orbitRadius = orbitRadius;
+    this.damage = damage;
+    this.duration = duration;
+    this.startTime = gameTimeSystem.getTime();
+    this.used = false;
+    
+    // 회전 속도 (개별 랜덤)
+    this.rotationSpeed = 0.03 + Math.random() * 0.01; // 더 빠른 회전
+    
+    // 위치 계산
+    this.updatePosition();
+    
+    // 크기
+    this.size = size;
+    
+    // 이미 맞은 적 추적
+    this.hitEnemies = new Map(); // enemy => lastHitTime
+    this.hitCooldown = 500; // 0.5초마다 같은 적에게 데미지
+    
+    // 애니메이션
+    this.fadeIn = true;
+    this.fadeInDuration = 300;
+    
+    // 1~8 중 랜덤 이미지 선택
+    this.imageIndex = Math.floor(Math.random() * 8) + 1;
+  }
+  
+  updatePosition() {
+    // 원형 궤도상의 위치 계산
+    this.x = this.centerX + Math.cos(this.angle) * this.orbitRadius;
+    this.y = this.centerY + Math.sin(this.angle) * this.orbitRadius;
+  }
+  
+  update() {
+    const currentTime = gameTimeSystem.getTime();
+    const elapsed = currentTime - this.startTime;
+    
+    // 지속시간 체크
+    if (elapsed >= this.duration) {
+      this.used = true;
+      return;
+    }
+    
+    // 회전 각도 업데이트
+    this.angle += this.rotationSpeed;
+    
+    // 새 위치 계산
+    this.updatePosition();
+    
+    // 적과의 충돌 검사
+    for (let enemy of gameObjects.enemies) {
+      if (enemy.state !== 'moving') continue;
+      
+      const dx = enemy.x - this.x;
+      const dy = enemy.y - this.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      
+      if (distance < this.size + enemy.size) {
+        // 마지막 히트 시간 확인
+        const lastHitTime = this.hitEnemies.get(enemy) || 0;
+        
+        if (currentTime - lastHitTime >= this.hitCooldown) {
+          enemy.takeDamage(this.damage);
+          this.hitEnemies.set(enemy, currentTime);
+        }
+      }
+    }
+  }
+  
+  draw(offsetX, offsetY) {
+    ctx.save();
+    
+    // 페이드 효과 계산
+    let alpha = 1.0;
+    const elapsed = gameTimeSystem.getTime() - this.startTime;
+    
+    if (this.fadeIn && elapsed < this.fadeInDuration) {
+      alpha = elapsed / this.fadeInDuration;
+    }
+    
+    const fadeOutStart = this.duration * 0.8;
+    if (elapsed > fadeOutStart) {
+      const fadeProgress = (elapsed - fadeOutStart) / (this.duration - fadeOutStart);
+      alpha *= (1 - fadeProgress);
+    }
+    
+    // 메인 유령 그리기
+    const drawX = this.x + offsetX;
+    const drawY = this.y + offsetY;
+    
+    ctx.globalAlpha = alpha;
+    
+    // 유령 이미지 그리기
+    if (assetManager.loaded.weapons && assetManager.images.weapons[`poltergeist_${this.imageIndex}`]) {
+      ctx.save();
+      ctx.translate(drawX, drawY);
+      
+      const drawSize = this.size * 3;
+      
+      // 그림자/잔상 효과
+      ctx.globalAlpha = alpha * 0.3;
+      ctx.drawImage(
+        assetManager.images.weapons[`poltergeist_${this.imageIndex}`],
+        -drawSize / 2 - 3,
+        -drawSize / 2 - 3,
+        drawSize,
+        drawSize
+      );
+      
+      // 메인 이미지
+      ctx.globalAlpha = alpha;
+      ctx.drawImage(
+        assetManager.images.weapons[`poltergeist_${this.imageIndex}`],
+        -drawSize / 2,
+        -drawSize / 2,
+        drawSize,
+        drawSize
+      );
+      
+      ctx.restore();
+    }
   }
   
   outOfBounds() {
@@ -6652,7 +6896,8 @@ function generateLevelUpOptions() {
     'plasma': 'dd.',
     'inferno': 'dd.',
     'supernova': 'dd.',
-    'lightningBolt': 'dd.'
+    'lightningBolt': 'dd.',
+    'poltergeist': 'dd.'
   };
 
   for (let weapon of player.weapons) {
@@ -6848,7 +7093,8 @@ function getWeaponDisplayName(weaponType) {
     'plasma': '플라즈마 레이저',
     'inferno': '인페르노',
     'supernova': '슈퍼노바',
-    'lightningBolt': '질풍신뢰'
+    'lightningBolt': '질풍신뢰',
+    'poltergeist': '폴터가이스트'
   };
   return names[weaponType] || weaponType;
 }
@@ -7161,7 +7407,7 @@ function resetGame() {
   player.weapons = [];
   player.fusedWeapons = [];
   
-  const flameWeapon = WeaponFactory.createWeapon('lightningBolt');
+  const flameWeapon = WeaponFactory.createWeapon('poltergeist');
   for (let i = 1; i < 10; i++) {
     flameWeapon.upgrade();
   }
