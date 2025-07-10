@@ -4404,7 +4404,7 @@ class SupernovaStar {
   }
 }
 
-// 질풍신뢰 무기 클래스
+// 라이트닝볼트 무기 클래스
 class LightningBoltWeapon extends Weapon {
   constructor() {
     super({
@@ -4498,7 +4498,7 @@ class LightningBoltWeapon extends Weapon {
   }
 }
 
-// 번개 볼트 투사체 클래스
+// 라이트닝볼트 투사체 클래스
 class LightningBoltProjectile {
   constructor(x, y, angle, speed, damage, maxBounces) {
     this.x = x;
