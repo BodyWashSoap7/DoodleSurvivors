@@ -4414,32 +4414,41 @@ class LightningBoltWeapon extends Weapon {
     });
     this.projectileSpeed = 7;
     this.maxBounces = 3; // 최대 반사 횟수
+    this.projectileCount = 1; // 동시 발사 개수 추가
   }
   
   fire() {
-    // 가장 가까운 적을 향해 발사
-    const nearestEnemy = findNearestEnemy();
-    let angle;
-    
-    if (nearestEnemy) {
-      const dx = nearestEnemy.x - player.x;
-      const dy = nearestEnemy.y - player.y;
-      angle = Math.atan2(dy, dx);
-    } else {
-      // 적이 없으면 무작위 방향으로 발사
-      angle = Math.random() * Math.PI * 2; // 0 ~ 2π 사이의 랜덤 각도
+    // projectileCount만큼 발사
+    for (let i = 0; i < this.projectileCount; i++) {
+      let angle;
+      
+      // 첫 번째 발사체는 가장 가까운 적을 향해
+      if (i === 0) {
+        const nearestEnemy = findNearestEnemy();
+        if (nearestEnemy) {
+          const dx = nearestEnemy.x - player.x;
+          const dy = nearestEnemy.y - player.y;
+          angle = Math.atan2(dy, dx);
+        } else {
+          // 적이 없으면 무작위 방향
+          angle = Math.random() * Math.PI * 2;
+        }
+      } else {
+        // 나머지 발사체들은 완전 무작위 방향으로
+        angle = Math.random() * Math.PI * 2; // 0 ~ 2π 사이의 랜덤 각도
+      }
+      
+      const bolt = new LightningBoltProjectile(
+        player.x,
+        player.y,
+        angle,
+        this.projectileSpeed,
+        this.damage * player.getTotalRangedAttackPower(),
+        this.maxBounces
+      );
+      
+      gameObjects.bullets.push(bolt);
     }
-    
-    const bolt = new LightningBoltProjectile(
-      player.x,
-      player.y,
-      angle,
-      this.projectileSpeed,
-      this.damage * player.getTotalRangedAttackPower(),
-      this.maxBounces
-    );
-    
-    gameObjects.bullets.push(bolt);
   }
   
   applyLevelBonus() {
@@ -4447,12 +4456,14 @@ class LightningBoltWeapon extends Weapon {
     
     switch(this.level) {
       case 2:
+        this.projectileCount = 2; // 2발 동시 발사
         this.maxBounces = 4; // 반사 횟수 증가
         break;
       case 3:
         this.projectileSpeed += 1; // 속도 증가
         break;
       case 4:
+        this.projectileCount = 3; // 3발 동시 발사
         this.damage += 8; // 데미지 증가
         this.baseCooldown *= 0.8; // 쿨타임 감소
         break;
@@ -4460,6 +4471,7 @@ class LightningBoltWeapon extends Weapon {
         this.maxBounces = 5; // 반사 횟수 추가 증가
         break;
       case 6:
+        this.projectileCount = 4; // 4발 동시 발사
         this.projectileSpeed += 1; // 속도 추가 증가
         break;
       case 7:
@@ -4467,12 +4479,14 @@ class LightningBoltWeapon extends Weapon {
         this.damage += 10; // 데미지 추가 증가
         break;
       case 8:
+        this.projectileCount = 5; // 5발 동시 발사
         this.baseCooldown *= 0.7; // 쿨타임 추가 감소
         break;
       case 9:
         this.maxBounces = 7; // 반사 횟수 추가 증가
         break;
       case 10:
+        this.projectileCount = 6; // 6발 동시 발사 (최대)
         this.maxBounces = 8; // 최대 반사 횟수
         this.damage += 15; // 최종 데미지 보너스
         this.baseCooldown *= 0.6;
