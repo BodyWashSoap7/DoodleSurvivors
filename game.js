@@ -4729,7 +4729,7 @@ class PoltergeistWeapon extends Weapon {
       damage: 25
     });
     
-    this.circleCount = 1; // 동시에 생성되는 원의 수
+    this.circleCount = 3; // 동시에 생성되는 원의 수
     this.circleRadius = 100; // 원의 반경 (궤도 크기)
     this.projectileDuration = 3000; // 지속시간 (3초)
     this.projectilesPerCircle = 3; // 원 하나당 유령 수
@@ -4776,7 +4776,6 @@ class PoltergeistWeapon extends Weapon {
         this.damage += 10; // 데미지 증가
         break;
       case 4:
-        this.circleCount = 2; // 원 개수 증가
         this.baseGhostSize = 21;
         break;
       case 5:
@@ -4789,7 +4788,6 @@ class PoltergeistWeapon extends Weapon {
         this.baseGhostSize = 24;
         break;
       case 7:
-        this.circleCount = 3; // 원 개수 증가
         this.circleRadius += 25;
         break;
       case 8:
@@ -7407,7 +7405,7 @@ function resetGame() {
   player.weapons = [];
   player.fusedWeapons = [];
   
-  const flameWeapon = WeaponFactory.createWeapon('poltergeist');
+  const flameWeapon = WeaponFactory.createWeapon('wind');
   for (let i = 1; i < 10; i++) {
     flameWeapon.upgrade();
   }
