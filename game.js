@@ -4917,16 +4917,6 @@ class PoltergeistProjectile {
       
       const drawSize = this.size * 3;
       
-      // 그림자/잔상 효과
-      ctx.globalAlpha = alpha * 0.3;
-      ctx.drawImage(
-        assetManager.images.weapons[`poltergeist_${this.imageIndex}`],
-        -drawSize / 2 - 3,
-        -drawSize / 2 - 3,
-        drawSize,
-        drawSize
-      );
-      
       // 메인 이미지
       ctx.globalAlpha = alpha;
       ctx.drawImage(
@@ -7405,7 +7395,7 @@ function resetGame() {
   player.weapons = [];
   player.fusedWeapons = [];
   
-  const flameWeapon = WeaponFactory.createWeapon('wind');
+  const flameWeapon = WeaponFactory.createWeapon('poltergeist');
   for (let i = 1; i < 10; i++) {
     flameWeapon.upgrade();
   }
