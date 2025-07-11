@@ -2347,6 +2347,11 @@ const WeaponFactory = {
       default:
         return new WindWeapon();
     }
+    
+    // 무기에 updateRange 메서드가 있으면 초기 범위 적용
+    if (weapon && weapon.updateRange) {
+      weapon.updateRange();
+    }
   }
 };
 
@@ -3256,10 +3261,25 @@ class MagneticWeapon extends Weapon {
       baseCooldown: 100,
       damage: 5
     });
-    this.fieldRadius = 100;
+    this.baseFieldRadius = 100;
+    this.fieldRadius = this.baseFieldRadius;
     this.tickDamage = 2;
     this.damageInterval = 100;
     this.magneticField = null; // 자기장 효과 객체
+  }
+
+  // 공격 범위 특성 적용
+  updateRange() {
+    this.fieldRadius = this.baseFieldRadius * player.getTotalAttackRange();
+    
+    // 현재 활성화된 자기장이 있으면 업데이트
+    if (this.magneticField && !this.magneticField.used) {
+      this.magneticField.updateStats(
+        this.fieldRadius,
+        this.tickDamage * player.getTotalAttackPower(),
+        this.damageInterval
+      );
+    }
   }
   
   update() {
@@ -3299,7 +3319,7 @@ class MagneticWeapon extends Weapon {
         this.tickDamage += 1;
         break;
       case 3:
-        this.fieldRadius += 20;
+        this.baseFieldRadius += 20;
         break;
       case 4:
         this.damageInterval *= 0.9;
@@ -3308,7 +3328,7 @@ class MagneticWeapon extends Weapon {
         this.tickDamage += 2;
         break;
       case 6:
-        this.fieldRadius += 30;
+        this.baseFieldRadius += 30;
         break;
       case 7:
         this.tickDamage += 2;
@@ -3317,7 +3337,7 @@ class MagneticWeapon extends Weapon {
         this.damageInterval *= 0.8;
         break;
       case 9:
-        this.fieldRadius += 40;
+        this.baseFieldRadius += 40;
         break;
       case 10:
         this.tickDamage += 3;
@@ -3326,13 +3346,7 @@ class MagneticWeapon extends Weapon {
     }
     
     // 레벨업 시 기존 자기장 업데이트
-    if (this.magneticField && !this.magneticField.used) {
-      this.magneticField.updateStats(
-        this.fieldRadius,
-        this.tickDamage * player.getTotalAttackPower(),
-        this.damageInterval
-      );
-    }
+    this.updateRange();
   }
 }
 
@@ -3380,7 +3394,7 @@ class MagneticField {
   }
   
   dealAreaDamage() {
-    const range = this.radius * player.getTotalAttackRange();
+    const range = this.radius;
     
     for (let enemy of gameObjects.enemies) {
       if (enemy.state !== 'moving') continue;
@@ -3398,7 +3412,7 @@ class MagneticField {
   draw(offsetX, offsetY) {
     const centerX = this.x + offsetX;
     const centerY = this.y + offsetY;
-    const range = this.radius * player.getTotalAttackRange();
+    const range = this.radius;
     
     // 이미지로 자기장 효과 그리기
     if (assetManager.loaded.weapons && assetManager.images.weapons.magnetic) {
@@ -3453,13 +3467,28 @@ class PlasmaWeapon extends Weapon {
       damage: 20
     });
     
-    this.beamWidth = 3;      // 레이저 빔 너비
-    this.beamLength = 300;   // 레이저 빔 길이
-    this.rotationSpeed = 0.02; // 회전 속도
-    this.currentAngle = 0;   // 현재 빔 각도
-    this.currentBeams = [];  // 현재 활성 빔들 (배열로 변경)
-    this.targetTracking = true; // 타겟 추적 여부
-    this.beamCount = 1;      // 빔 개수 추가
+    this.baseBeamWidth = 3;      // 기본 빔 너비
+    this.beamWidth = this.baseBeamWidth;
+    this.baseBeamLength = 300;   // 기본 빔 길이
+    this.beamLength = this.baseBeamLength;
+    this.rotationSpeed = 0.02;
+    this.currentAngle = 0;
+    this.currentBeams = [];
+    this.targetTracking = true;
+    this.beamCount = 1;
+  }
+
+  // 공격 범위 특성 적용
+  updateRange() {
+    this.beamLength = this.baseBeamLength * player.getTotalAttackRange();
+    this.beamWidth = this.baseBeamWidth * player.getTotalAttackRange();
+    
+    // 현재 빔들 업데이트
+    this.currentBeams.forEach(beam => {
+      if (beam && !beam.expired) {
+        beam.updateStats(this.beamLength, this.beamWidth, this.damage * player.getTotalRangedAttackPower());
+      }
+    });
   }
   
   update() {
@@ -3573,12 +3602,8 @@ class PlasmaWeapon extends Weapon {
       this.currentBeams = [];
     }
     
-    // 현재 빔들 업데이트
-    this.currentBeams.forEach(beam => {
-      if (beam && !beam.expired) {
-        beam.updateStats(this.beamLength, this.beamWidth, this.damage * player.getTotalRangedAttackPower());
-      }
-    });
+    // 레벨업 시 범위 업데이트
+    this.updateRange();
   }
 }
 
@@ -4058,11 +4083,17 @@ class SupernovaWeapon extends Weapon {
       damage: 25
     });
     
-    this.activeStars = []; // 활성화된 별들
-    this.maxStars = 3; // 동시에 존재할 수 있는 최대 별 개수
-    this.starDuration = 5000; // 별 지속시간 5초
-    this.starRange = 100; // 별의 데미지 범위
-    this.tickInterval = 800; // 0.2초마다 데미지
+    this.activeStars = [];
+    this.maxStars = 3;
+    this.starDuration = 5000;
+    this.baseStarRange = 100; // 기본 별 범위
+    this.starRange = this.baseStarRange;
+    this.tickInterval = 800;
+  }
+
+  // 공격 범위 특성 적용
+  updateRange() {
+    this.starRange = this.baseStarRange * player.getTotalAttackRange();
   }
   
   fire() {
@@ -4146,7 +4177,8 @@ class SupernovaWeapon extends Weapon {
         break;
     }
     
-    this.updateCooldown(player.getTotalCooldownReduction());
+    // 레벨업 시 범위 업데이트
+    this.updateRange();
   }
 }
 
@@ -4743,12 +4775,18 @@ class PoltergeistWeapon extends Weapon {
       damage: 25
     });
     
-    this.circleCount = 3; // 동시에 생성되는 원의 수
-    this.circleRadius = 100; // 원의 반경 (궤도 크기)
-    this.projectileDuration = 3000; // 지속시간 (3초)
-    this.projectilesPerCircle = 3; // 원 하나당 유령 수
-    this.spawnDistance = 120; // 플레이어로부터 소환 거리
-    this.baseGhostSize = 15; // 기본 유령 크기
+    this.circleCount = 3;
+    this.baseCircleRadius = 100; // 기본 원 반경
+    this.circleRadius = this.baseCircleRadius;
+    this.projectileDuration = 3000;
+    this.projectilesPerCircle = 3;
+    this.spawnDistance = 120;
+    this.baseGhostSize = 15;
+  }
+
+  // 공격 범위 특성 적용
+  updateRange() {
+    this.circleRadius = this.baseCircleRadius * player.getTotalAttackRange();
   }
   
   fire() {
@@ -4764,13 +4802,13 @@ class PoltergeistWeapon extends Weapon {
         const startAngle = (Math.PI * 2 * j) / this.projectilesPerCircle + Math.random() * Math.PI * 2;
         
         const ghost = new PoltergeistProjectile(
-          spawnX, // 이 지점이 원의 중심
+          spawnX,
           spawnY,
           startAngle,
-          this.circleRadius, // 이 반경으로 원을 그림
+          this.circleRadius, // 공격 범위 특성이 적용된 반경
           this.damage * player.getTotalRangedAttackPower(),
           this.projectileDuration,
-          this.baseGhostSize
+          this.baseGhostSize * player.getTotalAttackRange() // 유령 크기도 범위에 비례
         );
         
         gameObjects.bullets.push(ghost);
@@ -4822,7 +4860,8 @@ class PoltergeistWeapon extends Weapon {
         break;
     }
     
-    this.updateCooldown(player.getTotalCooldownReduction());
+    // 레벨업 시 범위 업데이트
+    this.updateRange();
   }
 }
 
@@ -7388,7 +7427,7 @@ function resetGame() {
   player.x = 0;
   player.y = 0;
   player.health = player.maxHealth;
-  player.level = 1;
+  player.level = 0;
   player.exp = 0;
   player.nextLevelExp = 50;
   player.prevLevelExp = 0;
