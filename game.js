@@ -3911,7 +3911,8 @@ class InfernoWeapon extends Weapon {
       angle,
       this.projectileSpeed,
       this.projectileRange,
-      this.damage * player.getTotalRangedAttackPower()
+      this.damage * player.getTotalRangedAttackPower(),
+      player.getTotalAttackRange() // 공격 범위 전달
     );
     gameObjects.bullets.push(projectile);
   }
@@ -3969,7 +3970,7 @@ class InfernoWeapon extends Weapon {
 
 // 인페르노 투사체 클래스
 class InfernoProjectile {
-  constructor(x, y, angle, speed, maxRange, damage) {
+  constructor(x, y, angle, speed, maxRange, damage, attackRangeMultiplier = 1) {
     this.x = x;
     this.y = y;
     this.angle = angle;
@@ -3979,10 +3980,11 @@ class InfernoProjectile {
     this.distanceTraveled = 0;
     this.used = false;
     
-    // 크기 관련 (거리에 따라 커짐)
-    this.baseSize = 8; // 기본 크기 증가
-    this.size = this.baseSize;
-    this.maxSize = 20; // 최대 크기
+    // 크기 관련 (거리에 따라 커지며, 공격 범위 특성 적용)
+    this.baseSize = 8;
+    this.size = this.baseSize * attackRangeMultiplier;
+    this.maxSize = 20 * attackRangeMultiplier; // 최대 크기도 공격 범위에 비례
+    this.attackRangeMultiplier = attackRangeMultiplier;
     
     // 관통한 적 추적 (중복 데미지 방지)
     this.hitEnemies = new Set();
@@ -4006,7 +4008,7 @@ class InfernoProjectile {
     
     // 거리에 따라 크기 증가
     const sizeProgress = Math.min(this.distanceTraveled / this.maxRange, 1);
-    this.size = this.baseSize + (this.maxSize - this.baseSize) * sizeProgress;
+    this.size = (this.baseSize + (this.maxSize - this.baseSize) * sizeProgress) * this.attackRangeMultiplier;
     
     // 애니메이션 업데이트
     this.frameTime += 16;
@@ -4476,7 +4478,8 @@ class LightningBoltWeapon extends Weapon {
         angle,
         this.projectileSpeed,
         this.damage * player.getTotalRangedAttackPower(),
-        this.maxBounces
+        this.maxBounces,
+        player.getTotalAttackRange() // 공격 범위 전달
       );
       
       gameObjects.bullets.push(bolt);
@@ -4532,7 +4535,7 @@ class LightningBoltWeapon extends Weapon {
 
 // 라이트닝볼트 투사체 클래스
 class LightningBoltProjectile {
-  constructor(x, y, angle, speed, damage, maxBounces) {
+  constructor(x, y, angle, speed, damage, maxBounces, attackRangeMultiplier = 1) {
     this.x = x;
     this.y = y;
     this.angle = angle;
@@ -4541,7 +4544,9 @@ class LightningBoltProjectile {
     this.maxBounces = maxBounces;
     this.bounceCount = 0;
     this.used = false;
-    this.size = 8; // 충돌 판정용 크기
+    this.baseSize = 8;
+    this.size = this.baseSize * attackRangeMultiplier; // 충돌 판정용 크기
+    this.attackRangeMultiplier = attackRangeMultiplier;
     
     // 256x256 스프라이트 정보
     this.spriteWidth = 256;
@@ -4725,7 +4730,7 @@ class LightningBoltProjectile {
       
       ctx.globalAlpha = alpha;
       
-      const trailSize = this.frameWidth * 0.5 * scale;
+      const trailSize = this.frameWidth * 0.5 * scale * this.attackRangeMultiplier;
       
       ctx.translate(trailPoint.x + offsetX, trailPoint.y + offsetY);
       ctx.rotate(this.angle);
@@ -4749,7 +4754,7 @@ class LightningBoltProjectile {
     ctx.rotate(this.angle);
     
     // 현재 애니메이션 프레임
-    const drawSize = this.frameWidth * 0.4; // 크기 조정
+    const drawSize = this.frameWidth * 0.4 * this.attackRangeMultiplier;
     
     ctx.drawImage(
       assetManager.images.weapons.lightningBolt,
